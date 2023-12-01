@@ -63,14 +63,17 @@ project "Candy"		--Candy项目
 	-- 不同配置下的预定义不同
 	filter "configurations:Debug"
 		defines "CANDY_DEBUG"
+		buildoptions "/MDd"
 		symbols "On"
 
 	filter "configurations:Release"
 		defines "CANDY_RELEASE"
+		buildoptions "/MD"
 		optimize "On"
 
 	filter "configurations:Dist"
 		defines "CANDY_DIST"
+		buildoptions "/MD"
 		optimize "On"
 
 project "Sandbox"
@@ -106,12 +109,15 @@ project "Sandbox"
 
 	filter "configurations:Debug"
 		defines "CANDY_DEBUG"
+		buildoptions "/MDd"
 		symbols "On"
 
 	filter "configurations:Release"
 		defines "CANDY_RELEASE"
+		buildoptions "/MD"
 		optimize "On"
 
 	filter "configurations:Dist"
 		defines "CANDY_DIST"
+		buildoptions "/MD"
 		optimize "On"
