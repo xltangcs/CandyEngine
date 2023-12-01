@@ -2,8 +2,6 @@
 
 #include "Event.h"
 
-#include <sstream>
-
 namespace Candy {
 
 	class CANDY_API KeyEvent : public Event

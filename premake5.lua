@@ -16,6 +16,9 @@ project "Candy"		--Candy项目
 	targetdir ("bin/" .. outputdir .. "/%{prj.name}") -- 输出目录
 	objdir ("bin-int/" .. outputdir .. "/%{prj.name}")-- 中间目录
 
+    pchheader "candypch.h"
+    pchsource "Candy/src/candypch.cpp"
+
 	-- 包含的所有h和cpp文件
 	files{
 		"%{prj.name}/src/**.h",

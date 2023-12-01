@@ -1,3 +1,4 @@
+#include "candypch.h"
 #include "Application.h"
 #include "Candy/Events/ApplicationEvent.h"
 #include "Candy/Log.h"

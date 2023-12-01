@@ -3,8 +3,6 @@
 
 #include "Event.h"
 
-#include <sstream>
-
 namespace Candy {
 
 	class CANDY_API WindowResizeEvent : public Event
