@@ -23,6 +23,7 @@ project "Candy"		--Candy项目
 	}
 	-- 包含目录
 	includedirs{
+        "%{prj.name}/src",
 		"%{prj.name}/vendor/spdlog/include"
 	}
 	-- 如果是window系统

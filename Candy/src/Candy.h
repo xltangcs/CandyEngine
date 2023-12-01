@@ -2,8 +2,8 @@
 
 //for use by Candy application
 
-#include "CandyEngine/Log.h"
-#include "CandyEngine/Application.h"
+#include "Candy/Log.h"
+#include "Candy/Application.h"
 
-#include "CandyEngine/EntryPoint.h"
+#include "Candy/EntryPoint.h"
 

@@ -10,3 +10,5 @@
 #else
 	#error CandyEngine only support windows
 #endif //  CANDY_PLATFORM_WINDOWS
+
+#define BIT(x) (1 << x)

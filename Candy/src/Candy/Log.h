@@ -1,7 +1,11 @@
 #pragma once
 #include <memory>
 #include "Core.h"
+
 #include "spdlog/spdlog.h"
+#include "spdlog/fmt/ostr.h"
+
+
 namespace Candy {
 	class CANDY_API Log {
 	public:
