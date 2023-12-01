@@ -1,0 +1,6 @@
+[submodule "candy/vendor/spdlog"]
+	path = candy/vendor/spdlog
+	url = https://github.com/gabime/spdlog
+[submodule "candy/vendor/GLFW"]
+	path = candy/vendor/GLFW
+	url = https://github.com/TheCherno/glfw

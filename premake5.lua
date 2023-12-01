@@ -9,6 +9,12 @@ workspace "CandyEngine"		-- sln文件名
 -- 组成输出目录:Debug-windows-x86_64
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
+-- Include directories relative to root folder (solution directory)
+IncludeDir = {}
+IncludeDir["GLFW"] = "Candy/vendor/GLFW/include"
+
+include "Candy/vendor/GLFW"
+
 project "Candy"		--Candy项目
 	location "Candy"--在sln所属文件夹下的Candy文件夹
 	kind "SharedLib"--dll动态库
@@ -27,8 +33,17 @@ project "Candy"		--Candy项目
 	-- 包含目录
 	includedirs{
         "%{prj.name}/src",
-		"%{prj.name}/vendor/spdlog/include"
+		"%{prj.name}/vendor/spdlog/include",
+        "%{IncludeDir.GLFW}"
 	}
+
+    links 
+	{ 
+		"GLFW",
+		"opengl32.lib",
+        "dwmapi.lib"
+	}
+
 	-- 如果是window系统
 	filter "system:windows"
 		cppdialect "C++17"
