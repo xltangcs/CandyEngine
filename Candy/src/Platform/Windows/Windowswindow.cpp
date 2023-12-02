@@ -5,6 +5,8 @@
 #include "Candy/Events/MouseEvent.h"
 #include "Candy/Events/KeyEvent.h"
 
+#include "glad/glad.h"
+
 namespace Candy {
 
 	static bool s_GLFWInitialized = false;
@@ -49,6 +51,12 @@ namespace Candy {
 
 		m_Window = glfwCreateWindow((int)props.Width, (int)props.Height, m_Data.Title.c_str(), nullptr, nullptr);
 		glfwMakeContextCurrent(m_Window);
+
+		int status = gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+
+		CANDY_CORE_ASSERT(status, "Faile to initial Glad!");
+
+
 		glfwSetWindowUserPointer(m_Window, &m_Data);
 		SetVSync(true);
 

@@ -12,8 +12,11 @@ outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 -- Include directories relative to root folder (solution directory)
 IncludeDir = {}
 IncludeDir["GLFW"] = "Candy/vendor/GLFW/include"
+IncludeDir["Glad"] = "Candy/vendor/Glad/include"
+
 
 include "Candy/vendor/GLFW"
+include "Candy/vendor/Glad"
 
 project "Candy"		--Candy项目
 	location "Candy"--在sln所属文件夹下的Candy文件夹
@@ -34,12 +37,14 @@ project "Candy"		--Candy项目
 	includedirs{
         "%{prj.name}/src",
 		"%{prj.name}/vendor/spdlog/include",
-        "%{IncludeDir.GLFW}"
+        "%{IncludeDir.GLFW}",
+        "%{IncludeDir.Glad}"
 	}
 
     links 
 	{ 
 		"GLFW",
+		"Glad",
 		"opengl32.lib",
         "dwmapi.lib"
 	}
@@ -54,7 +59,8 @@ project "Candy"		--Candy项目
 		-- 预处理器定义
 		defines{
 			"CANDY_PLATFORM_WINDOWS",
-			"CANDY_BUILD_DLL"
+			"CANDY_BUILD_DLL",
+			"GLFW_INCLUDE_NONE"
 		}
 		-- 编译好后移动Candy.dll文件到Sandbox文件夹下
 		postbuildcommands{
