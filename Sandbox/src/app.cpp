@@ -10,12 +10,18 @@ public:
 
 	void OnUpdate() override
 	{
-		CANDY_INFO("ExampleLayer::Update");
+		//CANDY_INFO("ExampleLayer::Update");
+
+		if (Candy::Input::IsKeyPressed(CANDY_KEY_TAB))
+		{
+			CANDY_TRACE("Tab key is pressed! ");
+		}
+
 	}
 
 	void OnEvent(Candy::Event& event) override
 	{
-		CANDY_TRACE("{0}", event);
+		//CANDY_TRACE("{0}", event);
 	}
 
 };
