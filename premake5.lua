@@ -13,10 +13,12 @@ outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 IncludeDir = {}
 IncludeDir["GLFW"] = "Candy/vendor/GLFW/include"
 IncludeDir["Glad"] = "Candy/vendor/Glad/include"
+IncludeDir["Imgui"] = "Candy/vendor/imgui"
 
 
 include "Candy/vendor/GLFW"
 include "Candy/vendor/Glad"
+include "Candy/vendor/imgui"
 
 project "Candy"		--Candy项目
 	location "Candy"--在sln所属文件夹下的Candy文件夹
@@ -38,13 +40,15 @@ project "Candy"		--Candy项目
         "%{prj.name}/src",
 		"%{prj.name}/vendor/spdlog/include",
         "%{IncludeDir.GLFW}",
-        "%{IncludeDir.Glad}"
+        "%{IncludeDir.Glad}",
+        "%{IncludeDir.Imgui}"
 	}
 
     links 
 	{ 
 		"GLFW",
 		"Glad",
+		"Imgui",
 		"opengl32.lib",
         "dwmapi.lib"
 	}

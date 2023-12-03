@@ -4,3 +4,6 @@
 [submodule "candy/vendor/GLFW"]
 	path = candy/vendor/GLFW
 	url = https://github.com/TheCherno/glfw
+[submodule "Candy/vendor/imgui"]
+	path = Candy/vendor/imgui
+	url = https://github.com/TheCherno/imgui
