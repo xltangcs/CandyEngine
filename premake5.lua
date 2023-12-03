@@ -12,9 +12,10 @@ outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
 -- Include directories relative to root folder (solution directory)
 IncludeDir = {}
-IncludeDir["GLFW"] = "Candy/vendor/GLFW/include"
-IncludeDir["Glad"] = "Candy/vendor/Glad/include"
+IncludeDir["GLFW"]  = "Candy/vendor/GLFW/include"
+IncludeDir["Glad"]  = "Candy/vendor/Glad/include"
 IncludeDir["Imgui"] = "Candy/vendor/imgui"
+IncludeDir["glm"]   = "Candy/vendor/glm"
 
 
 include "Candy/vendor/GLFW"
@@ -37,7 +38,9 @@ project "Candy"		--Candy项目
 	-- 包含的所有h和cpp文件
 	files{
 		"%{prj.name}/src/**.h",
-		"%{prj.name}/src/**.cpp"
+		"%{prj.name}/src/**.cpp",
+		"%{prj.name}/vendor/glm/glm/**.hpp",
+		"%{prj.name}/vendor/glm/glm/**.inl"
 	}
 	-- 包含目录
 	includedirs{
@@ -45,7 +48,8 @@ project "Candy"		--Candy项目
 		"%{prj.name}/vendor/spdlog/include",
         "%{IncludeDir.GLFW}",
         "%{IncludeDir.Glad}",
-        "%{IncludeDir.Imgui}"
+        "%{IncludeDir.Imgui}",
+        "%{IncludeDir.glm}"
 	}
 
     links 
@@ -104,7 +108,8 @@ project "Sandbox"
 	-- 同样包含spdlog头文件
 	includedirs{
 		"Candy/vendor/spdlog/include",
-		"Candy/src"
+		"Candy/src",
+        "%{IncludeDir.glm}"
 	}
 	-- 引用hazel
 	links{

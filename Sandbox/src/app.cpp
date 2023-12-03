@@ -1,4 +1,6 @@
 #include "Candy.h"
+#include "glm/glm.hpp"
+
 
 class ExampleLayer : public Candy::Layer
 {

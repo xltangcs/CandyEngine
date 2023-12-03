@@ -7,3 +7,6 @@
 [submodule "Candy/vendor/imgui"]
 	path = Candy/vendor/imgui
 	url = https://github.com/TheCherno/imgui
+[submodule "Candy/vendor/glm"]
+	path = Candy/vendor/glm
+	url = https://github.com/g-truc/glm
