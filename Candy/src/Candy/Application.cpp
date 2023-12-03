@@ -6,6 +6,7 @@
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
 
+#include "Candy/Input.h"
 
 namespace Candy {
 	#define BIND_EVENT_FN(x) std::bind(&Application::x, this, std::placeholders::_1)
@@ -57,8 +58,13 @@ namespace Candy {
 			glClearColor(1, 0, 1, 1);
 			glClear(GL_COLOR_BUFFER_BIT);
 
+			//update layer
 			for (Layer* layer : m_LayerStack)
 				layer->OnUpdate();
+
+			auto [x, y] = Input::GetMousePosition();
+			CANDY_CORE_TRACE("{0}, {1}", x, y);
+
 
 			m_Window->OnUpdate();
 		}
