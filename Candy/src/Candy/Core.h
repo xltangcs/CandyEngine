@@ -11,6 +11,10 @@
 	#error CandyEngine only support windows
 #endif //  CANDY_PLATFORM_WINDOWS
 
+#ifdef CANDY_DEBUG
+	#define  CANDY_ENABLE_ASSERTS
+#endif
+
 
 #ifdef CANDY_ENABLE_ASSERTS
     #define CANDY_ASSERT(x, ...) { if(!(x)) { CANDY_ERROR("Assertion Failed: {0}", __VA_ARGS__); __debugbreak(); } }
