@@ -17,10 +17,12 @@ IncludeDir["Glad"]  = "Candy/vendor/Glad/include"
 IncludeDir["Imgui"] = "Candy/vendor/imgui"
 IncludeDir["glm"]   = "Candy/vendor/glm"
 
+group "Dependencies"
+	include "Candy/vendor/GLFW"
+	include "Candy/vendor/Glad"
+	include "Candy/vendor/imgui"
 
-include "Candy/vendor/GLFW"
-include "Candy/vendor/Glad"
-include "Candy/vendor/imgui"
+group ""
 
 
 project "Candy"		--Candy项目

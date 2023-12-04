@@ -9,6 +9,7 @@
 #include "Candy/Imgui/ImguiLayer.h"
 
 #include "Candy/Renderer/Shader.h"
+#include "Candy/Renderer/Buffer.h"
 
 namespace Candy {
 
@@ -37,10 +38,12 @@ namespace Candy {
 		bool m_Running = true;
 		LayerStack m_LayerStack;
 
-		static Application* s_Instance;
-
 		std::unique_ptr<Shader> m_Shader;
-		unsigned int m_VertexArray, m_VertexBuffer, m_IndexBuffer;
+		unsigned int m_VertexArray;
+		std::unique_ptr<VertexBuffer> m_VertexBuffer;
+		std::unique_ptr<IndexBuffer> m_IndexBuffer;
+	private:
+		static Application* s_Instance;
 
 	};
 

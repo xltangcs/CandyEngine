@@ -93,11 +93,23 @@
     <ClInclude Include="src\Candy\MouseButtonCodes.h">
       <Filter>src\Candy</Filter>
     </ClInclude>
+    <ClInclude Include="src\Candy\Renderer\Buffer.h">
+      <Filter>src\Candy\Renderer</Filter>
+    </ClInclude>
     <ClInclude Include="src\Candy\Renderer\GraphicsContext.h">
+      <Filter>src\Candy\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Candy\Renderer\Renderer.h">
+      <Filter>src\Candy\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Candy\Renderer\Shader.h">
       <Filter>src\Candy\Renderer</Filter>
     </ClInclude>
     <ClInclude Include="src\Candy\Window.h">
       <Filter>src\Candy</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Platform\OpenGL\OpenGLBuffer.h">
+      <Filter>src\Platform\OpenGL</Filter>
     </ClInclude>
     <ClInclude Include="src\Platform\OpenGL\OpenGLContext.h">
       <Filter>src\Platform\OpenGL</Filter>
@@ -1359,7 +1371,6 @@
     <ClInclude Include="vendor\glm\glm\vector_relational.hpp">
       <Filter>vendor\glm\glm</Filter>
     </ClInclude>
-    <ClInclude Include="src\Candy\Renderer\Shader.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Candy\Application.cpp">
@@ -1380,6 +1391,18 @@
     <ClCompile Include="src\Candy\Log.cpp">
       <Filter>src\Candy</Filter>
     </ClCompile>
+    <ClCompile Include="src\Candy\Renderer\Buffer.cpp">
+      <Filter>src\Candy\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Candy\Renderer\Renderer.cpp">
+      <Filter>src\Candy\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Candy\Renderer\Shader.cpp">
+      <Filter>src\Candy\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Platform\OpenGL\OpenGLBuffer.cpp">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClCompile>
     <ClCompile Include="src\Platform\OpenGL\OpenGLContext.cpp">
       <Filter>src\Platform\OpenGL</Filter>
     </ClCompile>
@@ -1392,6 +1415,5 @@
     <ClCompile Include="src\candypch.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Candy\Renderer\Shader.cpp" />
   </ItemGroup>
 </Project>
