@@ -8,6 +8,8 @@
 #include "Candy/Events/ApplicationEvent.h"
 #include "Candy/Imgui/ImguiLayer.h"
 
+#include "Candy/Renderer/Shader.h"
+
 namespace Candy {
 
 	class CANDY_API Application
@@ -37,6 +39,7 @@ namespace Candy {
 
 		static Application* s_Instance;
 
+		std::unique_ptr<Shader> m_Shader;
 		unsigned int m_VertexArray, m_VertexBuffer, m_IndexBuffer;
 
 	};

@@ -140,6 +140,7 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="src\Candy\Renderer\Shader.h" />
     <ClInclude Include="src\Candy.h" />
     <ClInclude Include="src\Candy\Application.h" />
     <ClInclude Include="src\Candy\Core.h" />
@@ -579,6 +580,7 @@
     <ClInclude Include="vendor\glm\glm\vector_relational.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\Candy\Renderer\Shader.cpp" />
     <ClCompile Include="src\Candy\Application.cpp" />
     <ClCompile Include="src\Candy\Imgui\ImguiBuild.cpp" />
     <ClCompile Include="src\Candy\Imgui\ImguiLayer.cpp" />
