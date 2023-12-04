@@ -155,7 +155,9 @@
     <ClInclude Include="src\Candy\LayerStack.h" />
     <ClInclude Include="src\Candy\Log.h" />
     <ClInclude Include="src\Candy\MouseButtonCodes.h" />
+    <ClInclude Include="src\Candy\Renderer\GraphicsContext.h" />
     <ClInclude Include="src\Candy\Window.h" />
+    <ClInclude Include="src\Platform\OpenGL\OpenGLContext.h" />
     <ClInclude Include="src\Platform\Windows\WindowsInput.h" />
     <ClInclude Include="src\Platform\Windows\Windowswindow.h" />
     <ClInclude Include="src\candypch.h" />
@@ -583,6 +585,7 @@
     <ClCompile Include="src\Candy\Layer.cpp" />
     <ClCompile Include="src\Candy\LayerStack.cpp" />
     <ClCompile Include="src\Candy\Log.cpp" />
+    <ClCompile Include="src\Platform\OpenGL\OpenGLContext.cpp" />
     <ClCompile Include="src\Platform\Windows\WindowsInput.cpp" />
     <ClCompile Include="src\Platform\Windows\Windowswindow.cpp" />
     <ClCompile Include="src\candypch.cpp">
