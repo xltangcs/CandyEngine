@@ -6,6 +6,7 @@
 #include "Events/Event.h"
 #include "Candy/LayerStack.h"
 #include "Candy/Events/ApplicationEvent.h"
+#include "Candy/Imgui/ImguiLayer.h"
 
 namespace Candy {
 
@@ -28,6 +29,9 @@ namespace Candy {
 	private:
 		bool OnWindowClose(WindowCloseEvent& e);
 		std::unique_ptr<Window> m_Window;
+
+		ImGuiLayer* m_ImGuiLayer;
+
 		bool m_Running = true;
 		LayerStack m_LayerStack;
 

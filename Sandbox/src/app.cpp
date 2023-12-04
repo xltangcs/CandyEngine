@@ -34,7 +34,7 @@ public :
 	Sandbox()
 	{
 		PushLayer(new ExampleLayer());
-		PushOverlay(new Candy::ImGuiLayer());
+		
 	}
 
 	~Sandbox()

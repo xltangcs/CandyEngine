@@ -25,9 +25,10 @@ include "Candy/vendor/imgui"
 
 project "Candy"		--Candy项目
 	location "Candy"--在sln所属文件夹下的Candy文件夹
-	kind "SharedLib"--dll动态库
+	kind "StaticLib"--dll动态库
 	language "C++"
-	staticruntime "off"
+	cppdialect "C++17"
+	staticruntime "on"
 
 	targetdir ("bin/" .. outputdir .. "/%{prj.name}") -- 输出目录
 	objdir ("bin-int/" .. outputdir .. "/%{prj.name}")-- 中间目录
@@ -41,6 +42,9 @@ project "Candy"		--Candy项目
 		"%{prj.name}/src/**.cpp",
 		"%{prj.name}/vendor/glm/glm/**.hpp",
 		"%{prj.name}/vendor/glm/glm/**.inl"
+	}
+	defines{
+		"_CRT_SECURE_NO_WARNINGS"
 	}
 	-- 包含目录
 	includedirs{
@@ -57,13 +61,11 @@ project "Candy"		--Candy项目
 		"GLFW",
 		"Glad",
 		"Imgui",
-		"opengl32.lib",
-        "dwmapi.lib"
+		"opengl32.lib"
 	}
 
 	-- 如果是window系统
 	filter "system:windows"
-		cppdialect "C++17"
 		systemversion "latest"	-- windowSDK版本
 
 		-- 预处理器定义
@@ -72,31 +74,29 @@ project "Candy"		--Candy项目
 			"CANDY_BUILD_DLL",
 			"GLFW_INCLUDE_NONE"
 		}
-		-- 编译好后移动Candy.dll文件到Sandbox文件夹下
-		postbuildcommands{
-			("{COPY} %{cfg.buildtarget.relpath} \"../bin/" .. outputdir .. "/Sandbox/\"")
-		}
+
 	-- 不同配置下的预定义不同
 	filter "configurations:Debug"
 		defines "CANDY_DEBUG"
 		runtime "Debug"
-		symbols "On"
+		symbols "on"
 
 	filter "configurations:Release"
 		defines "CANDY_RELEASE"
 		runtime "Release"
-		optimize "On"
+		optimize "on"
 
 	filter "configurations:Dist"
 		defines "CANDY_DIST"
 		runtime "Release"
-		optimize "On"
+		optimize "on"
 
 project "Sandbox"
 	location "Sandbox"
 	kind "ConsoleApp"
 	language "C++"
-	staticruntime "off"
+	cppdialect "C++17"
+	staticruntime "on"
 
 	targetdir ("bin/" .. outputdir .. "/%{prj.name}")
 	objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
@@ -117,7 +117,6 @@ project "Sandbox"
 	}
 
 	filter "system:windows"
-		cppdialect "C++17"
 		systemversion "latest"
 
 		defines{
@@ -127,14 +126,14 @@ project "Sandbox"
 	filter "configurations:Debug"
 		defines "CANDY_DEBUG"
 		runtime "Debug"
-		symbols "On"
+		symbols "on"
 
 	filter "configurations:Release"
 		defines "CANDY_RELEASE"
 		runtime "Release"
-		optimize "On"
+		optimize "on"
 
 	filter "configurations:Dist"
 		defines "CANDY_DIST"
 		runtime "Release"
-		optimize "On"
+		optimize "on"
