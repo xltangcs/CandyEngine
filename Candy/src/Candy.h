@@ -14,6 +14,18 @@
 #include "Candy/MouseButtonCodes.h"
 #include "Candy/KeyCodes.h"
 
-//--- Entry Point---
+#include "Candy/Core/Timestep.h"
+
+
+
+//-------------- Renderer ---------------
+#include "Candy/Renderer/Renderer.h"
+#include "Candy/Renderer/RenderCommand.h" 
+#include "Candy/Renderer/Buffer.h"
+#include "Candy/Renderer/Shader.h"
+#include "Candy/Renderer/VertexArray.h"
+#include "Candy/Renderer/OrthographicCamera.h"
+
+//------------- Entry Point---------------
 #include "Candy/EntryPoint.h"
 

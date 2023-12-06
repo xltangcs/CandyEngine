@@ -1378,8 +1378,10 @@
       <Filter>vendor\glm\glm</Filter>
     </ClInclude>
     <ClInclude Include="src\Candy\Renderer\RendererAPI.h" />
-    <ClInclude Include="src\Candy\Renderer\RendererCommand.h" />
+    <ClInclude Include="src\Candy\Renderer\RenderCommand.h" />
     <ClInclude Include="src\Platform\OpenGL\OpenGLRendererAPI.h" />
+    <ClInclude Include="src\Candy\Renderer\OrthographicCamera.h" />
+    <ClInclude Include="src\Candy\Core\Timestep.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Candy\Application.cpp">
@@ -1431,7 +1433,8 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\Candy\Renderer\RendererAPI.cpp" />
-    <ClCompile Include="src\Candy\Renderer\RendererCommand.cpp" />
+    <ClCompile Include="src\Candy\Renderer\RenderCommand.cpp" />
     <ClCompile Include="src\Platform\OpenGL\OpenGLRendererAPI.cpp" />
+    <ClCompile Include="src\Candy\Renderer\OrthographicCamera.cpp" />
   </ItemGroup>
 </Project>

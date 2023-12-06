@@ -8,13 +8,11 @@
 #include "Candy/Events/ApplicationEvent.h"
 #include "Candy/Imgui/ImguiLayer.h"
 
-#include "Candy/Renderer/Shader.h"
-#include "Candy/Renderer/Buffer.h"
-#include "Candy/Renderer/VertexArray.h"
+#include "Candy/Core/Timestep.h"
 
 namespace Candy {
 
-	class CANDY_API Application
+	class Application
 	{
 	public:
 		Application();
@@ -32,20 +30,13 @@ namespace Candy {
 
 	private:
 		bool OnWindowClose(WindowCloseEvent& e);
-		std::unique_ptr<Window> m_Window;
-
-		ImGuiLayer* m_ImGuiLayer;
-
-		bool m_Running = true;
-		LayerStack m_LayerStack;
-
-		std::shared_ptr<Shader> m_Shader;
-		std::shared_ptr<VertexArray> m_VertexArray;
-
-		std::shared_ptr<Shader> m_BlueShader;
-		std::shared_ptr<VertexArray> m_SquareVA;
 
 	private:
+		std::unique_ptr<Window> m_Window;
+		ImGuiLayer* m_ImGuiLayer;
+		bool m_Running = true;
+		LayerStack m_LayerStack;
+		float m_LastFrameTime = 0.0f;
 		static Application* s_Instance;
 
 	};
