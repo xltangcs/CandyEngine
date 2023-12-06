@@ -9,8 +9,8 @@ namespace Candy {
 	{
 		switch (Renderer::GetAPI())
 		{
-		case RendererAPI::None:    CANDY_CORE_ASSERT(false, "RendererAPI::None is currently not supported!"); return nullptr;
-		case RendererAPI::OpenGL:  return new OpenGLVertexArray();
+			case RendererAPI::API::None:    CANDY_CORE_ASSERT(false, "RendererAPI::None is currently not supported!"); return nullptr;
+			case RendererAPI::API::OpenGL:  return new OpenGLVertexArray();
 		}
 
 		CANDY_CORE_ASSERT(false, "Unknown RendererAPI!");

@@ -105,6 +105,9 @@
     <ClInclude Include="src\Candy\Renderer\Shader.h">
       <Filter>src\Candy\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="src\Candy\Renderer\VertexArray.h">
+      <Filter>src\Candy\Renderer</Filter>
+    </ClInclude>
     <ClInclude Include="src\Candy\Window.h">
       <Filter>src\Candy</Filter>
     </ClInclude>
@@ -112,6 +115,9 @@
       <Filter>src\Platform\OpenGL</Filter>
     </ClInclude>
     <ClInclude Include="src\Platform\OpenGL\OpenGLContext.h">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Platform\OpenGL\OpenGLVertexArray.h">
       <Filter>src\Platform\OpenGL</Filter>
     </ClInclude>
     <ClInclude Include="src\Platform\Windows\WindowsInput.h">
@@ -1371,8 +1377,9 @@
     <ClInclude Include="vendor\glm\glm\vector_relational.hpp">
       <Filter>vendor\glm\glm</Filter>
     </ClInclude>
-    <ClInclude Include="src\Candy\Renderer\VertexArray.h" />
-    <ClInclude Include="src\Platform\OpenGL\OpenGLVertexArray.h" />
+    <ClInclude Include="src\Candy\Renderer\RendererAPI.h" />
+    <ClInclude Include="src\Candy\Renderer\RendererCommand.h" />
+    <ClInclude Include="src\Platform\OpenGL\OpenGLRendererAPI.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Candy\Application.cpp">
@@ -1402,10 +1409,16 @@
     <ClCompile Include="src\Candy\Renderer\Shader.cpp">
       <Filter>src\Candy\Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="src\Candy\Renderer\VertexArray.cpp">
+      <Filter>src\Candy\Renderer</Filter>
+    </ClCompile>
     <ClCompile Include="src\Platform\OpenGL\OpenGLBuffer.cpp">
       <Filter>src\Platform\OpenGL</Filter>
     </ClCompile>
     <ClCompile Include="src\Platform\OpenGL\OpenGLContext.cpp">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Platform\OpenGL\OpenGLVertexArray.cpp">
       <Filter>src\Platform\OpenGL</Filter>
     </ClCompile>
     <ClCompile Include="src\Platform\Windows\WindowsInput.cpp">
@@ -1417,7 +1430,8 @@
     <ClCompile Include="src\candypch.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Candy\Renderer\VertexArray.cpp" />
-    <ClCompile Include="src\Platform\OpenGL\OpenGLVertexArray.cpp" />
+    <ClCompile Include="src\Candy\Renderer\RendererAPI.cpp" />
+    <ClCompile Include="src\Candy\Renderer\RendererCommand.cpp" />
+    <ClCompile Include="src\Platform\OpenGL\OpenGLRendererAPI.cpp" />
   </ItemGroup>
 </Project>
