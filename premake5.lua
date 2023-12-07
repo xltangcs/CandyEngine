@@ -16,6 +16,7 @@ IncludeDir["GLFW"]  = "Candy/vendor/GLFW/include"
 IncludeDir["Glad"]  = "Candy/vendor/Glad/include"
 IncludeDir["Imgui"] = "Candy/vendor/imgui"
 IncludeDir["glm"]   = "Candy/vendor/glm"
+IncludeDir["stb_image"] = "Candy/vendor/stb_image"
 
 group "Dependencies"
 	include "Candy/vendor/GLFW"
@@ -42,6 +43,8 @@ project "Candy"		--Candy项目
 	files{
 		"%{prj.name}/src/**.h",
 		"%{prj.name}/src/**.cpp",
+		"%{prj.name}/vendor/stb_image/**.h",
+		"%{prj.name}/vendor/stb_image/**.cpp",
 		"%{prj.name}/vendor/glm/glm/**.hpp",
 		"%{prj.name}/vendor/glm/glm/**.inl"
 	}
@@ -55,7 +58,8 @@ project "Candy"		--Candy项目
         "%{IncludeDir.GLFW}",
         "%{IncludeDir.Glad}",
         "%{IncludeDir.Imgui}",
-        "%{IncludeDir.glm}"
+        "%{IncludeDir.glm}",
+		"%{IncludeDir.stb_image}"
 	}
 
     links 

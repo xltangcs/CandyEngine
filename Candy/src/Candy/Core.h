@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 
 #ifdef  CANDY_PLATFORM_WINDOWS
 	#if CANDY_DYNAMIC_LINK
@@ -32,3 +33,11 @@
 #define BIT(x) (1 << x)
 
 #define CANDY_BIND_EVENT_FN(fn) std::bind(&fn, this, std::placeholders::_1)
+
+namespace Candy {
+	template<typename T>
+	using Scope = std::unique_ptr<T>;
+
+	template<typename T>
+	using Ref = std::shared_ptr<T>;
+}
