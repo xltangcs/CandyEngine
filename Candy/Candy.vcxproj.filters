@@ -7,6 +7,9 @@
     <Filter Include="src\Candy">
       <UniqueIdentifier>{4B8AAFB2-B7F4-6329-0033-15CF6CDC417E}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\Candy\Core">
+      <UniqueIdentifier>{83D56152-6FA3-5558-5837-C67E44A431BD}</UniqueIdentifier>
+    </Filter>
     <Filter Include="src\Candy\Events">
       <UniqueIdentifier>{CF534F77-BB4C-6EC9-E47E-534ED0D64DD5}</UniqueIdentifier>
     </Filter>
@@ -57,6 +60,9 @@
     <ClInclude Include="src\Candy\Core.h">
       <Filter>src\Candy</Filter>
     </ClInclude>
+    <ClInclude Include="src\Candy\Core\Timestep.h">
+      <Filter>src\Candy\Core</Filter>
+    </ClInclude>
     <ClInclude Include="src\Candy\EntryPoint.h">
       <Filter>src\Candy</Filter>
     </ClInclude>
@@ -99,7 +105,16 @@
     <ClInclude Include="src\Candy\Renderer\GraphicsContext.h">
       <Filter>src\Candy\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="src\Candy\Renderer\OrthographicCamera.h">
+      <Filter>src\Candy\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Candy\Renderer\RenderCommand.h">
+      <Filter>src\Candy\Renderer</Filter>
+    </ClInclude>
     <ClInclude Include="src\Candy\Renderer\Renderer.h">
+      <Filter>src\Candy\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Candy\Renderer\RendererAPI.h">
       <Filter>src\Candy\Renderer</Filter>
     </ClInclude>
     <ClInclude Include="src\Candy\Renderer\Shader.h">
@@ -115,6 +130,12 @@
       <Filter>src\Platform\OpenGL</Filter>
     </ClInclude>
     <ClInclude Include="src\Platform\OpenGL\OpenGLContext.h">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Platform\OpenGL\OpenGLRendererAPI.h">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Platform\OpenGL\OpenGLShader.h">
       <Filter>src\Platform\OpenGL</Filter>
     </ClInclude>
     <ClInclude Include="src\Platform\OpenGL\OpenGLVertexArray.h">
@@ -1377,11 +1398,6 @@
     <ClInclude Include="vendor\glm\glm\vector_relational.hpp">
       <Filter>vendor\glm\glm</Filter>
     </ClInclude>
-    <ClInclude Include="src\Candy\Renderer\RendererAPI.h" />
-    <ClInclude Include="src\Candy\Renderer\RenderCommand.h" />
-    <ClInclude Include="src\Platform\OpenGL\OpenGLRendererAPI.h" />
-    <ClInclude Include="src\Candy\Renderer\OrthographicCamera.h" />
-    <ClInclude Include="src\Candy\Core\Timestep.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Candy\Application.cpp">
@@ -1405,7 +1421,16 @@
     <ClCompile Include="src\Candy\Renderer\Buffer.cpp">
       <Filter>src\Candy\Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="src\Candy\Renderer\OrthographicCamera.cpp">
+      <Filter>src\Candy\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Candy\Renderer\RenderCommand.cpp">
+      <Filter>src\Candy\Renderer</Filter>
+    </ClCompile>
     <ClCompile Include="src\Candy\Renderer\Renderer.cpp">
+      <Filter>src\Candy\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Candy\Renderer\RendererAPI.cpp">
       <Filter>src\Candy\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="src\Candy\Renderer\Shader.cpp">
@@ -1420,6 +1445,12 @@
     <ClCompile Include="src\Platform\OpenGL\OpenGLContext.cpp">
       <Filter>src\Platform\OpenGL</Filter>
     </ClCompile>
+    <ClCompile Include="src\Platform\OpenGL\OpenGLRendererAPI.cpp">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Platform\OpenGL\OpenGLShader.cpp">
+      <Filter>src\Platform\OpenGL</Filter>
+    </ClCompile>
     <ClCompile Include="src\Platform\OpenGL\OpenGLVertexArray.cpp">
       <Filter>src\Platform\OpenGL</Filter>
     </ClCompile>
@@ -1432,9 +1463,5 @@
     <ClCompile Include="src\candypch.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Candy\Renderer\RendererAPI.cpp" />
-    <ClCompile Include="src\Candy\Renderer\RenderCommand.cpp" />
-    <ClCompile Include="src\Platform\OpenGL\OpenGLRendererAPI.cpp" />
-    <ClCompile Include="src\Candy\Renderer\OrthographicCamera.cpp" />
   </ItemGroup>
 </Project>

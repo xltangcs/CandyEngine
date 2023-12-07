@@ -111,6 +111,7 @@ project "Sandbox"
 	includedirs{
 		"Candy/vendor/spdlog/include",
 		"Candy/src",
+		"Candy/vendor",
         "%{IncludeDir.glm}"
 	}
 	-- 引用hazel
