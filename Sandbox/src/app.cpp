@@ -12,7 +12,7 @@ class ExampleLayer : public Candy::Layer
 {
 public:
 	ExampleLayer()
-		: Layer("Example"), m_Camera(-1.6f, 1.6f, -0.9f, 0.9f), m_CameraPosition(0.0f)
+		: Layer("Example"), m_CameraController(1280.0f / 720.0f)
 	{
 		m_VertexArray.reset(Candy::VertexArray::Create());
 
@@ -133,28 +133,14 @@ public:
 
 	void OnUpdate(Candy::Timestep ts) override
 	{
-		if (Candy::Input::IsKeyPressed(CANDY_KEY_LEFT))
-			m_CameraPosition.x -= m_CameraMoveSpeed * ts;
-		else if (Candy::Input::IsKeyPressed(CANDY_KEY_RIGHT))
-			m_CameraPosition.x += m_CameraMoveSpeed * ts;
+		// Update
+		m_CameraController.OnUpdate(ts);
 
-		if (Candy::Input::IsKeyPressed(CANDY_KEY_UP))
-			m_CameraPosition.y += m_CameraMoveSpeed * ts;
-		else if (Candy::Input::IsKeyPressed(CANDY_KEY_DOWN))
-			m_CameraPosition.y -= m_CameraMoveSpeed * ts;
-
-		if (Candy::Input::IsKeyPressed(CANDY_KEY_A))
-			m_CameraRotation += m_CameraRotationSpeed * ts;
-		if (Candy::Input::IsKeyPressed(CANDY_KEY_D))
-			m_CameraRotation -= m_CameraRotationSpeed * ts;
-
+		//Render
 		Candy::RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1 });
 		Candy::RenderCommand::Clear();
 
-		m_Camera.SetPosition(m_CameraPosition);
-		m_Camera.SetRotation(m_CameraRotation);
-
-		Candy::Renderer::BeginScene(m_Camera);
+		Candy::Renderer::BeginScene(m_CameraController.GetCamera());
 
 		glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f));
 		std::dynamic_pointer_cast<Candy::OpenGLShader>(m_FlatColorShader)->Bind();
@@ -181,9 +167,9 @@ public:
 		Candy::Renderer::EndScene();
 	}
 
-	void OnEvent(Candy::Event& event) override
+	void OnEvent(Candy::Event& e) override
 	{
-		
+		m_CameraController.OnEvent(e);
 	}
 
 	virtual void OnImGuiRender() override
@@ -205,12 +191,7 @@ private:
 	Candy::Ref<Candy::Texture2D> m_Texture;
 	Candy::Ref<Candy::Texture2D> m_CandyLogTexture;
 
-	Candy::OrthographicCamera m_Camera;
-	glm::vec3 m_CameraPosition;
-	float m_CameraMoveSpeed = 5.0f;
-
-	float m_CameraRotation = 0.0f;
-	float m_CameraRotationSpeed = 180.0f;
+	Candy::OrthographicCameraController m_CameraController;
 
 	glm::vec3 m_SquareColor = { 0.2f, 0.3f, 0.8f };
 };

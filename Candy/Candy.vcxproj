@@ -140,6 +140,7 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="src\Candy\OrthographicCameraController.h" />
     <ClInclude Include="src\Candy.h" />
     <ClInclude Include="src\Candy\Application.h" />
     <ClInclude Include="src\Candy\Core.h" />
@@ -594,6 +595,7 @@
     <ClInclude Include="vendor\stb_image\stb_image.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\Candy\OrthographicCameraController.cpp" />
     <ClCompile Include="src\Candy\Application.cpp" />
     <ClCompile Include="src\Candy\Imgui\ImguiBuild.cpp" />
     <ClCompile Include="src\Candy\Imgui\ImguiLayer.cpp" />
