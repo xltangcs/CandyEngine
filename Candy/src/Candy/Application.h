@@ -3,9 +3,11 @@
 #include "Core.h"
 #include "Window.h"
 
-#include "Events/Event.h"
 #include "Candy/LayerStack.h"
+
+#include "Events/Event.h"
 #include "Candy/Events/ApplicationEvent.h"
+
 #include "Candy/Imgui/ImguiLayer.h"
 
 #include "Candy/Core/Timestep.h"

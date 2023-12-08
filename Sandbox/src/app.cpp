@@ -153,6 +153,7 @@ public:
 		m_TextureShader.reset(Candy::Shader::Create(textureShaderVertexSrc, textureShaderFragmentSrc));
 
 		m_Texture = Candy::Texture2D::Create("assets/textures/Checkerboard.png");
+		m_CANDYLogTexture = Candy::Texture2D::Create("assets/textures/CANDY_Log.png");
 
 		std::dynamic_pointer_cast<Candy::OpenGLShader>(m_TextureShader)->Bind();
 		std::dynamic_pointer_cast<Candy::OpenGLShader>(m_TextureShader)->UploadUniformInt("u_Texture", 0);
@@ -200,7 +201,9 @@ public:
 		}
 		m_Texture->Bind();
 		Candy::Renderer::Submit(m_TextureShader, m_SquareVA, glm::scale(glm::mat4(1.0f), glm::vec3(1.5f)));
-
+		m_CANDYLogTexture->Bind();
+		Candy::Renderer::Submit(m_TextureShader, m_SquareVA, glm::scale(glm::mat4(1.0f), glm::vec3(1.5f)));
+		
 		Candy::Renderer::EndScene();
 	}
 
@@ -226,7 +229,7 @@ private:
 
 	std::shared_ptr<Candy::Shader> m_TextureShader;
 
-	Candy::Ref<Candy::Texture2D> m_Texture;
+	Candy::Ref<Candy::Texture2D> m_Texture, m_CANDYLogTexture;
 
 	Candy::OrthographicCamera m_Camera;
 	glm::vec3 m_CameraPosition;
