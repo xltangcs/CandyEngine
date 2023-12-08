@@ -1,5 +1,5 @@
 #pragma once
-#include "Candy/Core.h"
+#include "Core.h"
 #include "Candy/Events/Event.h"
 #include "Candy/Core/Timestep.h"
 

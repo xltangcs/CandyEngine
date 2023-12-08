@@ -1,13 +1,11 @@
 #include "candypch.h"
 #include "Application.h"
 
-#include "Candy/Log.h"
-#include "Candy/Input.h"
+#include "Candy/Core/Log.h"
+#include "Candy/Core/Input.h"
 #include "Candy/Renderer/Renderer.h"
 
 #include <glfw/glfw3.h>
-
-
 
 namespace Candy {
 	#define BIND_EVENT_FN(x) std::bind(&Application::x, this, std::placeholders::_1)

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Candy/Window.h"
+#include "Candy/Core/Window.h"
 #include "Candy/Renderer/GraphicsContext.h"
 
 #include <GLFW/glfw3.h>

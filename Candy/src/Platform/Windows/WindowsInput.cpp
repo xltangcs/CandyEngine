@@ -1,7 +1,7 @@
 #include "candypch.h"
 #include "WindowsInput.h"
 
-#include "Candy/Application.h"
+#include "Candy/Core/Application.h"
 #include <GLFW/glfw3.h>
 
 namespace Candy {

@@ -13,7 +13,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "Candy/Log.h"
+#include "Candy/Core/Log.h"
 
 #ifdef CANDY_PLATFORM_WINDOWS
 #include <Windows.h>

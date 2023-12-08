@@ -1,12 +1,12 @@
 [submodule "candy/vendor/spdlog"]
 	path = candy/vendor/spdlog
 	url = https://github.com/gabime/spdlog
-[submodule "candy/vendor/GLFW"]
-	path = candy/vendor/GLFW
-	url = https://github.com/TheCherno/glfw
 [submodule "Candy/vendor/glm"]
 	path = Candy/vendor/glm
 	url = https://github.com/g-truc/glm
 [submodule "Candy/vendor/imgui"]
 	path = Candy/vendor/imgui
 	url = https://github.com/xltangcs/imgui
+[submodule "Candy/vendor/GLFW"]
+	path = Candy/vendor/GLFW
+	url = https://github.com/xltangcs/glfw

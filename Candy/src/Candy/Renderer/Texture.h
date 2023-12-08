@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include <Candy/Core.h>
+#include <Candy/Core/Core.h>
 
 namespace Candy {
 	class Texture

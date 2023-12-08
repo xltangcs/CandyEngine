@@ -8,7 +8,7 @@
 #include "GLFW/glfw3.h"
 #include <glad/glad.h>
 
-#include "Candy/Application.h"
+#include "Candy/Core/Application.h"
 
 
 namespace Candy {

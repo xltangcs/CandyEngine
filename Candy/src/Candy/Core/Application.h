@@ -3,9 +3,9 @@
 #include "Core.h"
 #include "Window.h"
 
-#include "Candy/LayerStack.h"
+#include "Candy/Core/LayerStack.h"
 
-#include "Events/Event.h"
+#include "Candy/Events/Event.h"
 #include "Candy/Events/ApplicationEvent.h"
 
 #include "Candy/Imgui/ImguiLayer.h"

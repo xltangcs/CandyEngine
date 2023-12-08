@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Candy/Core.h"
+#include "Candy/Core/Core.h"
 #include "candypch.h"
 
 namespace Candy {

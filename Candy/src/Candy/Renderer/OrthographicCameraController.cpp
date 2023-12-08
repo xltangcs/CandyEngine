@@ -1,8 +1,8 @@
 #include "candypch.h"
 #include "OrthographicCameraController.h"
 
-#include "Candy/Input.h"
-#include "Candy/KeyCodes.h"
+#include "Candy/Core/Input.h"
+#include "Candy/Core/KeyCodes.h"
 
 namespace Candy {
 	OrthographicCameraController::OrthographicCameraController(float aspectRatio, bool rotation)

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Candy/Layer.h"
+#include "Candy/Core/Layer.h"
 #include "Candy/Events/ApplicationEvent.h"
 #include "Candy/Events/KeyEvent.h"
 #include "Candy/Events/MouseEvent.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Candy/Input.h"
+#include "Candy/Core/Input.h"
 
 namespace Candy {
 
