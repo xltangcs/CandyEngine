@@ -56,14 +56,14 @@ namespace Candy {
 		const auto& layout = vertexBuffer->GetLayout();
 		for (const auto& element : layout)
 		{
-			glEnableVertexAttribArray(index);
-			glVertexAttribPointer(index,
+			glEnableVertexAttribArray(index + m_VertexBufferIndex);
+			glVertexAttribPointer(index + m_VertexBufferIndex,
 				element.GetComponentCount(),
 				ShaderDataTypeToOpenGLBaseType(element.Type),
 				element.Normalized ? GL_TRUE : GL_FALSE,
 				layout.GetStride(),
 				(const void*)(intptr_t)element.Offset);
-			index++;
+			m_VertexBufferIndex++;
 		}
 		m_VertexBuffers.push_back(vertexBuffer);
 	}
