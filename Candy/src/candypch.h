@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <memory>
+#include <array>
 #include <utility>
 #include <algorithm>
 #include <functional>

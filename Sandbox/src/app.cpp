@@ -90,7 +90,7 @@ public:
 			}
 		)";
 
-		m_Shader.reset(Candy::Shader::Create(vertexSrc, fragmentSrc));
+		m_Shader = Candy::Shader::Create("VertexPosColor", vertexSrc, fragmentSrc);
 
 		std::string flatColorShaderVertexSrc = R"(
 			#version 330 core
@@ -120,43 +120,15 @@ public:
 			}
 		)";
 
-		m_FlatColorShader.reset(Candy::Shader::Create(flatColorShaderVertexSrc, flatColorShaderFragmentSrc));
+		m_FlatColorShader = Candy::Shader::Create("FlatColor", flatColorShaderVertexSrc, flatColorShaderFragmentSrc);
 		
-		std::string textureShaderVertexSrc = R"(
-			#version 330 core
-			
-			layout(location = 0) in vec3 a_Position;
-			layout(location = 1) in vec2 a_TexCoord;
-			uniform mat4 u_ViewProjection;
-			uniform mat4 u_Transform;
-			out vec2 v_TexCoord;
-			void main()
-			{
-				v_TexCoord = a_TexCoord;
-				gl_Position = u_ViewProjection * u_Transform * vec4(a_Position, 1.0);	
-			}
-		)";
-
-		std::string textureShaderFragmentSrc = R"(
-			#version 330 core
-			
-			layout(location = 0) out vec4 color;
-			in vec2 v_TexCoord;
-			
-			uniform sampler2D u_Texture;
-			void main()
-			{
-				color = texture(u_Texture, v_TexCoord);
-			}
-		)";
-
-		m_TextureShader.reset(Candy::Shader::Create(textureShaderVertexSrc, textureShaderFragmentSrc));
+		auto textureShader = m_ShaderLibrary.Load("assets/shaders/Texture.glsl");//shader name = file name
 
 		m_Texture = Candy::Texture2D::Create("assets/textures/Checkerboard.png");
-		m_CANDYLogTexture = Candy::Texture2D::Create("assets/textures/CANDY_Log.png");
+		m_CandyLogTexture = Candy::Texture2D::Create("assets/textures/Candy_Log.png");
 
-		std::dynamic_pointer_cast<Candy::OpenGLShader>(m_TextureShader)->Bind();
-		std::dynamic_pointer_cast<Candy::OpenGLShader>(m_TextureShader)->UploadUniformInt("u_Texture", 0);
+		std::dynamic_pointer_cast<Candy::OpenGLShader>(textureShader)->Bind();
+		std::dynamic_pointer_cast<Candy::OpenGLShader>(textureShader)->UploadUniformInt("u_Texture", 0);
 	}
 
 	void OnUpdate(Candy::Timestep ts) override
@@ -199,10 +171,12 @@ public:
 				Candy::Renderer::Submit(m_FlatColorShader, m_SquareVA, transform);
 			}
 		}
+		auto textureShader = m_ShaderLibrary.Get("Texture");
+
 		m_Texture->Bind();
-		Candy::Renderer::Submit(m_TextureShader, m_SquareVA, glm::scale(glm::mat4(1.0f), glm::vec3(1.5f)));
-		m_CANDYLogTexture->Bind();
-		Candy::Renderer::Submit(m_TextureShader, m_SquareVA, glm::scale(glm::mat4(1.0f), glm::vec3(1.5f)));
+		Candy::Renderer::Submit(textureShader, m_SquareVA, glm::scale(glm::mat4(1.0f), glm::vec3(1.5f)));
+		m_CandyLogTexture->Bind();
+		Candy::Renderer::Submit(textureShader, m_SquareVA, glm::scale(glm::mat4(1.0f), glm::vec3(1.5f)));
 		
 		Candy::Renderer::EndScene();
 	}
@@ -220,16 +194,16 @@ public:
 	}
 
 private:
-	std::shared_ptr<Candy::Shader> m_Shader;
-	std::shared_ptr<Candy::VertexArray> m_VertexArray;
+	Candy::ShaderLibrary m_ShaderLibrary;
 
-	std::shared_ptr<Candy::Shader> m_FlatColorShader;
+	Candy::Ref<Candy::Shader> m_Shader;
+	Candy::Ref<Candy::Shader> m_FlatColorShader;
+
+	Candy::Ref<Candy::VertexArray> m_VertexArray;
+	Candy::Ref<Candy::VertexArray> m_SquareVA;
 	
-	std::shared_ptr<Candy::VertexArray> m_SquareVA;
-
-	std::shared_ptr<Candy::Shader> m_TextureShader;
-
-	Candy::Ref<Candy::Texture2D> m_Texture, m_CANDYLogTexture;
+	Candy::Ref<Candy::Texture2D> m_Texture;
+	Candy::Ref<Candy::Texture2D> m_CandyLogTexture;
 
 	Candy::OrthographicCamera m_Camera;
 	glm::vec3 m_CameraPosition;
