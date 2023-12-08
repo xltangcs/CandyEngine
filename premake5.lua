@@ -6,6 +6,11 @@ workspace "CandyEngine"		-- sln文件名
 		"Release",
 		"Dist"
 	}
+
+	flags
+	{
+		"MultiProcessorCompile"
+	}
 -- https://github.com/premake/premake-core/wiki/Tokens#value-tokens
 -- 组成输出目录:Debug-windows-x86_64
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
