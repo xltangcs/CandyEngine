@@ -81,9 +81,6 @@
     <ClInclude Include="src\Candy\Core\Log.h">
       <Filter>src\Candy\Core</Filter>
     </ClInclude>
-    <ClInclude Include="src\Candy\Core\MouseButtonCodes.h">
-      <Filter>src\Candy\Core</Filter>
-    </ClInclude>
     <ClInclude Include="src\Candy\Core\Timestep.h">
       <Filter>src\Candy\Core</Filter>
     </ClInclude>
@@ -1416,6 +1413,7 @@
     <ClInclude Include="vendor\stb_image\stb_image.h">
       <Filter>vendor\stb_image</Filter>
     </ClInclude>
+    <ClInclude Include="src\Candy\Core\MouseCodes.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Candy\Core\Application.cpp">

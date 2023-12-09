@@ -10,7 +10,7 @@
 
 #include "Candy/Core/Input.h"
 #include "Candy/Core/KeyCodes.h"
-#include "Candy/Core/MouseButtonCodes.h"
+#include "Candy/Core/MouseCodes.h"
 
 #include "Candy/Core/Timestep.h"
 #include "Candy/Imgui/ImguiLayer.h"
