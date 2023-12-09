@@ -1,7 +1,8 @@
 #pragma once
 
-#include "Candy/Core/Core.h"
 #include "candypch.h"
+
+#include "Candy/Core/Core.h"
 
 namespace Candy {
 
@@ -35,7 +36,7 @@ namespace Candy {
 
 #define EVENT_CLASS_CATEGORY(category) virtual int GetCategoryFlags() const override { return category; }
 
-	class CANDY_API Event
+	class Event
 	{
 		friend class EventDispatcher;
 	public:

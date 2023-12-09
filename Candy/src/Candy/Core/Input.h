@@ -1,10 +1,10 @@
 #pragma once
 
-#include "Core.h"
+#include "Candy/Core/Core.h"
 
 namespace Candy {
 
-	class CANDY_API Input
+	class Input
 	{
 	protected:
 		Input() = default;

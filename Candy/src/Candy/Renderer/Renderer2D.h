@@ -1,8 +1,7 @@
 #pragma once
 
-#include "OrthographicCamera.h"
-
-#include "Texture.h"
+#include "Candy/Renderer/Texture.h"
+#include "Candy/Renderer/OrthographicCamera.h"
 
 namespace Candy {
 	class Renderer2D

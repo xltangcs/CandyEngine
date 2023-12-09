@@ -1,13 +1,7 @@
 #include "candypch.h"
-#include "LayerStack.h"
+#include "Candy/Core/LayerStack.h"
 
 namespace Candy {
-
-	LayerStack::LayerStack()
-	{
-		
-	}
-
 	LayerStack::~LayerStack()
 	{
 		for (Layer* layer : m_Layers)

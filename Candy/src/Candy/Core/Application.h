@@ -1,16 +1,14 @@
 #pragma once
 
-#include "Core.h"
-#include "Window.h"
-
+#include "Candy/Core/Core.h"
+#include "Candy/Core/Window.h"
+#include "Candy/Core/Timestep.h"
 #include "Candy/Core/LayerStack.h"
 
 #include "Candy/Events/Event.h"
 #include "Candy/Events/ApplicationEvent.h"
 
 #include "Candy/Imgui/ImguiLayer.h"
-
-#include "Candy/Core/Timestep.h"
 
 namespace Candy {
 

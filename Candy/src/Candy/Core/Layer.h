@@ -1,11 +1,11 @@
 #pragma once
-#include "Core.h"
+#include "Candy/Core/Core.h"
 #include "Candy/Events/Event.h"
 #include "Candy/Core/Timestep.h"
 
 namespace Candy {
 
-	class CANDY_API Layer
+	class Layer
 	{
 	public:
 		Layer(const std::string& name = "Layer");

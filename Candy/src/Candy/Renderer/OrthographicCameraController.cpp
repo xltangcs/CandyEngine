@@ -1,5 +1,6 @@
 #include "candypch.h"
-#include "OrthographicCameraController.h"
+
+#include "Candy/Renderer/OrthographicCameraController.h"
 
 #include "Candy/Core/Input.h"
 #include "Candy/Core/KeyCodes.h"

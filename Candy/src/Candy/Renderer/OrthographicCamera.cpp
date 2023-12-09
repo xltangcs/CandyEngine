@@ -1,5 +1,6 @@
 #include "candypch.h"
-#include "OrthographicCamera.h"
+
+#include "Candy/Renderer/OrthographicCamera.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 

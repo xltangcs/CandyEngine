@@ -1,7 +1,8 @@
 #include "candypch.h"
-#include "OpenGLTexture.h"
 
-#include "stb_image.h"
+#include "Platform/OpenGL/OpenGLTexture.h"
+
+#include <stb_image.h>
 
 namespace Candy {
 	OpenGLTexture2D::OpenGLTexture2D(uint32_t width, uint32_t height)

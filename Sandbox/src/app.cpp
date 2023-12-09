@@ -2,11 +2,7 @@
 
 #include "Candy/Core/EntryPoint.h"
 
-#include "Platform/OpenGL/OpenGLShader.h"
-
-#include "imgui/imgui.h"
-
-#include "glm/glm.hpp"
+#include <imgui/imgui.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -26,8 +22,7 @@ public:
 			 0.0f,  0.5f, 0.0f, 0.8f, 0.8f, 0.2f, 1.0f
 		};
 
-		std::shared_ptr<Candy::VertexBuffer> vertexBuffer;
-		vertexBuffer.reset(Candy::VertexBuffer::Create(vertices, sizeof(vertices)));
+		Candy::Ref<Candy::VertexBuffer> vertexBuffer = Candy::VertexBuffer::Create(vertices, sizeof(vertices));
 		Candy::BufferLayout layout = {
 			{ Candy::ShaderDataType::Float3, "a_Position" },
 			{ Candy::ShaderDataType::Float4, "a_Color" }
@@ -36,8 +31,7 @@ public:
 		m_VertexArray->AddVertexBuffer(vertexBuffer);
 
 		uint32_t indices[3] = { 0, 1, 2 };
-		std::shared_ptr<Candy::IndexBuffer> indexBuffer;
-		indexBuffer.reset(Candy::IndexBuffer::Create(indices, sizeof(indices) / sizeof(uint32_t)));
+		Candy::Ref<Candy::IndexBuffer> indexBuffer = Candy::IndexBuffer::Create(indices, sizeof(indices) / sizeof(uint32_t));
 		m_VertexArray->SetIndexBuffer(indexBuffer);
 
 		m_SquareVA = Candy::VertexArray::Create();
@@ -49,8 +43,7 @@ public:
 			-0.5f,  0.5f, 0.0f, 0.0f, 1.0f
 		};
 
-		std::shared_ptr<Candy::VertexBuffer> squareVB;
-		squareVB.reset(Candy::VertexBuffer::Create(squareVertices, sizeof(squareVertices)));
+		Candy::Ref<Candy::VertexBuffer> squareVB = Candy::VertexBuffer::Create(squareVertices, sizeof(squareVertices));
 		squareVB->SetLayout({
 			{ Candy::ShaderDataType::Float3, "a_Position" },
 			{ Candy::ShaderDataType::Float2, "a_TexCoord" }
@@ -58,8 +51,7 @@ public:
 		m_SquareVA->AddVertexBuffer(squareVB);
 
 		uint32_t squareIndices[6] = { 0, 1, 2, 2, 3, 0 };
-		std::shared_ptr<Candy::IndexBuffer> squareIB;
-		squareIB.reset(Candy::IndexBuffer::Create(squareIndices, sizeof(squareIndices) / sizeof(uint32_t)));
+		Candy::Ref<Candy::IndexBuffer> squareIB = Candy::IndexBuffer::Create(squareIndices, sizeof(squareIndices) / sizeof(uint32_t));
 		m_SquareVA->SetIndexBuffer(squareIB);
 
 		std::string vertexSrc = R"(
@@ -131,8 +123,8 @@ public:
 		m_Texture = Candy::Texture2D::Create("assets/textures/Checkerboard.png");
 		m_CandyLogTexture = Candy::Texture2D::Create("assets/textures/Candy_Log.png");
 
-		std::dynamic_pointer_cast<Candy::OpenGLShader>(textureShader)->Bind();
-		std::dynamic_pointer_cast<Candy::OpenGLShader>(textureShader)->UploadUniformInt("u_Texture", 0);
+		textureShader->Bind();
+		textureShader->SetInt("u_Texture", 0);
 	}
 
 	void OnUpdate(Candy::Timestep ts) override
@@ -147,8 +139,8 @@ public:
 		Candy::Renderer::BeginScene(m_CameraController.GetCamera());
 
 		glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f));
-		std::dynamic_pointer_cast<Candy::OpenGLShader>(m_FlatColorShader)->Bind();
-		std::dynamic_pointer_cast<Candy::OpenGLShader>(m_FlatColorShader)->UploadUniformFloat3("u_Color", m_SquareColor);
+		m_FlatColorShader->Bind();
+		m_FlatColorShader->SetFloat3("u_Color", m_SquareColor);
 
 
 		for (int y = 0; y < 20; y++)

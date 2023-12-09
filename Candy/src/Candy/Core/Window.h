@@ -3,7 +3,7 @@
 
 #include "candypch.h"
 
-#include "Core.h"
+#include "Candy/Core/Core.h"
 #include "Candy/Events/Event.h"
 
 namespace Candy {
@@ -23,12 +23,12 @@ namespace Candy {
 	};
 
 	// Interface representing a desktop system based Window
-	class CANDY_API Window
+	class Window
 	{
 	public:
 		using EventCallbackFn = std::function<void(Event&)>;
 
-		virtual ~Window() {}
+		virtual ~Window() = default;
 
 		virtual void OnUpdate() = 0;
 
@@ -42,7 +42,7 @@ namespace Candy {
 
 		virtual void* GetNativeWindow() const = 0;
 
-		static Window* Create(const WindowProps& props = WindowProps());
+		static Scope<Window> Create(const WindowProps& props = WindowProps());
 	};
 
 }

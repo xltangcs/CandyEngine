@@ -1,7 +1,8 @@
 #include "candypch.h"
-#include "Texture.h"
 
-#include "Renderer.h"
+#include "Candy/Renderer/Texture.h"
+#include "Candy/Renderer/Renderer.h"
+
 #include "Platform/OpenGL/OpenGLTexture.h"
 
 namespace Candy {

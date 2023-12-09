@@ -1,24 +1,24 @@
 #include "candypch.h"
-#include "ImguiLayer.h"
 
-#include "imgui.h"
-#include "backends/imgui_impl_glfw.h"
-#include "backends/imgui_impl_opengl3.h"
-
-#include "GLFW/glfw3.h"
-#include <glad/glad.h>
 
 #include "Candy/Core/Application.h"
+
+#include "Candy/imgui/ImguiLayer.h"
+
+#include <imgui.h> 
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_opengl3.h>
+		 
+#include <GLFW/glfw3.h>
+#include <glad/glad.h>
+
+
 
 
 namespace Candy {
 
 	ImGuiLayer::ImGuiLayer()
 		: Layer("ImGuiLayer")
-	{
-	}
-
-	ImGuiLayer::~ImGuiLayer()
 	{
 	}
 

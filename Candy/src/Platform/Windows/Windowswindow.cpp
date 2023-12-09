@@ -1,5 +1,6 @@
 #include "candypch.h"
-#include "WindowsWindow.h"
+
+#include "Platform/Windows/WindowsWindow.h"
 
 #include "Candy/Events/ApplicationEvent.h"
 #include "Candy/Events/MouseEvent.h"
@@ -16,9 +17,9 @@ namespace Candy {
 		CANDY_CORE_ERROR("GLFW Error ({0}): {1}", error, description);
 	}
 
-	Window* Window::Create(const WindowProps& props)
+	Scope<Window> Window::Create(const WindowProps& props)
 	{
-		return new WindowsWindow(props);
+		return CreateScope<WindowsWindow>(props);
 	}
 
 	WindowsWindow::WindowsWindow(const WindowProps& props)
@@ -53,7 +54,7 @@ namespace Candy {
 		
 		s_GLFWWindowCount ++;
 
-		m_Context = CreateScope<OpenGLContext>(m_Window);
+		m_Context = GraphicsContext::Create(m_Window);
 		m_Context->Init();
 
 		glfwSetWindowUserPointer(m_Window, &m_Data);
@@ -157,7 +158,6 @@ namespace Candy {
 		s_GLFWWindowCount --;
 		if (s_GLFWWindowCount == 0)
 		{
-			CANDY_CORE_INFO("Terminating GLFW... ");
 			glfwTerminate();
 		}
 	}

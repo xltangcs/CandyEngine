@@ -2,7 +2,7 @@
 
 //for use by Candy application
 
-
+#include "Candy/Core/Core.h"
 #include "Candy/Core/Application.h"
 
 #include "Candy/Core/Log.h"

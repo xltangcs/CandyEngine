@@ -1,16 +1,16 @@
 #pragma once
 
-#include "Core.h"
-#include "Layer.h"
+#include "Candy/Core/Core.h"
+#include "Candy/Core/Layer.h"
 
 #include <vector>
 
 namespace Candy {
 
-	class CANDY_API LayerStack
+	class LayerStack
 	{
 	public:
-		LayerStack();
+		LayerStack() = default;
 		~LayerStack();
 
 		void PushLayer(Layer* layer);
