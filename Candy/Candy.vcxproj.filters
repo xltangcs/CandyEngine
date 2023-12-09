@@ -123,6 +123,9 @@
     <ClInclude Include="src\Candy\Renderer\Renderer.h">
       <Filter>src\Candy\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="src\Candy\Renderer\Renderer2D.h">
+      <Filter>src\Candy\Renderer</Filter>
+    </ClInclude>
     <ClInclude Include="src\Candy\Renderer\RendererAPI.h">
       <Filter>src\Candy\Renderer</Filter>
     </ClInclude>
@@ -1446,6 +1449,9 @@
       <Filter>src\Candy\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="src\Candy\Renderer\Renderer.cpp">
+      <Filter>src\Candy\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Candy\Renderer\Renderer2D.cpp">
       <Filter>src\Candy\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="src\Candy\Renderer\RendererAPI.cpp">

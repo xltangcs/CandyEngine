@@ -19,13 +19,11 @@
 
 //-------------- Renderer ---------------
 #include "Candy/Renderer/Renderer.h"
+#include "Candy/Renderer/Renderer2D.h"
 #include "Candy/Renderer/RenderCommand.h" 
+
 #include "Candy/Renderer/Buffer.h"
 #include "Candy/Renderer/Shader.h"
 #include "Candy/Renderer/Texture.h"
 #include "Candy/Renderer/VertexArray.h"
 #include "Candy/Renderer/OrthographicCamera.h"
-
-//------------- Entry Point---------------
-#include "Candy/Core/EntryPoint.h"
-
