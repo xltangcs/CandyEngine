@@ -26,4 +26,5 @@
 #include "Candy/Renderer/Shader.h"
 #include "Candy/Renderer/Texture.h"
 #include "Candy/Renderer/VertexArray.h"
+#include "Candy/Renderer/Framebuffer.h"
 #include "Candy/Renderer/OrthographicCamera.h"

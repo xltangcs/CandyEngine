@@ -12,6 +12,10 @@ Sandbox2D::Sandbox2D()
 void Sandbox2D::OnAttach()
 {
 	m_CheckerboardTexture = Candy::Texture2D::Create("assets/textures/Checkerboard.png");
+	Candy::FramebufferSpecification fbSpec;
+	fbSpec.Width = 1280;
+	fbSpec.Height = 720;
+	m_Framebuffer = Candy::Framebuffer::Create(fbSpec);
 }
 
 void Sandbox2D::OnDetach()
@@ -25,6 +29,8 @@ void Sandbox2D::OnUpdate(Candy::Timestep ts)
 	m_CameraController.OnUpdate(ts);
 
 	Candy::Renderer2D::ResetStats();
+
+	m_Framebuffer->Bind();
 
 	// Render
 	Candy::RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1 });
@@ -43,6 +49,8 @@ void Sandbox2D::OnUpdate(Candy::Timestep ts)
 	
 	Candy::Renderer2D::EndScene();
 
+	m_Framebuffer->Unbind();
+
 	Candy::Renderer2D::BeginScene(m_CameraController.GetCamera());
 	for (float y = -5.0f; y < 5.0f; y += 0.5f)
 	{
@@ -58,7 +66,7 @@ void Sandbox2D::OnUpdate(Candy::Timestep ts)
 void Sandbox2D::OnImGuiRender()
 {
 	// Note: Switch this to true to enable dockspace
-	static bool dockingEnabled = false;
+	static bool dockingEnabled = true;
 	if (dockingEnabled)
 	{
 		static bool dockspaceOpen = true;
@@ -131,8 +139,8 @@ void Sandbox2D::OnImGuiRender()
 
 		ImGui::ColorEdit4("Square Color", glm::value_ptr(m_SquareColor));
 
-		uint32_t textureID = m_CheckerboardTexture->GetRendererID();
-		ImGui::Image((void*)textureID, ImVec2{ 256.0f, 256.0f });
+		uint32_t textureID = m_Framebuffer->GetColorAttachmentRendererID();
+		ImGui::Image((void*)textureID, ImVec2{ 1280, 720 });
 		ImGui::End();
 
 		ImGui::End();
@@ -151,11 +159,8 @@ void Sandbox2D::OnImGuiRender()
 		ImGui::ColorEdit4("Square Color", glm::value_ptr(m_SquareColor));
 
 		uint32_t textureID = m_CheckerboardTexture->GetRendererID();
-		ImGui::Image((void*)textureID, ImVec2{ 256.0f, 256.0f });
+		ImGui::Image((void*)textureID, ImVec2{ 1280, 720 });
 		ImGui::End();
-
-		/*static bool show = true;
-		ImGui::ShowDemoWindow(&show);*/
 	}
 }
 
