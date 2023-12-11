@@ -180,7 +180,6 @@
     <ClInclude Include="src\Platform\OpenGL\OpenGLShader.h" />
     <ClInclude Include="src\Platform\OpenGL\OpenGLTexture.h" />
     <ClInclude Include="src\Platform\OpenGL\OpenGLVertexArray.h" />
-    <ClInclude Include="src\Platform\Windows\WindowsInput.h" />
     <ClInclude Include="src\Platform\Windows\Windowswindow.h" />
     <ClInclude Include="src\candypch.h" />
     <ClInclude Include="vendor\glm\glm\common.hpp" />
@@ -606,6 +605,7 @@
     <ClCompile Include="src\Candy\Core\Layer.cpp" />
     <ClCompile Include="src\Candy\Core\LayerStack.cpp" />
     <ClCompile Include="src\Candy\Core\Log.cpp" />
+    <ClCompile Include="src\Candy\Core\Window.cpp" />
     <ClCompile Include="src\Candy\Imgui\ImguiBuild.cpp" />
     <ClCompile Include="src\Candy\Imgui\ImguiLayer.cpp" />
     <ClCompile Include="src\Candy\Renderer\Buffer.cpp" />

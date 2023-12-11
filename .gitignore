@@ -12,3 +12,7 @@ bin-int/
 **.vcxproj
 **.vcxproj.filters
 **.vcxproj.user
+
+
+#ImGui File
+imgui.ini
