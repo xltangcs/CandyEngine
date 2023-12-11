@@ -15,17 +15,18 @@ workspace "CandyEngine"		-- sln文件名
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
 IncludeDir = {}
-IncludeDir["GLFW"]  = "Candy/vendor/GLFW/include"
-IncludeDir["Glad"]  = "Candy/vendor/Glad/include"
-IncludeDir["Imgui"] = "Candy/vendor/imgui"
-IncludeDir["glm"]   = "Candy/vendor/glm"
+IncludeDir["GLFW"]  	= "Candy/vendor/GLFW/include"
+IncludeDir["Glad"]  	= "Candy/vendor/Glad/include"
+IncludeDir["Imgui"] 	= "Candy/vendor/imgui"
+IncludeDir["glm"]   	= "Candy/vendor/glm"
 IncludeDir["stb_image"] = "Candy/vendor/stb_image"
+IncludeDir["entt"]  	= "Candy/vendor/entt/include"
+
 
 group "Dependencies"
 	include "Candy/vendor/GLFW"
 	include "Candy/vendor/Glad"
 	include "Candy/vendor/imgui"
-
 group ""
 
 
@@ -63,7 +64,8 @@ project "Candy"
         "%{IncludeDir.Glad}",
         "%{IncludeDir.Imgui}",
         "%{IncludeDir.glm}",
-		"%{IncludeDir.stb_image}"
+		"%{IncludeDir.stb_image}",
+		"%{IncludeDir.entt}"
 	}
 
     links 
@@ -115,7 +117,8 @@ project "Sandbox"
 		"Candy/vendor/spdlog/include",
 		"Candy/src",
 		"Candy/vendor",
-        "%{IncludeDir.glm}"
+        "%{IncludeDir.glm}",
+		"%{IncludeDir.entt}"
 	}
 	
 	links{
@@ -163,7 +166,8 @@ project "Candy_Editor"
 		"Candy/vendor/spdlog/include",
 		"Candy/src",
 		"Candy/vendor",
-		"%{IncludeDir.glm}"
+		"%{IncludeDir.glm}",
+		"%{IncludeDir.entt}"
 	}
 	
 	links{

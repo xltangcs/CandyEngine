@@ -19,6 +19,9 @@
     <Filter Include="src\Candy\Renderer">
       <UniqueIdentifier>{51926E7F-3D76-2FD5-A6D6-292892D91957}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\Candy\Scene">
+      <UniqueIdentifier>{A843B79F-14CF-2464-1DE0-A75889EA8064}</UniqueIdentifier>
+    </Filter>
     <Filter Include="src\Platform">
       <UniqueIdentifier>{21CA02E5-0D2D-9289-B6B2-CA3FA2F45D0C}</UniqueIdentifier>
     </Filter>
@@ -140,6 +143,12 @@
     </ClInclude>
     <ClInclude Include="src\Candy\Renderer\VertexArray.h">
       <Filter>src\Candy\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Candy\Scene\Components.h">
+      <Filter>src\Candy\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Candy\Scene\Scene.h">
+      <Filter>src\Candy\Scene</Filter>
     </ClInclude>
     <ClInclude Include="src\Platform\OpenGL\OpenGLBuffer.h">
       <Filter>src\Platform\OpenGL</Filter>
@@ -1433,6 +1442,9 @@
     <ClCompile Include="src\Candy\Core\Log.cpp">
       <Filter>src\Candy\Core</Filter>
     </ClCompile>
+    <ClCompile Include="src\Candy\Core\Window.cpp">
+      <Filter>src\Candy\Core</Filter>
+    </ClCompile>
     <ClCompile Include="src\Candy\Imgui\ImguiBuild.cpp">
       <Filter>src\Candy\Imgui</Filter>
     </ClCompile>
@@ -1475,6 +1487,9 @@
     <ClCompile Include="src\Candy\Renderer\VertexArray.cpp">
       <Filter>src\Candy\Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="src\Candy\Scene\Scene.cpp">
+      <Filter>src\Candy\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="src\Platform\OpenGL\OpenGLBuffer.cpp">
       <Filter>src\Platform\OpenGL</Filter>
     </ClCompile>
@@ -1508,6 +1523,5 @@
     <ClCompile Include="vendor\stb_image\stb_image.cpp">
       <Filter>vendor\stb_image</Filter>
     </ClCompile>
-    <ClCompile Include="src\Candy\Core\Window.cpp" />
   </ItemGroup>
 </Project>
