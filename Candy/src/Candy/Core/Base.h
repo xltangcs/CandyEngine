@@ -2,19 +2,20 @@
 
 #include <memory>
 
-#ifdef  CANDY_PLATFORM_WINDOWS
-	#if CANDY_DYNAMIC_LINK
-		#ifdef CANDY_BUILD_DLL
-			#define CANDY_API _declspec(dllexport)
-		#else
-			#define CANDY_API _declspec(dllimport)
-		#endif // CANDY_BUILD_DLL
-	#else
-		#define CANDY_API
-	#endif
-#else
-	#error CandyEngine only support windows
-#endif //  CANDY_PLATFORM_WINDOWS
+// Platform detection using predefined macros
+//#ifdef _WIN32
+//		/* Windows x64/x86 */
+//	#ifdef _WIN64
+//		/* Windows x64  */
+//	#define CANDY_PLATFORM_WINDOWS
+//	#else
+//		/* Windows x86 */
+//	#error "x86 Builds are not supported!"
+//	#endif
+//#else
+//	#error CandyEngine only support windows
+//#endif
+
 
 #ifdef CANDY_DEBUG
 	#define  CANDY_ENABLE_ASSERTS

@@ -1,5 +1,5 @@
 #pragma once
-#include "Candy/Core/Core.h"
+#include "Candy/Core/Base.h"
 
 #include "spdlog/spdlog.h"
 #include "spdlog/fmt/ostr.h"

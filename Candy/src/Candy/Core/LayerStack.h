@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Candy/Core/Core.h"
+#include "Candy/Core/Base.h"
 #include "Candy/Core/Layer.h"
 
 #include <vector>

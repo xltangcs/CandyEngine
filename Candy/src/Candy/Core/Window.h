@@ -3,7 +3,7 @@
 
 #include "candypch.h"
 
-#include "Candy/Core/Core.h"
+#include "Candy/Core/Base.h"
 #include "Candy/Events/Event.h"
 
 namespace Candy {

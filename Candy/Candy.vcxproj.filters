@@ -60,7 +60,7 @@
     <ClInclude Include="src\Candy\Core\Application.h">
       <Filter>src\Candy\Core</Filter>
     </ClInclude>
-    <ClInclude Include="src\Candy\Core\Core.h">
+    <ClInclude Include="src\Candy\Core\Base.h">
       <Filter>src\Candy\Core</Filter>
     </ClInclude>
     <ClInclude Include="src\Candy\Core\EntryPoint.h">

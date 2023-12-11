@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Candy/Core/Core.h"
+#include "Candy/Core/Base.h"
 #include "Candy/Core/Window.h"
 #include "Candy/Core/Timestep.h"
 #include "Candy/Core/LayerStack.h"
@@ -26,6 +26,7 @@ namespace Candy {
 		void PushOverlay(Layer* layer);
 
 		inline Window& GetWindow() { return *m_Window; }
+		void Close();
 
 		inline static Application& Get() { return *s_Instance; }
 

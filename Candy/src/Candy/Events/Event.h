@@ -2,7 +2,7 @@
 
 #include "candypch.h"
 
-#include "Candy/Core/Core.h"
+#include "Candy/Core/Base.h"
 
 namespace Candy {
 

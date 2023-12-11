@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Candy/Core/Core.h"
+#include "Candy/Core/Base.h"
 
 #ifdef CANDY_PLATFORM_WINDOWS
 

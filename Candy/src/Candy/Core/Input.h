@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Candy/Core/Core.h"
+#include "Candy/Core/Base.h"
 #include "Candy/Core/Keycodes.h"
 #include "Candy/Core/MouseCodes.h"
 

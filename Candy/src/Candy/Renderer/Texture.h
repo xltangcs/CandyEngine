@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include <Candy/Core/Core.h>
+#include <Candy/Core/Base.h>
 
 namespace Candy {
 	class Texture
@@ -11,6 +11,7 @@ namespace Candy {
 
 		virtual uint32_t GetWidth() const = 0;
 		virtual uint32_t GetHeight() const = 0;
+		virtual uint32_t GetRendererID() const = 0;
 
 		virtual void SetData(void* data, uint32_t size) = 0;
 
