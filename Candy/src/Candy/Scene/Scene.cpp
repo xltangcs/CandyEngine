@@ -1,6 +1,7 @@
 #include "candypch.h"
 
 #include "Candy/Scene/Scene.h"
+#include "Candy/Scene/Entity.h"
 #include "Candy/Scene/Components.h"
 
 #include "Candy/Renderer/Renderer2D.h"
@@ -50,9 +51,13 @@ namespace Candy {
 	{
 	}
 
-	entt::entity Scene::CreateEntity()
+	Entity Scene::CreateEntity(const std::string& name)
 	{
-		return m_Registry.create();
+		Entity entity = { m_Registry.create(), this };
+		entity.AddComponent<TransformComponent>();
+		auto& tag = entity.AddComponent<TagComponent>();
+		tag.Tag = name.empty() ? "Entity" : name;
+		return entity;
 	}
 
 	void Scene::OnUpdate(Timestep ts)

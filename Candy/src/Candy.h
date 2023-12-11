@@ -14,6 +14,7 @@
 #include "Candy/Imgui/ImguiLayer.h"
 
 #include "Candy/Scene/Scene.h"
+#include "Candy/Scene/Entity.h"
 #include "Candy/Scene/Components.h"
 
 //-------------- Renderer ---------------

@@ -174,6 +174,7 @@
     <ClInclude Include="src\Candy\Renderer\Texture.h" />
     <ClInclude Include="src\Candy\Renderer\VertexArray.h" />
     <ClInclude Include="src\Candy\Scene\Components.h" />
+    <ClInclude Include="src\Candy\Scene\Entity.h" />
     <ClInclude Include="src\Candy\Scene\Scene.h" />
     <ClInclude Include="src\Platform\OpenGL\OpenGLBuffer.h" />
     <ClInclude Include="src\Platform\OpenGL\OpenGLContext.h" />
@@ -622,6 +623,7 @@
     <ClCompile Include="src\Candy\Renderer\Shader.cpp" />
     <ClCompile Include="src\Candy\Renderer\Texture.cpp" />
     <ClCompile Include="src\Candy\Renderer\VertexArray.cpp" />
+    <ClCompile Include="src\Candy\Scene\Entity.cpp" />
     <ClCompile Include="src\Candy\Scene\Scene.cpp" />
     <ClCompile Include="src\Platform\OpenGL\OpenGLBuffer.cpp" />
     <ClCompile Include="src\Platform\OpenGL\OpenGLContext.cpp" />
