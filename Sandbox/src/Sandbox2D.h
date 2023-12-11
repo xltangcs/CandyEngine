@@ -20,7 +20,6 @@ private:
 	// Temp
 	Candy::Ref<Candy::VertexArray> m_SquareVA;
 	Candy::Ref<Candy::Shader> m_FlatColorShader;
-	Candy::Ref<Candy::Framebuffer> m_Framebuffer;
 
 	Candy::Ref<Candy::Texture2D> m_CheckerboardTexture;
 

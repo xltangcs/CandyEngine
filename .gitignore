@@ -4,7 +4,7 @@
 bin-int/
 
 #CandyEngine log file
-*.log
+**.log
 
 # Visual Studio files and folder
 .vs/

@@ -1,6 +1,6 @@
 workspace "CandyEngine"		-- sln文件名
 	architecture "x64"	
-	startproject "Sandbox"
+	startproject "Candy_Editor"
 	configurations{
 		"Debug",
 		"Release",
@@ -78,7 +78,7 @@ project "Candy"
 		systemversion "latest"
 
 		defines{
-			
+
 		}
 
 	filter "configurations:Debug"
@@ -126,7 +126,55 @@ project "Sandbox"
 		systemversion "latest"
 
 		defines{
-			"CANDY_PLATFORM_WINDOWS"
+			
+		}
+
+	filter "configurations:Debug"
+		defines "CANDY_DEBUG"
+		runtime "Debug"
+		symbols "on"
+
+	filter "configurations:Release"
+		defines "CANDY_RELEASE"
+		runtime "Release"
+		optimize "on"
+
+	filter "configurations:Dist"
+		defines "CANDY_DIST"
+		runtime "Release"
+		optimize "on"
+
+project "Candy_Editor"
+	location "Candy_Editor"
+	kind "ConsoleApp"
+	language "C++"
+	cppdialect "C++17"
+	staticruntime "on"
+
+	targetdir ("bin/" .. outputdir .. "/%{prj.name}")
+	objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
+
+	files{
+		"%{prj.name}/src/**.h",
+		"%{prj.name}/src/**.cpp"
+	}
+	
+	includedirs{
+		"Candy/vendor/spdlog/include",
+		"Candy/src",
+		"Candy/vendor",
+		"%{IncludeDir.glm}"
+	}
+	
+	links{
+		"Candy"
+	}
+
+	filter "system:windows"
+		systemversion "latest"
+
+		defines{
+			
 		}
 
 	filter "configurations:Debug"
