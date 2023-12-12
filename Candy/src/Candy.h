@@ -16,6 +16,7 @@
 #include "Candy/Scene/Scene.h"
 #include "Candy/Scene/Entity.h"
 #include "Candy/Scene/Components.h"
+#include "Candy/Scene/ScriptableEntity.h"
 
 //-------------- Renderer ---------------
 #include "Candy/Renderer/Renderer.h"

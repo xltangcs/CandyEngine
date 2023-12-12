@@ -1431,6 +1431,7 @@
     <ClInclude Include="src\Candy\Scene\Entity.h" />
     <ClInclude Include="src\Candy\Renderer\Camera.h" />
     <ClInclude Include="src\Candy\Scene\SceneCamera.h" />
+    <ClInclude Include="src\Candy\Scene\ScriptableEntity.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Candy\Core\Application.cpp">
