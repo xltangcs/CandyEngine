@@ -1,6 +1,6 @@
 #pragma once
-#pragma once
 
+#include "Candy/Scene/SceneCamera.h"
 #include <glm/glm.hpp>
 
 namespace Candy {
@@ -35,6 +35,16 @@ namespace Candy {
 		SpriteRendererComponent(const SpriteRendererComponent&) = default;
 		SpriteRendererComponent(const glm::vec4& color)
 			: Color(color) {}
+	};
+
+	struct CameraComponent
+	{
+		SceneCamera Camera;
+		bool Primary = true; // TODO: think about moving to Scene
+		bool FixedAspectRatio = false;
+
+		CameraComponent() = default;
+		CameraComponent(const CameraComponent&) = default;
 	};
 
 }

@@ -1429,6 +1429,8 @@
       <Filter>vendor\stb_image</Filter>
     </ClInclude>
     <ClInclude Include="src\Candy\Scene\Entity.h" />
+    <ClInclude Include="src\Candy\Renderer\Camera.h" />
+    <ClInclude Include="src\Candy\Scene\SceneCamera.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Candy\Core\Application.cpp">
@@ -1525,5 +1527,6 @@
       <Filter>vendor\stb_image</Filter>
     </ClCompile>
     <ClCompile Include="src\Candy\Scene\Entity.cpp" />
+    <ClCompile Include="src\Candy\Scene\SceneCamera.cpp" />
   </ItemGroup>
 </Project>

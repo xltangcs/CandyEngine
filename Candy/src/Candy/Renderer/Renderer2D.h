@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Candy/Renderer/Camera.h"
 #include "Candy/Renderer/Texture.h"
 #include "Candy/Renderer/OrthographicCamera.h"
 
@@ -10,7 +11,8 @@ namespace Candy {
 		static void Init();
 		static void Shutdown();
 
-		static void BeginScene(const OrthographicCamera& camera);
+		static void BeginScene(const Camera& camera, const glm::mat4& transform);
+		static void BeginScene(const OrthographicCamera& camera); // TODO: Remove
 		static void EndScene();
 		static void Flush();
 
