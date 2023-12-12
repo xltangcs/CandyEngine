@@ -43,7 +43,6 @@ namespace Candy {
 		if (s_GLFWWindowCount == 0)
 		{
 			// TODO: glfwTerminate on system shutdown
-			CANDY_CORE_INFO("Initializing GLFW successfully!");
 			int success = glfwInit();
 			CANDY_CORE_ASSERT(success, "Could not initialize GLFW!");
 			glfwSetErrorCallback(GLFWErrorCallback);

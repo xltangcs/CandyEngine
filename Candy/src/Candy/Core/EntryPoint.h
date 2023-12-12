@@ -10,7 +10,7 @@ int main(int argc, char** argv)
 {
 	Candy::Log::Init();
 
-	CANDY_CORE_WARN("Initialized Log!");
+	CANDY_CORE_INFO("Initialized Log!");
 	
 	auto app = Candy::CreateApplication();
 	app->Run();
