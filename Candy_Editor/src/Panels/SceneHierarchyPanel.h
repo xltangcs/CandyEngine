@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Candy/Core/Base.h"
-#include "Candy/Core/Log.h"
 #include "Candy/Scene/Scene.h"
 #include "Candy/Scene/Entity.h"
 

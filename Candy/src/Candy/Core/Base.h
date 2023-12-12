@@ -18,17 +18,22 @@
 
 
 #ifdef CANDY_DEBUG
-	#define  CANDY_ENABLE_ASSERTS
-#endif
-
-
-#ifdef CANDY_ENABLE_ASSERTS
-    #define CANDY_ASSERT(x, ...) { if(!(x)) { CANDY_ERROR("Assertion Failed: {0}", __VA_ARGS__); __debugbreak(); } }
-    #define CANDY_CORE_ASSERT(x, ...) { if(!(x)) { CANDY_CORE_ERROR("Assertion Failed: {0}", __VA_ARGS__); __debugbreak(); } }
+	#if defined(CANDY_PLATFORM_WINDOWS)
+		#define CANDY_DEBUGBREAK() __debugbreak()
+	#elif defined(CANDY_PLATFORM_LINUX)
+		#include <signal.h>
+		#define CANDY_DEBUGBREAK() raise(SIGTRAP)
+	#else
+		#error "Platform doesn't support debugbreak yet!"
+	#endif
+	#define CANDY_ENABLE_ASSERTS
 #else
-    #define CANDY_ASSERT(x, ...)
-    #define CANDY_CORE_ASSERT(x, ...)
+	#define CANDY_DEBUGBREAK()
 #endif
+
+
+#define CANDY_EXPAND_MACRO(x) x
+#define CANDY_STRINGIFY_MACRO(x) #x
 
 
 #define BIT(x) (1 << x)
@@ -52,3 +57,7 @@ namespace Candy {
 		return std::make_shared<T>(std::forward<Args>(args)...);
 	}
 }
+
+
+#include "Candy/Core/Log.h"
+#include "Candy/Core/Assert.h"

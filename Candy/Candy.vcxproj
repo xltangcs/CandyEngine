@@ -146,6 +146,7 @@
   <ItemGroup>
     <ClInclude Include="src\Candy.h" />
     <ClInclude Include="src\Candy\Core\Application.h" />
+    <ClInclude Include="src\Candy\Core\Assert.h" />
     <ClInclude Include="src\Candy\Core\Base.h" />
     <ClInclude Include="src\Candy\Core\EntryPoint.h" />
     <ClInclude Include="src\Candy\Core\Input.h" />

@@ -2,6 +2,7 @@
 
 //for use by Candy application
 
+#include "Candy/Core/Assert.h"
 #include "Candy/Core/Base.h"
 #include "Candy/Core/Application.h"
 #include "Candy/Core/Log.h"
