@@ -15,18 +15,20 @@ workspace "CandyEngine"		-- sln文件名
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
 IncludeDir = {}
-IncludeDir["GLFW"]  	= "Candy/vendor/GLFW/include"
-IncludeDir["Glad"]  	= "Candy/vendor/Glad/include"
-IncludeDir["Imgui"] 	= "Candy/vendor/imgui"
-IncludeDir["glm"]   	= "Candy/vendor/glm"
-IncludeDir["stb_image"] = "Candy/vendor/stb_image"
-IncludeDir["entt"]  	= "Candy/vendor/entt/include"
+IncludeDir["GLFW"]  	= "%{wks.location}/Candy/vendor/GLFW/include"
+IncludeDir["Glad"]  	= "%{wks.location}/Candy/vendor/Glad/include"
+IncludeDir["Imgui"] 	= "%{wks.location}/Candy/vendor/imgui"
+IncludeDir["glm"]   	= "%{wks.location}/Candy/vendor/glm"
+IncludeDir["stb_image"] = "%{wks.location}/Candy/vendor/stb_image"
+IncludeDir["entt"]  	= "%{wks.location}/Candy/vendor/entt/include"
+IncludeDir["yaml_cpp"]  = "%{wks.location}/Candy/vendor/yaml-cpp/include"
 
 
 group "Dependencies"
 	include "Candy/vendor/GLFW"
 	include "Candy/vendor/Glad"
 	include "Candy/vendor/imgui"
+	include "Candy/vendor/yaml-cpp"
 group ""
 
 
@@ -54,7 +56,8 @@ project "Candy"
 	}
 	defines{
 		"_CRT_SECURE_NO_WARNINGS",
-		"GLFW_INCLUDE_NONE"
+		"GLFW_INCLUDE_NONE",
+		"YAML_CPP_STATIC_DEFINE"
 	}
 	
 	includedirs{
@@ -65,7 +68,9 @@ project "Candy"
         "%{IncludeDir.Imgui}",
         "%{IncludeDir.glm}",
 		"%{IncludeDir.stb_image}",
+		"%{IncludeDir.yaml_cpp}",
 		"%{IncludeDir.entt}"
+		
 	}
 
     links 
@@ -73,6 +78,7 @@ project "Candy"
 		"GLFW",
 		"Glad",
 		"Imgui",
+		"yaml-cpp",
 		"opengl32.lib"
 	}
 
@@ -118,7 +124,8 @@ project "Sandbox"
 		"Candy/src",
 		"Candy/vendor",
         "%{IncludeDir.glm}",
-		"%{IncludeDir.entt}"
+		"%{IncludeDir.entt}",
+		"%{IncludeDir.yaml_cpp}"
 	}
 	
 	links{
@@ -167,7 +174,8 @@ project "Candy_Editor"
 		"Candy/src",
 		"Candy/vendor",
 		"%{IncludeDir.glm}",
-		"%{IncludeDir.entt}"
+		"%{IncludeDir.entt}",
+		"%{IncludeDir.yaml_cpp}"
 	}
 	
 	links{
