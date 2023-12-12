@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Candy/Core/Base.h"
+#include <glm/glm.hpp>
 #include "Candy/Core/Keycodes.h"
 #include "Candy/Core/MouseCodes.h"
 
@@ -12,7 +12,7 @@ namespace Candy {
 		static bool IsKeyPressed(KeyCode key);
 
 		static bool IsMouseButtonPressed(MouseCode button);
-		static std::pair<float, float> GetMousePosition();
+		static glm::vec2 GetMousePosition();
 		static float GetMouseX();
 		static float GetMouseY();
 	};

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "candypch.h"
+#include <functional>
 
 #include "Candy/Core/Base.h"
 
