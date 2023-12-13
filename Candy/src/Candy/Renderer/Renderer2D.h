@@ -3,6 +3,7 @@
 #include "Candy/Renderer/Camera.h"
 #include "Candy/Renderer/Texture.h"
 #include "Candy/Renderer/OrthographicCamera.h"
+#include "Candy/Renderer/EditorCamera.h"
 
 namespace Candy {
 	class Renderer2D
@@ -13,6 +14,7 @@ namespace Candy {
 
 		static void BeginScene(const Camera& camera, const glm::mat4& transform);
 		static void BeginScene(const OrthographicCamera& camera); // TODO: Remove
+		static void BeginScene(const EditorCamera& camera);
 		static void EndScene();
 		static void Flush();
 

@@ -2,6 +2,7 @@
 
 #include "Candy.h"
 #include "Panels/SceneHierarchyPanel.h"
+#include "Candy/Renderer/EditorCamera.h"
 
 namespace Candy {
 
@@ -38,6 +39,7 @@ namespace Candy {
 		Entity m_SecondCamera;
 
 		bool m_PrimaryCamera = true;
+		EditorCamera m_EditorCamera;
 
 		Ref<Texture2D> m_CheckerboardTexture;
 		bool m_ViewportFocused = false, m_ViewportHovered = false;

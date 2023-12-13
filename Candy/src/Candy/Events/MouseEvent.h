@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sstream>
 #include "Candy/Events/Event.h"
 #include "Candy/Core/MouseCodes.h"
 

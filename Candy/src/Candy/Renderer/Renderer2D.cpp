@@ -120,6 +120,16 @@ namespace Candy {
 		StartBatch();
 	}
 
+	void Renderer2D::BeginScene(const EditorCamera& camera)
+	{
+		glm::mat4 viewProj = camera.GetViewProjection();
+
+		s_Data.TextureShader->Bind();
+		s_Data.TextureShader->SetMat4("u_ViewProjection", viewProj);
+
+		StartBatch();
+	}
+
 	void Renderer2D::EndScene()
 	{
 		uint32_t dataSize = (uint32_t)((uint8_t*)s_Data.QuadVertexBufferPtr - (uint8_t*)s_Data.QuadVertexBufferBase);

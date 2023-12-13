@@ -165,6 +165,7 @@
     <ClInclude Include="src\Candy\Math\Math.h" />
     <ClInclude Include="src\Candy\Renderer\Buffer.h" />
     <ClInclude Include="src\Candy\Renderer\Camera.h" />
+    <ClInclude Include="src\Candy\Renderer\EditorCamera.h" />
     <ClInclude Include="src\Candy\Renderer\Framebuffer.h" />
     <ClInclude Include="src\Candy\Renderer\GraphicsContext.h" />
     <ClInclude Include="src\Candy\Renderer\OrthographicCamera.h" />
@@ -621,6 +622,7 @@
     <ClCompile Include="src\Candy\Imgui\ImguiLayer.cpp" />
     <ClCompile Include="src\Candy\Math\Math.cpp" />
     <ClCompile Include="src\Candy\Renderer\Buffer.cpp" />
+    <ClCompile Include="src\Candy\Renderer\EditorCamera.cpp" />
     <ClCompile Include="src\Candy\Renderer\Framebuffer.cpp" />
     <ClCompile Include="src\Candy\Renderer\GraphicsContext.cpp" />
     <ClCompile Include="src\Candy\Renderer\OrthographicCamera.cpp" />
