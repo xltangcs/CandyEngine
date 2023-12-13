@@ -22,6 +22,7 @@ IncludeDir["glm"]   	= "%{wks.location}/Candy/vendor/glm"
 IncludeDir["stb_image"] = "%{wks.location}/Candy/vendor/stb_image"
 IncludeDir["entt"]  	= "%{wks.location}/Candy/vendor/entt/include"
 IncludeDir["yaml_cpp"]  = "%{wks.location}/Candy/vendor/yaml-cpp/include"
+IncludeDir["ImGuizmo"]  = "%{wks.location}/Candy/vendor/ImGuizmo"
 
 
 group "Dependencies"
@@ -52,7 +53,9 @@ project "Candy"
 		"%{prj.name}/vendor/stb_image/**.h",
 		"%{prj.name}/vendor/stb_image/**.cpp",
 		"%{prj.name}/vendor/glm/glm/**.hpp",
-		"%{prj.name}/vendor/glm/glm/**.inl"
+		"%{prj.name}/vendor/glm/glm/**.inl",
+		"%{prj.name}/vendor/ImGuizmo/ImGuizmo.h",
+		"%{prj.name}/vendor/ImGuizmo/ImGuizmo.cpp"
 	}
 	defines{
 		"_CRT_SECURE_NO_WARNINGS",
@@ -69,7 +72,8 @@ project "Candy"
         "%{IncludeDir.glm}",
 		"%{IncludeDir.stb_image}",
 		"%{IncludeDir.yaml_cpp}",
-		"%{IncludeDir.entt}"
+		"%{IncludeDir.entt}",
+		"%{IncludeDir.ImGuizmo}"
 		
 	}
 
@@ -175,7 +179,9 @@ project "Candy_Editor"
 		"Candy/vendor",
 		"%{IncludeDir.glm}",
 		"%{IncludeDir.entt}",
-		"%{IncludeDir.yaml_cpp}"
+		"%{IncludeDir.Imgui}",
+		"%{IncludeDir.yaml_cpp}",
+		"%{IncludeDir.ImGuizmo}"
 	}
 	
 	links{

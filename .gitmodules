@@ -13,3 +13,6 @@
 [submodule "Candy/vendor/yaml-cpp"]
 	path = Candy/vendor/yaml-cpp
 	url = https://github.com/xltangcs/yaml-cpp
+[submodule "Candy/vendor/ImGuizmo"]
+	path = Candy/vendor/ImGuizmo
+	url = https://github.com/xltangcs/ImGuizmo
