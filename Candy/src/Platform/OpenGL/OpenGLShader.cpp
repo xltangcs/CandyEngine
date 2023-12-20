@@ -71,7 +71,6 @@ namespace Candy {
 		{
 			CANDY_CORE_ERROR("Could not open file '{0}'", filepath);
 		}
-
 		return result;
 	}
 
