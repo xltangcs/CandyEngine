@@ -130,7 +130,7 @@ namespace Candy {
 		if (m_ColorAttachmentSpecifications.size())
 		{
 			m_ColorAttachments.resize(m_ColorAttachmentSpecifications.size());
-			Utils::CreateTextures(multisample, m_ColorAttachments.data(), m_ColorAttachments.size());
+			Utils::CreateTextures(multisample, reinterpret_cast<uint32_t*>(m_ColorAttachments.data()), m_ColorAttachments.size() );
 
 			for (size_t i = 0; i < m_ColorAttachments.size(); i++)
 			{
