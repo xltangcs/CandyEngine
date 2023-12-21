@@ -20,6 +20,7 @@ namespace Candy {
 		void OnEvent(Event& e) override;
 	private:
 		bool OnKeyPressed(KeyPressedEvent& e);
+		bool OnMouseButtonPressed(MouseButtonPressedEvent& e);
 
 		void NewScene();
 		void OpenScene();
@@ -37,6 +38,7 @@ namespace Candy {
 
 		Entity m_CameraEntity;
 		Entity m_SecondCamera;
+		Entity m_HoveredEntity;
 
 		bool m_PrimaryCamera = true;
 		EditorCamera m_EditorCamera;
