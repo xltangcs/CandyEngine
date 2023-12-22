@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include "Candy/Renderer/Texture.h"
 
 namespace Candy {
 
@@ -12,6 +13,9 @@ namespace Candy {
 		void OnImGuiRender();
 	private:
 		std::filesystem::path m_CurrentDirectory;
+
+		Ref<Texture2D> m_DirectoryIcon;
+		Ref<Texture2D> m_FileIcon;
 	};
 
 }
