@@ -2,6 +2,7 @@
 
 #include "Candy.h"
 #include "Panels/SceneHierarchyPanel.h"
+#include "Panels/ContentBrowserPanel.h"
 #include "Candy/Renderer/EditorCamera.h"
 
 namespace Candy {
@@ -51,6 +52,7 @@ namespace Candy {
 		int m_GizmoType = -1;
 		// Panels
 		SceneHierarchyPanel m_SceneHierarchyPanel;
+		ContentBrowserPanel m_ContentBrowserPanel;
 	};
 
 }
