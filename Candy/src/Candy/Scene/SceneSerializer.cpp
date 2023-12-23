@@ -153,9 +153,14 @@ namespace Candy {
 
 	void SceneSerializer::Serialize(const std::string& filepath)
 	{
+		std::string::size_type iPos = filepath.find_last_of('\\') + 1;
+		std::string filename = filepath.substr(iPos, filepath.length() - iPos);
+		filename = filename.substr(0, filename.rfind("."));
+
+		CANDY_CORE_INFO("Serialize Path is {0}", filepath);
 		YAML::Emitter out;
 		out << YAML::BeginMap;
-		out << YAML::Key << "Scene" << YAML::Value << "Untitled";
+		out << YAML::Key << "Scene" << YAML::Value << filename;
 		out << YAML::Key << "Entities" << YAML::Value << YAML::BeginSeq;
 		m_Scene->m_Registry.each([&](auto entityID)
 			{
@@ -180,6 +185,7 @@ namespace Candy {
 
 	bool SceneSerializer::Deserialize(const std::string& filepath)
 	{
+		CANDY_CORE_INFO("Deserialize Path is {0}", filepath);
 		YAML::Node data = YAML::LoadFile(filepath);
 		if (!data["Scene"])
 			return false;
