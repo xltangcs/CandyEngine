@@ -2,6 +2,7 @@
 
 #include "Candy/Scene/SceneCamera.h"
 #include "Candy/Scene/ScriptableEntity.h"
+#include "Candy/Renderer/Texture.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -44,7 +45,8 @@ namespace Candy {
 	struct SpriteRendererComponent
 	{
 		glm::vec4 Color{ 1.0f, 1.0f, 1.0f, 1.0f };
-
+		Ref<Texture2D> Texture;
+		float TilingFactor = 1.0f;
 		SpriteRendererComponent() = default;
 		SpriteRendererComponent(const SpriteRendererComponent&) = default;
 		SpriteRendererComponent(const glm::vec4& color)
