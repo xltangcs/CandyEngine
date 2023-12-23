@@ -16,3 +16,6 @@
 [submodule "Candy/vendor/ImGuizmo"]
 	path = Candy/vendor/ImGuizmo
 	url = https://github.com/xltangcs/ImGuizmo
+[submodule "Candy/vendor/box2d"]
+	path = Candy/vendor/box2d
+	url = https://github.com/xltangcs/box2d

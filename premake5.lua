@@ -23,10 +23,12 @@ IncludeDir["stb_image"] = "%{wks.location}/Candy/vendor/stb_image"
 IncludeDir["entt"]  	= "%{wks.location}/Candy/vendor/entt/include"
 IncludeDir["yaml_cpp"]  = "%{wks.location}/Candy/vendor/yaml-cpp/include"
 IncludeDir["ImGuizmo"]  = "%{wks.location}/Candy/vendor/ImGuizmo"
+IncludeDir["box2d"]  = "%{wks.location}/Candy/vendor/box2d/include"
 
 
 group "Dependencies"
 	include "Candy/vendor/GLFW"
+	include "Candy/vendor/box2d"
 	include "Candy/vendor/Glad"
 	include "Candy/vendor/imgui"
 	include "Candy/vendor/yaml-cpp"

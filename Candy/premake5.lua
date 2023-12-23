@@ -2,7 +2,7 @@ project "Candy"
 	kind "StaticLib"
 	language "C++"
 	cppdialect "C++17"
-	staticruntime "on"
+	staticruntime "off"
 
     targetdir ("%{wks.location}/bin/" .. outputdir .. "/%{prj.name}")
 	objdir ("%{wks.location}/bin-int/" .. outputdir .. "/%{prj.name}")
@@ -37,6 +37,7 @@ project "Candy"
 		"%{IncludeDir.stb_image}",
 		"%{IncludeDir.yaml_cpp}",
 		"%{IncludeDir.entt}",
+		"%{IncludeDir.box2d}",
 		"%{IncludeDir.ImGuizmo}"
 		
 	}
@@ -47,6 +48,7 @@ project "Candy"
 		"Glad",
 		"Imgui",
 		"yaml-cpp",
+		"box2d",
 		"opengl32.lib"
 	}
 
