@@ -3,7 +3,9 @@
 #include "entt.hpp"
 
 #include "Candy/Core/Timestep.h"
+#include "Candy/Core/UUID.h"
 #include "Candy/Renderer/EditorCamera.h"
+
 
 class b2World;
 
@@ -18,6 +20,7 @@ namespace Candy {
 		~Scene();
 
 		Entity CreateEntity(const std::string& name = std::string());
+		Entity CreateEntityWithUUID(UUID uuid, const std::string& name = std::string());
 		void DestroyEntity(Entity entity);
 
 		void OnRuntimeStart();

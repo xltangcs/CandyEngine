@@ -6,6 +6,8 @@
 #include "Candy/Renderer/RenderCommand.h"
 
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 
 namespace Candy {
 	struct QuadVertex

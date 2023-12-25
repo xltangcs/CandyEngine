@@ -1,8 +1,9 @@
 #pragma once
 
 #include "Candy/Scene/SceneCamera.h"
-#include "Candy/Scene/ScriptableEntity.h"
+#include "Candy/Core/UUID.h"
 #include "Candy/Renderer/Texture.h"
+
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -11,6 +12,14 @@
 #include <glm/gtx/quaternion.hpp>
 
 namespace Candy {
+
+	struct IDComponent
+	{
+		UUID ID;
+
+		IDComponent() = default;
+		IDComponent(const IDComponent&) = default;
+	};
 
 	struct TagComponent
 	{
@@ -62,6 +71,9 @@ namespace Candy {
 		CameraComponent() = default;
 		CameraComponent(const CameraComponent&) = default;
 	};
+
+	// Forward declaration
+	class ScriptableEntity;
 
 	struct NativeScriptComponent
 	{

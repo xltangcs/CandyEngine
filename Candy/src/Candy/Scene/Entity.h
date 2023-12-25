@@ -1,6 +1,8 @@
 #pragma once
 
+#include "Candy/Core/UUID.h"
 #include "Candy/Scene/Scene.h"
+#include "Candy/Scene/Components.h"
 
 #include "entt.hpp"
 
@@ -48,6 +50,7 @@ namespace Candy {
 		operator bool() const { return m_EntityHandle != entt::null; }
 		operator entt::entity() const { return m_EntityHandle; }
 		operator uint32_t() const { return (uint32_t)m_EntityHandle; }
+		UUID GetUUID() { return GetComponent<IDComponent>().ID; }
 
 		bool operator==(const Entity& other) const
 		{

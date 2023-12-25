@@ -156,6 +156,7 @@
     <ClInclude Include="src\Candy\Core\Log.h" />
     <ClInclude Include="src\Candy\Core\MouseCodes.h" />
     <ClInclude Include="src\Candy\Core\Timestep.h" />
+    <ClInclude Include="src\Candy\Core\UUID.h" />
     <ClInclude Include="src\Candy\Core\Window.h" />
     <ClInclude Include="src\Candy\Events\ApplicationEvent.h" />
     <ClInclude Include="src\Candy\Events\Event.h" />
@@ -617,6 +618,7 @@
     <ClCompile Include="src\Candy\Core\Layer.cpp" />
     <ClCompile Include="src\Candy\Core\LayerStack.cpp" />
     <ClCompile Include="src\Candy\Core\Log.cpp" />
+    <ClCompile Include="src\Candy\Core\UUID.cpp" />
     <ClCompile Include="src\Candy\Core\Window.cpp" />
     <ClCompile Include="src\Candy\Imgui\ImguiBuild.cpp" />
     <ClCompile Include="src\Candy\Imgui\ImguiLayer.cpp" />

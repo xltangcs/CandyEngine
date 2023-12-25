@@ -1,6 +1,24 @@
 Scene: 2DQuad
 Entities:
-  - Entity: 12837192831273
+  - Entity: 2540010385376538016
+    TagComponent:
+      Tag: Green
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SpriteRendererComponent:
+      Color: [0.179669932, 0.745173752, 0.13234745, 1]
+  - Entity: 2405613058465647291
+    TagComponent:
+      Tag: Red
+    TransformComponent:
+      Translation: [1.79999995, 0, -1.10000002]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SpriteRendererComponent:
+      Color: [0.880308867, 0.13255617, 0.184523895, 1]
+  - Entity: 653384798559702517
     TagComponent:
       Tag: Camera
     TransformComponent:
@@ -18,21 +36,3 @@ Entities:
         OrthographicFar: 46
       Primary: true
       FixedAspectRatio: false
-  - Entity: 12837192831273
-    TagComponent:
-      Tag: Red
-    TransformComponent:
-      Translation: [1.5, 0, -1.10000002]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    SpriteRendererComponent:
-      Color: [0.880308867, 0.13255617, 0.184523895, 1]
-  - Entity: 12837192831273
-    TagComponent:
-      Tag: Green
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    SpriteRendererComponent:
-      Color: [0.179669932, 0.745173752, 0.13234745, 1]
