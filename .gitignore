@@ -1,6 +1,5 @@
 # Binaries
-**/bin/
-!vendor/premake/bin/
+bin/
 bin-int/
 
 #CandyEngine log file
@@ -13,6 +12,3 @@ bin-int/
 **.vcxproj.filters
 **.vcxproj.user
 
-
-#ImGui File
-imgui.ini
