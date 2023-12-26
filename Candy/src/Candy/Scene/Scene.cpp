@@ -271,6 +271,8 @@ namespace Candy {
 			}
 		}
 
+		//Renderer2D::DrawLine(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.75f, 0.75f, 0.0f), glm::vec4(1.0f, 1.0f, 0.0f, 1.0f));
+
 		Renderer2D::EndScene();
 	}
 
