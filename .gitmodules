@@ -9,7 +9,7 @@
 	url = https://github.com/xltangcs/imgui
 [submodule "Candy/vendor/GLFW"]
 	path = Candy/vendor/GLFW
-	url = https://github.com/xltangcs/glfw
+	url = https://github.com/xltangcs/glfw.git
 [submodule "Candy/vendor/yaml-cpp"]
 	path = Candy/vendor/yaml-cpp
 	url = https://github.com/xltangcs/yaml-cpp
