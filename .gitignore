@@ -2,6 +2,8 @@
 bin/
 bin-int/
 
+!bin/premake
+
 #CandyEngine log file
 **.log
 
