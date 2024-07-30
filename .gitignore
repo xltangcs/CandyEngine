@@ -2,7 +2,7 @@
 bin/
 bin-int/
 
-!bin/premake
+!/vendor/premake/premake5.exe
 
 #CandyEngine log file
 **.log

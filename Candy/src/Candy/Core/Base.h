@@ -61,3 +61,4 @@ namespace Candy {
 
 #include "Candy/Core/Log.h"
 #include "Candy/Core/Assert.h"
+#include "Candy/Debug/Instrumentor.h"

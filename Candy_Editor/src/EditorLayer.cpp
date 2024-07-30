@@ -23,6 +23,8 @@ namespace Candy {
 
 	void EditorLayer::OnAttach()
 	{
+		CANDY_PROFILE_FUNCTION();
+
 		m_CheckerboardTexture = Texture2D::Create("assets/textures/Checkerboard.png");
 		m_IconPlay = Texture2D::Create("../Resources/Icons/PlayButton.png");
 		m_IconStop = Texture2D::Create("../Resources/Icons/StopButton.png");
@@ -92,11 +94,13 @@ namespace Candy {
 
 	void EditorLayer::OnDetach()
 	{
-
+		CANDY_PROFILE_FUNCTION();
 	}
 
 	void EditorLayer::OnUpdate(Timestep ts)
 	{
+		CANDY_PROFILE_FUNCTION();
+
 		// Resize
 		if (FramebufferSpecification spec = m_Framebuffer->GetSpecification();
 			m_ViewportSize.x > 0.0f && m_ViewportSize.y > 0.0f && // zero sized framebuffer is invalid
@@ -171,6 +175,8 @@ namespace Candy {
 
 	void EditorLayer::OnImGuiRender()
 	{
+		CANDY_PROFILE_FUNCTION();
+
 		// Note: Switch this to true to enable dockspace
 		static bool dockspaceOpen = true;
 		static bool opt_fullscreen_persistant = true;

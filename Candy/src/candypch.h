@@ -23,6 +23,7 @@
 #include <unordered_set>
 
 #include "Candy/Core/Log.h"
+#include "Candy/Debug/Instrumentor.h"
 
 #ifdef CANDY_PLATFORM_WINDOWS
 	#include <Windows.h>
