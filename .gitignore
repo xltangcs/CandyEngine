@@ -21,6 +21,10 @@ Candy/ThirdParty/box2d/
 **.vcxproj
 **.vcxproj.filters
 **.vcxproj.user
+.idea/
+
+# xmake build cache
+.xmake/
 
 # Profiling output
 results.json

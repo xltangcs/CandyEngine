@@ -3,6 +3,7 @@ project "Candy_Editor"
 	language "C++"
 	cppdialect "C++17"
 	staticruntime "off"
+	buildoptions { "/utf-8" }
 
     targetdir ("%{wks.location}/bin/" .. outputdir .. "/%{prj.name}")
 	objdir ("%{wks.location}/bin-int/" .. outputdir .. "/%{prj.name}")
