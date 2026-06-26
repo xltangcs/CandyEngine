@@ -11,7 +11,7 @@ Sandbox2D::Sandbox2D()
 
 void Sandbox2D::OnAttach()
 {
-	m_CheckerboardTexture = Candy::Texture2D::Create("assets/textures/Checkerboard.png");
+	m_CheckerboardTexture = Candy::Texture2D::Create("Assets/textures/Checkerboard.png");
 }
 
 void Sandbox2D::OnDetach()

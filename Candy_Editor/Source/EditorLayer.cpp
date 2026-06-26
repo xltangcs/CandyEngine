@@ -25,7 +25,7 @@ namespace Candy {
 	{
 		CANDY_PROFILE_FUNCTION();
 
-		m_CheckerboardTexture = Texture2D::Create("assets/textures/Checkerboard.png");
+		m_CheckerboardTexture = Texture2D::Create("Assets/textures/Checkerboard.png");
 		m_IconPlay = Texture2D::Create("../Resources/Icons/PlayButton.png");
 		m_IconStop = Texture2D::Create("../Resources/Icons/StopButton.png");
 		m_IconSimulate = Texture2D::Create("../Resources/Icons/SimulateButton.png");

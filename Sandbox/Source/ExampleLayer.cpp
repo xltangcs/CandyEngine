@@ -109,10 +109,10 @@ ExampleLayer::ExampleLayer()
 
 	m_FlatColorShader = Candy::Shader::Create("FlatColor", flatColorShaderVertexSrc, flatColorShaderFragmentSrc);
 
-	auto textureShader = m_ShaderLibrary.Load("assets/shaders/Texture.glsl");//shader name = file name
+	auto textureShader = m_ShaderLibrary.Load("Assets/shaders/Texture.glsl");//shader name = file name
 
-	m_Texture = Candy::Texture2D::Create("assets/textures/Checkerboard.png");
-	m_CandyLogTexture = Candy::Texture2D::Create("assets/textures/Candy_Log.png");
+	m_Texture = Candy::Texture2D::Create("Assets/textures/Checkerboard.png");
+	m_CandyLogTexture = Candy::Texture2D::Create("Assets/textures/Candy_Log.png");
 
 	textureShader->Bind();
 	textureShader->SetInt("u_Texture", 0);
