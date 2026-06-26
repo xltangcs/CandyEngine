@@ -19,3 +19,21 @@
 [submodule "Candy/vendor/box2d"]
 	path = Candy/ThirdParty/box2d
 	url = https://github.com/xltangcs/box2d
+[submodule "Candy/ThirdParty/GLFW"]
+	path = Candy/ThirdParty/GLFW
+	url = https://github.com/xltangcs/glfw.git
+[submodule "Candy/ThirdParty/yaml-cpp"]
+	path = Candy/ThirdParty/yaml-cpp
+	url = https://github.com/xltangcs/yaml-cpp
+[submodule "Candy/ThirdParty/ImGuizmo"]
+	path = Candy/ThirdParty/ImGuizmo
+	url = https://github.com/xltangcs/ImGuizmo
+[submodule "Candy/ThirdParty/box2d"]
+	path = Candy/ThirdParty/box2d
+	url = https://github.com/xltangcs/box2d
+[submodule "Candy/ThirdParty/glm"]
+	path = Candy/ThirdParty/glm
+	url = https://github.com/g-truc/glm
+[submodule "Candy/ThirdParty/imgui"]
+	path = Candy/ThirdParty/imgui
+	url = https://github.com/xltangcs/imgui
