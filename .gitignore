@@ -2,7 +2,15 @@
 bin/
 bin-int/
 
-!/vendor/premake/premake5.exe
+!/ThirdParty/premake/premake5.exe
+
+# Third-party dependencies (cloned by GenerateProjects.bat)
+Candy/ThirdParty/glm/
+Candy/ThirdParty/imgui/
+Candy/ThirdParty/GLFW/
+Candy/ThirdParty/yaml-cpp/
+Candy/ThirdParty/ImGuizmo/
+Candy/ThirdParty/box2d/
 
 #CandyEngine log file
 **.log
@@ -14,5 +22,5 @@ bin-int/
 **.vcxproj.filters
 **.vcxproj.user
 
-#
-**.json
+# Profiling output
+results.json

@@ -1,21 +1,21 @@
 [submodule "candy/vendor/spdlog"]
-	path = candy/vendor/spdlog
+	path = Candy/ThirdParty/spdlog
 	url = https://github.com/gabime/spdlog
 [submodule "Candy/vendor/glm"]
-	path = Candy/vendor/glm
+	path = Candy/ThirdParty/glm
 	url = https://github.com/g-truc/glm
 [submodule "Candy/vendor/imgui"]
-	path = Candy/vendor/imgui
+	path = Candy/ThirdParty/imgui
 	url = https://github.com/xltangcs/imgui
 [submodule "Candy/vendor/GLFW"]
-	path = Candy/vendor/GLFW
+	path = Candy/ThirdParty/GLFW
 	url = https://github.com/xltangcs/glfw.git
 [submodule "Candy/vendor/yaml-cpp"]
-	path = Candy/vendor/yaml-cpp
+	path = Candy/ThirdParty/yaml-cpp
 	url = https://github.com/xltangcs/yaml-cpp
 [submodule "Candy/vendor/ImGuizmo"]
-	path = Candy/vendor/ImGuizmo
+	path = Candy/ThirdParty/ImGuizmo
 	url = https://github.com/xltangcs/ImGuizmo
 [submodule "Candy/vendor/box2d"]
-	path = Candy/vendor/box2d
+	path = Candy/ThirdParty/box2d
 	url = https://github.com/xltangcs/box2d
