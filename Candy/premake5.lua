@@ -26,6 +26,8 @@ project "Candy"
 		"GLFW_INCLUDE_NONE",
 		"YAML_CPP_STATIC_DEFINE"
 	}
+
+	buildoptions { "/utf-8" }
 	
 	includedirs{
         "Source",
