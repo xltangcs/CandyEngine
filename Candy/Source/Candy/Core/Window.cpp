@@ -1,4 +1,4 @@
-#include "candypch.h"
+#include "CandyPCH.h"
 #include "Candy/Core/Window.h"
 
 #ifdef CANDY_PLATFORM_WINDOWS

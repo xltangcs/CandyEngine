@@ -1,4 +1,4 @@
-#include "candypch.h"
+#include "CandyPCH.h"
 
 #include "Candy/Renderer/RendererAPI.h"
 #include "Platform/OpenGL/OpenGLRendererAPI.h"

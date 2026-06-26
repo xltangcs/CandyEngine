@@ -1,4 +1,4 @@
-#include "candypch.h"
+#include "CandyPCH.h"
 
 #include "Candy/Renderer/Shader.h"
 #include "Candy/Renderer/Renderer2D.h"
@@ -165,9 +165,9 @@ namespace Candy {
 		for (uint32_t i = 0; i < s_Data.MaxTextureSlots; i++)
 			samplers[i] = i;
 
-		s_Data.QuadShader = Shader::Create("assets/shaders/Renderer2D_Quad.glsl");
-		s_Data.CircleShader = Shader::Create("assets/shaders/Renderer2D_Circle.glsl");
-		s_Data.LineShader = Shader::Create("assets/shaders/Renderer2D_Line.glsl");
+		s_Data.QuadShader = Shader::Create("Assets/shaders/Renderer2D_Quad.glsl");
+		s_Data.CircleShader = Shader::Create("Assets/shaders/Renderer2D_Circle.glsl");
+		s_Data.LineShader = Shader::Create("Assets/shaders/Renderer2D_Line.glsl");
 
 		s_Data.TextureSlots[0] = s_Data.WhiteTexture;
 

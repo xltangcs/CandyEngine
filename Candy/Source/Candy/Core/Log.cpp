@@ -1,4 +1,4 @@
-#include "candypch.h"
+#include "CandyPCH.h"
 
 #include "Candy/Core/Log.h"
 #include <spdlog/sinks/stdout_color_sinks.h>
