@@ -4,7 +4,7 @@
 #pragma once
 
 #ifndef SPDLOG_HEADER_ONLY
-    #include <spdlog/sinks/wincolor_sink.h>
+#include <spdlog/sinks/wincolor_sink.h>
 #endif
 
 #include <spdlog/details/windows_include.h>
@@ -13,13 +13,13 @@
 #include <spdlog/common.h>
 #include <spdlog/pattern_formatter.h>
 
-namespace spdlog {
+SPDLOG_NAMESPACE_BEGIN
 namespace sinks {
 template <typename ConsoleMutex>
 SPDLOG_INLINE wincolor_sink<ConsoleMutex>::wincolor_sink(void *out_handle, color_mode mode)
     : out_handle_(out_handle),
       mutex_(ConsoleMutex::mutex()),
-      formatter_(details::make_unique<spdlog::pattern_formatter>()) {
+      formatter_(details::make_unique<pattern_formatter>()) {
     set_color_mode_impl(mode);
     // set level colors
     colors_[level::trace] = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;  // white
@@ -82,12 +82,12 @@ void SPDLOG_INLINE wincolor_sink<ConsoleMutex>::flush() {
 template <typename ConsoleMutex>
 void SPDLOG_INLINE wincolor_sink<ConsoleMutex>::set_pattern(const std::string &pattern) {
     std::lock_guard<mutex_t> lock(mutex_);
-    formatter_ = std::unique_ptr<spdlog::formatter>(new pattern_formatter(pattern));
+    formatter_ = std::unique_ptr<formatter>(new pattern_formatter(pattern));
 }
 
 template <typename ConsoleMutex>
 void SPDLOG_INLINE
-wincolor_sink<ConsoleMutex>::set_formatter(std::unique_ptr<spdlog::formatter> sink_formatter) {
+wincolor_sink<ConsoleMutex>::set_formatter(std::unique_ptr<formatter> sink_formatter) {
     std::lock_guard<mutex_t> lock(mutex_);
     formatter_ = std::move(sink_formatter);
 }
@@ -134,9 +134,18 @@ void SPDLOG_INLINE wincolor_sink<ConsoleMutex>::print_range_(const memory_buf_t 
                                                              size_t start,
                                                              size_t end) {
     if (end > start) {
+#if defined(SPDLOG_UTF8_TO_WCHAR_CONSOLE)
+        wmemory_buf_t wformatted;
+        details::os::utf8_to_wstrbuf(string_view_t(formatted.data() + start, end - start),
+                                     wformatted);
+        auto size = static_cast<DWORD>(wformatted.size());
+        auto ignored = ::WriteConsoleW(static_cast<HANDLE>(out_handle_), wformatted.data(), size,
+                                       nullptr, nullptr);
+#else
         auto size = static_cast<DWORD>(end - start);
         auto ignored = ::WriteConsoleA(static_cast<HANDLE>(out_handle_), formatted.data() + start,
                                        size, nullptr, nullptr);
+#endif
         (void)(ignored);
     }
 }
@@ -160,4 +169,4 @@ template <typename ConsoleMutex>
 SPDLOG_INLINE wincolor_stderr_sink<ConsoleMutex>::wincolor_stderr_sink(color_mode mode)
     : wincolor_sink<ConsoleMutex>(::GetStdHandle(STD_ERROR_HANDLE), mode) {}
 }  // namespace sinks
-}  // namespace spdlog
+SPDLOG_NAMESPACE_END

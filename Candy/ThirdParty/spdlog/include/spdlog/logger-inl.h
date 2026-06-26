@@ -4,7 +4,7 @@
 #pragma once
 
 #ifndef SPDLOG_HEADER_ONLY
-    #include <spdlog/logger.h>
+#include <spdlog/logger.h>
 #endif
 
 #include <spdlog/details/backtracer.h>
@@ -13,7 +13,7 @@
 
 #include <cstdio>
 
-namespace spdlog {
+SPDLOG_NAMESPACE_BEGIN
 
 // public methods
 SPDLOG_INLINE logger::logger(const logger &other)
@@ -39,7 +39,7 @@ SPDLOG_INLINE logger &logger::operator=(logger other) SPDLOG_NOEXCEPT {
     return *this;
 }
 
-SPDLOG_INLINE void logger::swap(spdlog::logger &other) SPDLOG_NOEXCEPT {
+SPDLOG_INLINE void logger::swap(logger &other) SPDLOG_NOEXCEPT {
     name_.swap(other.name_);
     sinks_.swap(other.sinks_);
 
@@ -57,7 +57,7 @@ SPDLOG_INLINE void logger::swap(spdlog::logger &other) SPDLOG_NOEXCEPT {
     std::swap(tracer_, other.tracer_);
 }
 
-SPDLOG_INLINE void swap(logger &a, logger &b) { a.swap(b); }
+SPDLOG_INLINE void swap(logger &a, logger &b) noexcept { a.swap(b); }
 
 SPDLOG_INLINE void logger::set_level(level::level_enum log_level) { level_.store(log_level); }
 
@@ -121,7 +121,7 @@ SPDLOG_INLINE std::shared_ptr<logger> logger::clone(std::string logger_name) {
 }
 
 // protected methods
-SPDLOG_INLINE void logger::log_it_(const spdlog::details::log_msg &log_msg,
+SPDLOG_INLINE void logger::log_it_(const details::log_msg &log_msg,
                                    bool log_enabled,
                                    bool traceback_enabled) {
     if (log_enabled) {
@@ -163,12 +163,11 @@ SPDLOG_INLINE void logger::dump_backtrace_() {
     }
 }
 
-SPDLOG_INLINE bool logger::should_flush_(const details::log_msg &msg) {
-    auto flush_level = flush_level_.load(std::memory_order_relaxed);
-    return (msg.level >= flush_level) && (msg.level != level::off);
+SPDLOG_INLINE bool logger::should_flush_(const details::log_msg &msg) const {
+    return (msg.level >= flush_level()) && (msg.level != level::off);
 }
 
-SPDLOG_INLINE void logger::err_handler_(const std::string &msg) {
+SPDLOG_INLINE void logger::err_handler_(const std::string &msg) const {
     if (custom_err_handler_) {
         custom_err_handler_(msg);
     } else {
@@ -195,4 +194,4 @@ SPDLOG_INLINE void logger::err_handler_(const std::string &msg) {
 #endif
     }
 }
-}  // namespace spdlog
+SPDLOG_NAMESPACE_END

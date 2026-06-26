@@ -11,7 +11,7 @@
 #include <spdlog/sinks/sink.h>
 #include <string>
 
-namespace spdlog {
+SPDLOG_NAMESPACE_BEGIN
 namespace sinks {
 
 /**
@@ -36,12 +36,12 @@ public:
 
     void set_color(level::level_enum color_level, string_view_t color);
     void set_color_mode(color_mode mode);
-    bool should_color();
+    bool should_color() const;
 
     void log(const details::log_msg &msg) override;
     void flush() override;
-    void set_pattern(const std::string &pattern) final;
-    void set_formatter(std::unique_ptr<spdlog::formatter> sink_formatter) override;
+    void set_pattern(const std::string &pattern) override;
+    void set_formatter(std::unique_ptr<formatter> sink_formatter) override;
 
     // Formatting codes
     const string_view_t reset = "\033[m";
@@ -78,14 +78,17 @@ public:
     const string_view_t red_bold = "\033[31m\033[1m";
     const string_view_t bold_on_red = "\033[1m\033[41m";
 
-private:
+protected:
     FILE *target_file_;
+
+private:
     mutex_t &mutex_;
     bool should_do_colors_;
-    std::unique_ptr<spdlog::formatter> formatter_;
+    std::unique_ptr<formatter> formatter_;
     std::array<std::string, level::n_levels> colors_;
-    void print_ccode_(const string_view_t &color_code);
-    void print_range_(const memory_buf_t &formatted, size_t start, size_t end);
+    void set_color_mode_(color_mode mode);
+    void print_ccode_(const string_view_t &color_code) const;
+    void print_range_(const memory_buf_t &formatted, size_t start, size_t end) const;
     static std::string to_string_(const string_view_t &sv);
 };
 
@@ -108,8 +111,8 @@ using ansicolor_stderr_sink_mt = ansicolor_stderr_sink<details::console_mutex>;
 using ansicolor_stderr_sink_st = ansicolor_stderr_sink<details::console_nullmutex>;
 
 }  // namespace sinks
-}  // namespace spdlog
+SPDLOG_NAMESPACE_END
 
 #ifdef SPDLOG_HEADER_ONLY
-    #include "ansicolor_sink-inl.h"
+#include "ansicolor_sink-inl.h"
 #endif

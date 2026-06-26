@@ -9,13 +9,13 @@
 #include <spdlog/common.h>
 
 #if defined(__has_include)
-    #if __has_include(<version>)
-        #include <version>
-    #endif
+#if __has_include(<version>)
+#include <version>
+#endif
 #endif
 
 #if __cpp_lib_span >= 202002L
-    #include <span>
+#include <span>
 #endif
 
 //
@@ -36,7 +36,7 @@
 // logger->info("Some buffer {:X}", spdlog::to_hex(std::begin(buf), std::end(buf)));
 // logger->info("Some buffer {:X}", spdlog::to_hex(std::begin(buf), std::end(buf), 16));
 
-namespace spdlog {
+SPDLOG_NAMESPACE_BEGIN
 namespace details {
 
 template <typename It>
@@ -90,7 +90,7 @@ inline details::dump_info<It> to_hex(const It range_begin,
     return details::dump_info<It>(range_begin, range_end, size_per_line);
 }
 
-}  // namespace spdlog
+SPDLOG_NAMESPACE_END
 
 namespace
 #ifdef SPDLOG_USE_STD_FORMAT
@@ -101,8 +101,8 @@ namespace
 {
 
 template <typename T>
-struct formatter<spdlog::details::dump_info<T>, char> {
-    const char delimiter = ' ';
+struct formatter<SPDLOG_NAMESPACE::details::dump_info<T>, char> {
+    char delimiter = ' ';
     bool put_newlines = true;
     bool put_delimiters = true;
     bool use_uppercase = false;
@@ -142,8 +142,8 @@ struct formatter<spdlog::details::dump_info<T>, char> {
 
     // format the given bytes range as hex
     template <typename FormatContext, typename Container>
-    auto format(const spdlog::details::dump_info<Container> &the_range, FormatContext &ctx) const
-        -> decltype(ctx.out()) {
+    auto format(const SPDLOG_NAMESPACE::details::dump_info<Container> &the_range,
+                FormatContext &ctx) const -> decltype(ctx.out()) {
         SPDLOG_CONSTEXPR const char *hex_upper = "0123456789ABCDEF";
         SPDLOG_CONSTEXPR const char *hex_lower = "0123456789abcdef";
         const char *hex_chars = use_uppercase ? hex_upper : hex_lower;
@@ -217,7 +217,7 @@ struct formatter<spdlog::details::dump_info<T>, char> {
         *inserter++ = '\n';
 
         if (put_positions) {
-            spdlog::fmt_lib::format_to(inserter, SPDLOG_FMT_STRING("{:04X}: "), pos);
+            SPDLOG_NAMESPACE::fmt_lib::format_to(inserter, SPDLOG_FMT_STRING("{:04X}: "), pos);
         }
     }
 };

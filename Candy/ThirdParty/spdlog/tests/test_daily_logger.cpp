@@ -46,12 +46,8 @@ TEST_CASE("daily_logger with dateonly calculator", "[daily_logger]") {
 
 struct custom_daily_file_name_calculator {
     static spdlog::filename_t calc_filename(const spdlog::filename_t &basename, const tm &now_tm) {
-        filename_memory_buf_t w;
-        spdlog::fmt_lib::format_to(std::back_inserter(w), SPDLOG_FILENAME_T("{}{:04d}{:02d}{:02d}"),
-                                   basename, now_tm.tm_year + 1900, now_tm.tm_mon + 1,
-                                   now_tm.tm_mday);
-
-        return SPDLOG_BUF_TO_STRING(w);
+        return spdlog::fmt_lib::format(SPDLOG_FILENAME_T("{}{:04d}{:02d}{:02d}"), basename,
+                                       now_tm.tm_year + 1900, now_tm.tm_mon + 1, now_tm.tm_mday);
     }
 };
 
@@ -102,7 +98,7 @@ TEST_CASE("rotating_file_sink::calc_filename3", "[rotating_file_sink]") {
 // regex supported only from gcc 4.9 and above
 #if defined(_MSC_VER) || !(__GNUC__ <= 4 && __GNUC_MINOR__ < 9)
 
-    #include <regex>
+#include <regex>
 
 TEST_CASE("daily_file_sink::daily_filename_calculator", "[daily_file_sink]") {
     // daily_YYYY-MM-DD_hh-mm.txt

@@ -5,24 +5,24 @@
 
 #ifdef __ANDROID__
 
-    #include <spdlog/details/fmt_helper.h>
-    #include <spdlog/details/null_mutex.h>
-    #include <spdlog/details/os.h>
-    #include <spdlog/details/synchronous_factory.h>
-    #include <spdlog/sinks/base_sink.h>
+#include <spdlog/details/fmt_helper.h>
+#include <spdlog/details/null_mutex.h>
+#include <spdlog/details/os.h>
+#include <spdlog/details/synchronous_factory.h>
+#include <spdlog/sinks/base_sink.h>
 
-    #include <android/log.h>
-    #include <chrono>
-    #include <mutex>
-    #include <string>
-    #include <thread>
-    #include <type_traits>
+#include <android/log.h>
+#include <chrono>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <type_traits>
 
-    #if !defined(SPDLOG_ANDROID_RETRIES)
-        #define SPDLOG_ANDROID_RETRIES 2
-    #endif
+#if !defined(SPDLOG_ANDROID_RETRIES)
+#define SPDLOG_ANDROID_RETRIES 2
+#endif
 
-namespace spdlog {
+SPDLOG_NAMESPACE_BEGIN
 namespace sinks {
 
 /*
@@ -85,19 +85,19 @@ private:
         return __android_log_buf_write(ID, prio, tag, text);
     }
 
-    static android_LogPriority convert_to_android_(spdlog::level::level_enum level) {
+    static android_LogPriority convert_to_android_(level::level_enum level) {
         switch (level) {
-            case spdlog::level::trace:
+            case level::trace:
                 return ANDROID_LOG_VERBOSE;
-            case spdlog::level::debug:
+            case level::debug:
                 return ANDROID_LOG_DEBUG;
-            case spdlog::level::info:
+            case level::info:
                 return ANDROID_LOG_INFO;
-            case spdlog::level::warn:
+            case level::warn:
                 return ANDROID_LOG_WARN;
-            case spdlog::level::err:
+            case level::err:
                 return ANDROID_LOG_ERROR;
-            case spdlog::level::critical:
+            case level::critical:
                 return ANDROID_LOG_FATAL;
             default:
                 return ANDROID_LOG_DEFAULT;
@@ -120,18 +120,18 @@ using android_sink_buf_st = android_sink<details::null_mutex, BufferId>;
 
 // Create and register android syslog logger
 
-template <typename Factory = spdlog::synchronous_factory>
+template <typename Factory = synchronous_factory>
 inline std::shared_ptr<logger> android_logger_mt(const std::string &logger_name,
                                                  const std::string &tag = "spdlog") {
     return Factory::template create<sinks::android_sink_mt>(logger_name, tag);
 }
 
-template <typename Factory = spdlog::synchronous_factory>
+template <typename Factory = synchronous_factory>
 inline std::shared_ptr<logger> android_logger_st(const std::string &logger_name,
                                                  const std::string &tag = "spdlog") {
     return Factory::template create<sinks::android_sink_st>(logger_name, tag);
 }
 
-}  // namespace spdlog
+SPDLOG_NAMESPACE_END
 
 #endif  // __ANDROID__

@@ -15,7 +15,7 @@
 #include <functional>
 #include <mutex>
 #include <thread>
-namespace spdlog {
+SPDLOG_NAMESPACE_BEGIN
 namespace details {
 
 class SPDLOG_API periodic_worker {
@@ -38,6 +38,7 @@ public:
             }
         });
     }
+    std::thread &get_thread() { return worker_thread_; }
     periodic_worker(const periodic_worker &) = delete;
     periodic_worker &operator=(const periodic_worker &) = delete;
     // stop the worker thread and join it
@@ -50,8 +51,8 @@ private:
     std::condition_variable cv_;
 };
 }  // namespace details
-}  // namespace spdlog
+SPDLOG_NAMESPACE_END
 
 #ifdef SPDLOG_HEADER_ONLY
-    #include "periodic_worker-inl.h"
+#include "periodic_worker-inl.h"
 #endif

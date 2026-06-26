@@ -19,6 +19,15 @@ TEST_CASE("env", "[cfg]") {
 #endif
     load_env_levels();
     REQUIRE(l1->level() == spdlog::level::warn);
+
+#ifdef CATCH_PLATFORM_WINDOWS
+    _putenv_s("MYAPP_LEVEL", "l1=trace");
+#else
+    setenv("MYAPP_LEVEL", "l1=trace", 1);
+#endif
+    load_env_levels("MYAPP_LEVEL");
+    REQUIRE(l1->level() == spdlog::level::trace);
+
     spdlog::set_default_logger(spdlog::create<test_sink_st>("cfg-default"));
     REQUIRE(spdlog::default_logger()->level() == spdlog::level::info);
 }
@@ -166,4 +175,34 @@ TEST_CASE("restore-to-default", "[cfg]") {
     const char *argv[] = {"ignore", "SPDLOG_LEVEL=info"};
     load_argv_levels(2, argv);
     REQUIRE(spdlog::default_logger()->level() == spdlog::level::info);
+}
+
+TEST_CASE("uppercase-level-names", "[cfg]") {
+    spdlog::drop("l1");
+    spdlog::drop("l2");
+    
+#ifdef CATCH_PLATFORM_WINDOWS
+    _putenv_s("SPDLOG_LEVEL", "l1=DEBUG,INFO");
+#else
+    setenv("SPDLOG_LEVEL", "l1=DEBUG,INFO", 1);
+#endif
+    load_env_levels();
+    auto l1 = spdlog::create<test_sink_st>("l1");
+    auto l2 = spdlog::create<test_sink_st>("l2");
+    
+    REQUIRE(l1->level() == spdlog::level::debug);
+    REQUIRE(l2->level() == spdlog::level::info);
+    REQUIRE(spdlog::default_logger()->level() == spdlog::level::info);
+    
+    // Test with argv
+    spdlog::drop("l3");
+    const char *argv[] = {"ignore", "SPDLOG_LEVEL=l3=WARN,ERROR"};
+    load_argv_levels(2, argv);
+    auto l3 = spdlog::create<test_sink_st>("l3");
+    
+    REQUIRE(l3->level() == spdlog::level::warn);
+    REQUIRE(spdlog::default_logger()->level() == spdlog::level::err);
+    
+    // Reset to info
+    spdlog::set_level(spdlog::level::info);
 }

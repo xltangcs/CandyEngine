@@ -13,11 +13,11 @@
 #include "spdlog/sinks/rotating_file_sink.h"
 
 #if defined(SPDLOG_USE_STD_FORMAT)
-    #include <format>
+#include <format>
 #elif defined(SPDLOG_FMT_EXTERNAL)
-    #include <fmt/format.h>
+#include <fmt/format.h>
 #else
-    #include "spdlog/fmt/bundled/format.h"
+#include "spdlog/fmt/bundled/format.h"
 #endif
 
 #include "utils.h"
@@ -181,7 +181,7 @@ void bench_mt(int howmany, std::shared_ptr<spdlog::logger> log, size_t thread_co
 
     for (auto &t : threads) {
         t.join();
-    };
+    }
 
     auto delta = high_resolution_clock::now() - start;
     auto delta_d = duration_cast<duration<double>>(delta).count();

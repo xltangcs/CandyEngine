@@ -18,7 +18,7 @@
 #include <mutex>
 #include <string>
 
-namespace spdlog {
+SPDLOG_NAMESPACE_BEGIN
 namespace sinks {
 
 /*
@@ -39,6 +39,8 @@ struct hourly_filename_calculator {
  * Rotating file sink based on time.
  * If truncate != false , the created file will be truncated.
  * If max_files > 0, retain only the last max_files and delete previous.
+ * Note that old log files from previous executions will not be deleted by this class,
+ * rotation and deletion is only applied while the program is running.
  */
 template <typename Mutex, typename FileNameCalc = hourly_filename_calculator>
 class hourly_file_sink final : public base_sink<Mutex> {
@@ -117,7 +119,7 @@ private:
 
     tm now_tm(log_clock::time_point tp) {
         time_t tnow = log_clock::to_time_t(tp);
-        return spdlog::details::os::localtime(tnow);
+        return details::os::localtime(tnow);
     }
 
     log_clock::time_point next_rotation_tp_() {
@@ -169,7 +171,7 @@ using hourly_file_sink_st = hourly_file_sink<details::null_mutex>;
 //
 // factory functions
 //
-template <typename Factory = spdlog::synchronous_factory>
+template <typename Factory = synchronous_factory>
 inline std::shared_ptr<logger> hourly_logger_mt(const std::string &logger_name,
                                                 const filename_t &filename,
                                                 bool truncate = false,
@@ -179,7 +181,7 @@ inline std::shared_ptr<logger> hourly_logger_mt(const std::string &logger_name,
                                                                 max_files, event_handlers);
 }
 
-template <typename Factory = spdlog::synchronous_factory>
+template <typename Factory = synchronous_factory>
 inline std::shared_ptr<logger> hourly_logger_st(const std::string &logger_name,
                                                 const filename_t &filename,
                                                 bool truncate = false,
@@ -188,4 +190,4 @@ inline std::shared_ptr<logger> hourly_logger_st(const std::string &logger_name,
     return Factory::template create<sinks::hourly_file_sink_st>(logger_name, filename, truncate,
                                                                 max_files, event_handlers);
 }
-}  // namespace spdlog
+SPDLOG_NAMESPACE_END
