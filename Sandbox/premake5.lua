@@ -9,14 +9,14 @@ project "Sandbox"
 	objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
 
 	files{
-		"%{prj.name}/src/**.h",
-		"%{prj.name}/src/**.cpp"
+		"%{prj.name}/Source/**.h",
+		"%{prj.name}/Source/**.cpp"
 	}
 	
 	includedirs{
-		"Candy/vendor/spdlog/include",
-		"Candy/src",
-		"Candy/vendor",
+		"Candy/ThirdParty/spdlog/include",
+		"Candy/Source",
+		"Candy/ThirdParty",
         "%{IncludeDir.glm}",
 		"%{IncludeDir.entt}",
 		"%{IncludeDir.yaml_cpp}"

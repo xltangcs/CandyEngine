@@ -7,19 +7,19 @@ project "Candy"
     targetdir ("%{wks.location}/bin/" .. outputdir .. "/%{prj.name}")
 	objdir ("%{wks.location}/bin-int/" .. outputdir .. "/%{prj.name}")
 
-    pchheader "candypch.h"
-    pchsource "src/candypch.cpp"
+    pchheader "CandyPCH.h"
+    pchsource "Source/CandyPCH.cpp"
 
 	
 	files{
-		"src/**.h",
-		"src/**.cpp",
-		"vendor/stb_image/**.h",
-		"vendor/stb_image/**.cpp",
-		"vendor/glm/glm/**.hpp",
-		"vendor/glm/glm/**.inl",
-		"vendor/ImGuizmo/ImGuizmo.h",
-		"vendor/ImGuizmo/ImGuizmo.cpp"
+		"Source/**.h",
+		"Source/**.cpp",
+		"ThirdParty/stb_image/**.h",
+		"ThirdParty/stb_image/**.cpp",
+		"ThirdParty/glm/glm/**.hpp",
+		"ThirdParty/glm/glm/**.inl",
+		"ThirdParty/ImGuizmo/ImGuizmo.h",
+		"ThirdParty/ImGuizmo/ImGuizmo.cpp"
 	}
 	defines{
 		"_CRT_SECURE_NO_WARNINGS",
@@ -28,10 +28,10 @@ project "Candy"
 	}
 	
 	includedirs{
-        "src",
-		"vendor/spdlog/include",
+        "Source",
+		"ThirdParty/spdlog/include",
         "%{IncludeDir.GLFW}",
-        "%{IncludeDir.Glad}",
+        "%{IncludeDir.GLAD}",
         "%{IncludeDir.Imgui}",
         "%{IncludeDir.glm}",
 		"%{IncludeDir.stb_image}",
@@ -45,14 +45,14 @@ project "Candy"
     links 
 	{ 
 		"GLFW",
-		"Glad",
+		"GLAD",
 		"Imgui",
 		"yaml-cpp",
 		"box2d",
 		"opengl32.lib"
 	}
 
-	filter "files:vendor/ImGuizmo/**.cpp"
+	filter "files:ThirdParty/ImGuizmo/**.cpp"
 	flags { "NoPCH" }
 
 	filter "system:windows"

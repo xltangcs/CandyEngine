@@ -8,14 +8,14 @@ project "Candy_Editor"
 	objdir ("%{wks.location}/bin-int/" .. outputdir .. "/%{prj.name}")
 
 	files{
-		"src/**.h",
-		"src/**.cpp"
+		"Source/**.h",
+		"Source/**.cpp"
 	}
 	
 	includedirs{
-		"%{wks.location}/Candy/vendor/spdlog/include",
-		"%{wks.location}/Candy/src",
-		"%{wks.location}/Candy/vendor",
+		"%{wks.location}/Candy/ThirdParty/spdlog/include",
+		"%{wks.location}/Candy/Source",
+		"%{wks.location}/Candy/ThirdParty",
 
 		"%{IncludeDir.glm}",
 		"%{IncludeDir.entt}",
