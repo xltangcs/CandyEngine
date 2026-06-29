@@ -18,8 +18,8 @@ project "Candy"
 		"ThirdParty/stb_image/**.cpp",
 		"ThirdParty/glm/glm/**.hpp",
 		"ThirdParty/glm/glm/**.inl",
-		"ThirdParty/ImGuizmo/ImGuizmo.h",
-		"ThirdParty/ImGuizmo/ImGuizmo.cpp"
+		"ThirdParty/ImGuizmo/src/ImGuizmo.h",
+		"ThirdParty/ImGuizmo/src/ImGuizmo.cpp"
 	}
 	defines{
 		"_CRT_SECURE_NO_WARNINGS",
@@ -54,7 +54,7 @@ project "Candy"
 		"opengl32.lib"
 	}
 
-	filter "files:ThirdParty/ImGuizmo/**.cpp"
+	filter "files:ThirdParty/ImGuizmo/src/**.cpp"
 	flags { "NoPCH" }
 
 	filter "system:windows"

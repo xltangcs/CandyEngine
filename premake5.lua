@@ -22,7 +22,7 @@ IncludeDir["glm"]   	= "%{wks.location}/Candy/ThirdParty/glm"
 IncludeDir["stb_image"] = "%{wks.location}/Candy/ThirdParty/stb_image"
 IncludeDir["entt"]  	= "%{wks.location}/Candy/ThirdParty/entt/include"
 IncludeDir["yaml_cpp"]  = "%{wks.location}/Candy/ThirdParty/yaml-cpp/include"
-IncludeDir["ImGuizmo"]  = "%{wks.location}/Candy/ThirdParty/ImGuizmo"
+IncludeDir["ImGuizmo"]  = "%{wks.location}/Candy/ThirdParty/ImGuizmo/src"
 IncludeDir["box2d"]  = "%{wks.location}/Candy/ThirdParty/box2d/include"
 
 
