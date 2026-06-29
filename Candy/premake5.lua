@@ -40,8 +40,8 @@ project "Candy"
 		"%{IncludeDir.yaml_cpp}",
 		"%{IncludeDir.entt}",
 		"%{IncludeDir.box2d}",
-		"%{IncludeDir.ImGuizmo}"
-		
+		"%{IncludeDir.ImGuizmo}",
+		"%{IncludeDir.pybind11}"
 	}
 
     links 

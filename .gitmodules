@@ -16,3 +16,6 @@
 [submodule "Candy/ThirdParty/imgui"]
 	path = Candy/ThirdParty/imgui
 	url = https://github.com/xltangcs/imgui
+[submodule "Candy/ThirdParty/pybind11"]
+	path = Candy/ThirdParty/pybind11
+	url = https://github.com/xltangcs/pybind11.git
