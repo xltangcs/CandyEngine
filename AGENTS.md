@@ -2,131 +2,81 @@
 
 **语言：AI 回答请使用中文**
 
-## Build System
-
-- **Build tool:** premake5 (not CMake, not MSBuild). Config: `premake5.lua` at root.
-- **Language:** C++17, **Windows x64 only** (`architecture "x64"`).
-- **Config modes:** `Debug` → `CANDY_DEBUG`, `Release` → `CANDY_RELEASE`, `Dist` → `CANDY_DIST`.
+## Build
 
 ```pwsh
-# Generate VS solution (first step — .sln is gitignored)
-.\Scripts\GenerateProjects.bat
-
-# Then open CandyEngine.sln and build in VS, or build from command line:
+git submodule update --init --recursive
+.\Scripts\GenerateProjects.bat    # premake5 → .sln/.vcxproj (均 gitignored)
 msbuild CandyEngine.sln /p:Configuration=Debug
-
-# Run (output goes to bin/<config>-windows-x86_64/<Project>/)
 .\bin\Debug-windows-x86_64\Candy_Editor\Candy_Editor.exe
 ```
 
-**Important:** `CandyEngine.sln` and all `.vcxproj` files are gitignored. Run `Scripts\GenerateProjects.bat` to regenerate them via premake. Never edit generated project files directly.
+- `premake5.lua` 是唯一真实构建来源，**不要手动编辑生成的 .sln/.vcxproj**
+- 配置: `Debug`/`Release`/`Dist` → `CANDY_DEBUG`/`CANDY_RELEASE`/`CANDY_DIST`
+- Sandbox 默认注释在根 `premake5.lua:40`
 
-**Sandbox is commented out** in root `premake5.lua:38`. Uncomment to build it.
+## Design Philosophy — 参考 Godot & UE
 
-## Third-Party Dependencies
+本引擎虽当前架构接近 Hazel Engine（The Cherno 教程），但**设计目标应向 Godot 和 UE 靠拢**：
 
-All third-party libs live in `Candy/ThirdParty/`:
+| 概念 | Godot | UE | CandyEngine（当前） | 目标方向 |
+|------|-------|----|--------------------|---------|
+| 场景组织 | SceneTree + Node | Actor + Component | `Scene` 拥有 `entt::registry` | 引入节点层次/场景图 |
+| 脚本 | GDScript / C# | Blueprint / C++ | `NativeScriptComponent::Bind<T>()` | 类 Godot 节点附加脚本 / 类 UE Blueprint 可视化脚本 |
+| 编辑器 | 内嵌编辑器 | 内嵌编辑器 | `EditorLayer` 管理 Edit/Play/Simulate | 保持 3 态场景模式（类似 UE 的 PIE），增强 Play-in-Editor |
+| 场景文件 | .tscn | .umap | `.candy` (yaml-cpp) | 可读格式，逐步引入场景继承/实例化 |
+| 资源管理 | .import | Content Browser | 尚无资源管线 | 需实现类 Godot/UE 的资源导入和管理系统 |
 
-| Dependency | Type | How it builds |
-|---|---|---|
-| **GLFW** | git submodule (forked: `xltangcs/glfw`) | Separate premake project → `GLFW` static lib |
-| **glm** | git submodule (`g-truc/glm`) | Compiled as part of `Candy` (header + inline) |
-| **imgui** | git submodule (forked: `xltangcs/imgui`) | Separate premake project → `Imgui` static lib |
-| **ImGuizmo** | git submodule (forked: `xltangcs/ImGuizmo`) | Source compiled in `Candy` via `NoPCH` filter |
-| **yaml-cpp** | git submodule (forked: `xltangcs/yaml-cpp`) | Separate premake project → `yaml-cpp` static lib |
-| **box2d** | git submodule (forked: `xltangcs/box2d`) | Separate premake project → `box2d` static lib |
-| **GLAD** | vendored source | Separate premake project → `GLAD` static lib (C source) |
-| **stb_image** | vendored source | Compiled as part of `Candy` |
-| **entt** | git submodule (header-only) | Include path only, no compilation |
-| **spdlog** | vendored (header-only, `Candy/ThirdParty/spdlog/include`) | Include path only |
-
-After first clone:
-```pwsh
-git submodule update --init --recursive
-.\Scripts\GenerateProjects.bat
-```
+**关键理念：**
+- **保持引擎与编辑器的一体化设计**（像 Godot/UE 一样，编辑器是引擎的增强模式）
+- **场景即数据**：`.candy` 场景文件应可版本控制、可合并
+- **ECS 是实现手段，不是目的**：用户面对的是 Entity + Component API，而非裸 entt
 
 ## Project Structure
 
-| Directory | Target | Kind | Purpose |
+| 目录 | 目标 | 类型 | 用途 |
 |---|---|---|---|
-| `Candy/Source/` | `Candy` | static lib | Core engine |
-| `Candy_Editor/Source/` | `Candy_Editor` | binary (ConsoleApp) | Editor app |
-| `Sandbox/Source/` | `Sandbox` | binary (ConsoleApp) | Test/demo (commented out by default) |
+| `Candy/Source/` | `Candy` | 静态库 | 引擎核心 |
+| `Candy_Editor/Source/` | `Candy_Editor` | ConsoleApp | 编辑器（链接 `Candy`） |
+| `Sandbox/Source/` | `Sandbox` | ConsoleApp | 测试 demo（默认不构建） |
 
-## Entry Point — Read This First
+## Entry Point
 
-The engine **owns `main()`** in `Candy/Source/Candy/Core/EntryPoint.h`. Consumer apps are **not** standalone executables; they define:
+引擎拥有 `main()`（`Candy/Source/Candy/Core/EntryPoint.h`）。应用只需：
 
 ```cpp
-// In Candy namespace
+// 在 Candy 命名空间下
 Candy::Application* Candy::CreateApplication() {
-    return new MyApp();  // MyApp extends Candy::Application
+    return new MyApp();  // 继承 Candy::Application
 }
 ```
 
-In the constructor, push layers via `PushLayer()` / `PushOverlay()`. The engine calls `Run()`, which loops: `OnUpdate(Timestep)` → `OnImGuiRender()` → `Window::OnUpdate()`.
+构造函数中 `PushLayer()` / `PushOverlay()` 注册图层，引擎调用 `Run()`：
+`OnUpdate(Timestep)` → `OnImGuiRender()` → `Window::OnUpdate()`（swap + poll）
 
-## Precompiled Header
+## Architecture Essentials
 
-- **PCH file:** `Candy/Source/CandyPCH.h` (includes `Base.h`, `Log.h`, `Instrumentor.h`, `<Windows.h>` with `NOMINMAX`).
-- All engine `.cpp` files under `Candy/Source/` use the PCH.
-- **Third-party exceptions (NoPCH):** stb_image, ImGuizmo (see `Candy/premake5.lua:57-58`).
+- **Layer stack**：普通图层 + 叠加层（ImGuiLayer 始终为叠加层）。事件反向传播（LIFO）
+- **3 种场景状态**（`EditorLayer` 管理）：
+  - **Edit**: 直接编辑 `m_EditorScene`，无物理
+  - **Play**: `Scene::Copy(m_EditorScene)` → `OnRuntimeStart()` → 物理 + 原生脚本
+  - **Simulate**: 深拷贝，仅物理，编辑器摄像机
+- **渲染**: `RendererAPI` 抽象接口 + 静态单例 `RenderCommand` / `Renderer2D`（批量四边形/圆形/线条/精灵），当前仅 OpenGL 后端
+- **ECS**: 使用 EnTT，`Scene` 拥有 `entt::registry` + `b2World`。`Entity` = `entt::entity + Scene*`。组件位于 `Scene/Components.h`
+- **物理**: Box2D 集成（Rigidbody2D + Box/CircleCollider2D），运行时 body/fixture 存为 `void*`
+- **原生脚本**: `ScriptableEntity` 基类 + `NativeScriptComponent::Bind<T>()`
+- **Python 脚本**（计划中）：pybind11 已加入依赖但**引擎源码尚未使用**
+- **序列化**: yaml-cpp，`.candy` 文件。`SerializeRuntime()` 尚未实现
 
 ## Code Conventions
 
-- **Namespace:** `Candy::`.
-- **Smart pointers:** `Scope<T>` = `std::unique_ptr<T>`, `Ref<T>` = `std::shared_ptr<T>`. Use `CreateScope<T>(args...)` / `CreateRef<T>(args...)` factories (`Core/Base.h`).
-- **Event binding:** `CANDY_BIND_EVENT_FN(fn)` — expands to a generic lambda. Do **not** use `std::bind`.
-- **Logging:** `CANDY_CORE_*` macros for engine internals, `CANDY_*` for client/editor code (`spdlog`-based).
-- **Config defines:** `CANDY_DEBUG`, `CANDY_RELEASE`, `CANDY_DIST` — set by premake config filters.
-- **Windowing:** Uses GLFW (forked). `Candy::Window` is abstract; concrete impl is `WindowsWindow` in `Platform/Windows/`.
-- **YAML:** Uses yaml-cpp (forked). Scene files use `.candy` extension.
-- **Main include for consumers:** `#include "Candy.h"` (aggregates all public engine headers).
+- 命名空间 `Candy::`，PCH: `CandyPCH.h`（所有 `Candy/Source/` .cpp 使用）
+- `Scope<T>` = `unique_ptr<T>`，`Ref<T>` = `shared_ptr<T>`，工厂 `CreateScope`/`CreateRef`
+- `CANDY_BIND_EVENT_FN(fn)` 绑定事件（不要用 `std::bind`）
+- 日志: `CANDY_CORE_*`（引擎内部） / `CANDY_*`（客户端/编辑器）
+- 入口 include: `#include "Candy.h"`（聚合所有公共头）
+- 新增源文件放到对应 `Source/` 下即可（premake 通过 `Source/**.cpp` glob 包含），新增第三方源需加 `NoPCH` flag
 
-## Architecture Notes
+## Python 绑定现状
 
-### Layer System
-`Application` owns a `LayerStack`. Layers hook into `OnAttach`, `OnDetach`, `OnUpdate(Timestep)`, `OnImGuiRender()`, `OnEvent(Event&)`. Overlays (pushed via `PushOverlay`) sit at the top of the stack — `ImGuiLayer` is always an overlay. Events propagate top-down (LIFO, reverse iterator).
-
-### Renderer Backend
-Abstracted behind virtual interfaces (`RendererAPI`, `Shader`, `Texture`, `Framebuffer`, etc.) with static `Create()` factories. The only current backend is OpenGL (`Platform/OpenGL/`). `RendererAPI::API` enum has only `OpenGL` today. Use `RenderCommand` (static) for draw calls — it delegates to the active backend singleton. `Renderer2D` provides batched 2D primitives (quads, circles, lines, sprites).
-
-### ECS (Entity-Component-System)
-Uses **EnTT** (`entt::registry`). `Scene` owns the registry and a Box2D `b2World`. `Entity` is a thin handle wrapping `entt::entity + Scene*`. Components are POD structs in `Scene/Components.h`:
-- `IDComponent`, `TagComponent`, `TransformComponent`
-- `SpriteRendererComponent`, `CircleRendererComponent`
-- `CameraComponent`, `NativeScriptComponent`
-- `Rigidbody2DComponent`, `BoxCollider2DComponent`, `CircleCollider2DComponent`
-
-Scene serialization uses yaml-cpp via `SceneSerializer` (`.candy` files). Physics runtime bodies/fixtures stored as `void*` in components.
-
-### Editor
-`Candy_Editor` is a `ConsoleApp` that links `Candy`. Uses the same entry point pattern. `EditorLayer` manages viewport, gizmos (ImGuizmo), scene hierarchy, and content browser panels.
-
-### ImGui Integration
-- Core imgui is a separate static lib (`Imgui`).
-- Backends (`imgui_impl_opengl3`, `imgui_impl_glfw`) are compiled inside `Candy` via `Imgui/ImguiBuild.cpp` with `IMGUI_IMPL_OPENGL_LOADER_GLAD`.
-- `ImGuiLayer` is always pushed as an overlay in `Application` constructor.
-
-### Platform Abstraction
-Platform-specific code lives in `Candy/Source/Platform/`:
-- `Platform/OpenGL/` — OpenGL backend implementations (buffers, shaders, textures, framebuffers, etc.)
-- `Platform/Windows/` — Windows window, input, file dialogs
-
-### Profiling
-`Candy/Debug/Instrumentor.h` provides Chrome-tracing-compatible profiling. Use `CANDY_PROFILE_FUNCTION()` for RAII scoped timers. Outputs JSON files loadable in `chrome://tracing`.
-
-## Adding New Source Files
-
-1. Add `.cpp`/`.h` under `Candy/Source/`, `Candy_Editor/Source/`, or `Sandbox/Source/` — they're globbed by premake5 via `"Source/**.cpp"` and `"Source/**.h"`.
-2. Headers under `Candy/Source/` are available via the implicit include dir `"Source"`.
-3. When adding new vendored third-party, add explicit file patterns and `flags { "NoPCH" }` in the appropriate `premake5.lua`.
-
-## Design Principles
-
-- **Abstract backend, single impl:** Renderer API is abstract (virtual interfaces), but only OpenGL exists. The abstraction exists for future backends, not current flexibility.
-- **Engine owns the loop:** `Application::Run()` drives the game loop — consumers only define layers.
-- **Static singletons for services:** `Renderer`, `Renderer2D`, `RenderCommand`, `Input` are fully static classes (no instances).
-- **Scene-centric ECS:** All entity/component logic flows through `Scene`. Systems are not standalone — they're called from `Scene::OnUpdate*` methods.
-- **Editor as a consumer:** The editor (`Candy_Editor`) uses the same public API as any game app (`Application`, `Layer`, `Scene`, `Entity`, `Components`).
+pybind11 子模块已添加（`Candy/ThirdParty/pybind11`），`IncludeDir` 和 premake includedirs 已配置，但引擎源码中**无任何 pybind11 使用代码**。这是一个预留骨架，等待实现。

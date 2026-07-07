@@ -232,7 +232,9 @@ namespace Candy {
 		ImGui::PushItemWidth(-1);
 
 		if (ImGui::Button("Add Component"))
+		{
 			ImGui::OpenPopup("AddComponent");
+		}
 
 		if (ImGui::BeginPopup("AddComponent"))
 		{
@@ -286,6 +288,15 @@ namespace Candy {
 				if (ImGui::MenuItem("Circle Collider 2D"))
 				{
 					m_SelectionContext.AddComponent<CircleCollider2DComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
+			if (!m_SelectionContext.HasComponent<ScriptComponent>())
+			{
+				if (ImGui::MenuItem("Script"))
+				{
+					m_SelectionContext.AddComponent<ScriptComponent>();
 					ImGui::CloseCurrentPopup();
 				}
 			}
@@ -437,6 +448,19 @@ namespace Candy {
 				ImGui::DragFloat("Restitution", &component.Restitution, 0.01f, 0.0f, 1.0f);
 				ImGui::DragFloat("Restitution Threshold", &component.RestitutionThreshold, 0.01f, 0.0f);
 			});
+
+		DrawComponent<ScriptComponent>("Script", entity, [](auto& component)
+		{
+			char buffer[256];
+			memset(buffer, 0, sizeof(buffer));
+			std::strncpy(buffer, component.ClassName.c_str(), sizeof(buffer));
+			ImGui::Text("Class Name");
+			ImGui::SameLine();
+			if (ImGui::InputText("##ClassName", buffer, sizeof(buffer)))
+			{
+				component.ClassName = buffer;
+			}
+		});
 	}
 
 }

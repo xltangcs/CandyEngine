@@ -41,7 +41,8 @@ project "Candy"
 		"%{IncludeDir.entt}",
 		"%{IncludeDir.box2d}",
 		"%{IncludeDir.ImGuizmo}",
-		"%{IncludeDir.pybind11}"
+		"%{IncludeDir.pybind11}",
+		"%{IncludeDir.Python3}"
 	}
 
     links 
@@ -54,7 +55,14 @@ project "Candy"
 		"opengl32.lib"
 	}
 
+	if PythonLibDir and PythonLibDir ~= "" then
+		links { PythonLibDir .. "/" .. PythonLibName }
+	end
+
 	filter "files:ThirdParty/ImGuizmo/src/**.cpp"
+	flags { "NoPCH" }
+
+	filter "files:Source/Candy/Scripting/**.cpp"
 	flags { "NoPCH" }
 
 	filter "system:windows"
