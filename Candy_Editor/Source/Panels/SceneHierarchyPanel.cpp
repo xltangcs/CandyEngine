@@ -319,8 +319,6 @@ namespace Candy {
 			{
 				auto& camera = component.Camera;
 
-				ImGui::Checkbox("Primary", &component.Primary);
-
 				const char* projectionTypeStrings[] = { "Perspective", "Orthographic" };
 				const char* currentProjectionTypeString = projectionTypeStrings[(int)camera.GetProjectionType()];
 				if (ImGui::BeginCombo("Projection", currentProjectionTypeString))

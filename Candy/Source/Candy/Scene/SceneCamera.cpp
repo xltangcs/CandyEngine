@@ -31,6 +31,20 @@ namespace Candy {
 		RecalculateProjection();
 	}
 
+	SceneCamera SceneCamera::CreateOrthographic(float size, float nearClip, float farClip)
+	{
+		SceneCamera camera;
+		camera.SetOrthographic(size, nearClip, farClip);
+		return camera;
+	}
+
+	SceneCamera SceneCamera::CreatePerspective(float fov, float nearClip, float farClip)
+	{
+		SceneCamera camera;
+		camera.SetPerspective(fov, nearClip, farClip);
+		return camera;
+	}
+
 	void SceneCamera::RecalculateProjection()
 	{
 		if (m_ProjectionType == ProjectionType::Perspective)

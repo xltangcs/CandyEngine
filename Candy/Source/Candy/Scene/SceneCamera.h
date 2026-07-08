@@ -33,6 +33,9 @@ namespace Candy {
 
 		ProjectionType GetProjectionType() const { return m_ProjectionType; }
 		void SetProjectionType(ProjectionType type) { m_ProjectionType = type; RecalculateProjection(); }
+
+		static SceneCamera CreateOrthographic(float size = 10.0f, float nearClip = -1.0f, float farClip = 1.0f);
+		static SceneCamera CreatePerspective(float fov = 45.0f, float nearClip = 0.01f, float farClip = 1000.0f);
 	private:
 		void RecalculateProjection();
 	private:

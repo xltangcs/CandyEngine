@@ -37,6 +37,7 @@ namespace Candy {
 
 	Scene::Scene()
 	{
+		m_FallbackCamera = SceneCamera::CreateOrthographic(10.0f, 0.1f, 1000.0f);
 	}
 
 	Scene::~Scene()
@@ -51,7 +52,7 @@ namespace Candy {
 		for (auto e : view)
 		{
 			UUID uuid = src.get<IDComponent>(e).ID;
-			CANDY_CORE_ASSERT(enttMap.find(uuid) != enttMap.end());
+			CANDY_CORE_ASSERT(enttMap.find(uuid) != enttMap.end())
 			entt::entity dstEnttID = enttMap.at(uuid);
 
 			auto& component = src.get<Component>(e);
@@ -203,16 +204,19 @@ namespace Candy {
 			{
 				auto [transform, camera] = view.get<TransformComponent, CameraComponent>(entity);
 
-				if (camera.Primary)
-				{
-					mainCamera = &camera.Camera;
-					cameraTransform = transform.GetTransform();
-					break;
-				}
+				mainCamera = &camera.Camera;
+				cameraTransform = transform.GetTransform();
+				break;
 			}
 		}
 
-		if (mainCamera)
+		if (!mainCamera)
+		{
+			mainCamera = &m_FallbackCamera;
+			cameraTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+			m_FallbackCamera.SetViewportSize(m_ViewportWidth, m_ViewportHeight);
+		}
+
 		{
 			Renderer2D::BeginScene(*mainCamera, cameraTransform);
 			// Draw sprites
@@ -279,6 +283,9 @@ namespace Candy {
 		m_ViewportWidth = width;
 		m_ViewportHeight = height;
 
+		// Resize fallback camera
+		m_FallbackCamera.SetViewportSize(width, height);
+
 		// Resize our non-FixedAspectRatio cameras
 		auto view = m_Registry.view<CameraComponent>();
 		for (auto entity : view)
@@ -310,9 +317,7 @@ namespace Candy {
 		auto view = m_Registry.view<CameraComponent>();
 		for (auto entity : view)
 		{
-			const auto& camera = view.get<CameraComponent>(entity);
-			if (camera.Primary)
-				return Entity{ entity, this };
+			return Entity{ entity, this };
 		}
 		return {};
 	}

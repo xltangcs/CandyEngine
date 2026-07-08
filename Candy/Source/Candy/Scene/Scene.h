@@ -5,6 +5,7 @@
 #include "Candy/Core/Timestep.h"
 #include "Candy/Core/UUID.h"
 #include "Candy/Renderer/EditorCamera.h"
+#include "Candy/Scene/SceneCamera.h"
 #include "Candy/Scripting/ScriptSystem.h"
 
 
@@ -58,6 +59,7 @@ namespace Candy {
 
 		b2World* m_PhysicsWorld = nullptr;
 		ScriptSystem m_ScriptSystem;
+		SceneCamera m_FallbackCamera;
 
 		friend class Entity;
 		friend class SceneSerializer;
