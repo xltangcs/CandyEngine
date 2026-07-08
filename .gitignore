@@ -28,3 +28,7 @@ Candy/ThirdParty/box2d/
 
 # Profiling output
 results.json
+Candy_Editor/CandyProfile-*.json
+
+# Python
+__pycache__/

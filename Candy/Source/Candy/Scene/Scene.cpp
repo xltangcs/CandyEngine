@@ -4,6 +4,7 @@
 #include "Candy/Scene/Entity.h"
 #include "Candy/Scene/Components.h"
 #include "Candy/Scene/ScriptableEntity.h"
+#include "Candy/Scripting/ScriptSystem.h"
 
 #include "Candy/Renderer/Renderer2D.h"
 
@@ -95,6 +96,7 @@ namespace Candy {
 		CopyComponent<Rigidbody2DComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<BoxCollider2DComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<CircleCollider2DComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<ScriptComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 
 		return newScene;
 	}
@@ -121,12 +123,22 @@ namespace Candy {
 
 	void Scene::OnRuntimeStart()
 	{
+		m_ScriptSystem.InitPython();
+
+		auto scriptView = m_Registry.view<ScriptComponent>();
+		for (auto e : scriptView)
+		{
+			m_ScriptSystem.InstantiateScript(Entity{ e, this });
+		}
+
+		m_ScriptSystem.OnRuntimeStart();
 		OnPhysics2DStart();
 	}
 
 	void Scene::OnRuntimeStop()
 	{
 		OnPhysics2DStop();
+		m_ScriptSystem.OnRuntimeStop();
 	}
 
 	void Scene::OnSimulationStart()
@@ -141,7 +153,10 @@ namespace Candy {
 
 	void Scene::OnUpdateRuntime(Timestep ts)
 	{
-		// Update scripts
+		// Update Python scripts
+		m_ScriptSystem.OnUpdateRuntime(ts);
+
+		// Update native scripts
 		{
 			m_Registry.view<NativeScriptComponent>().each([=](auto entity, auto& nsc)
 				{
@@ -287,6 +302,7 @@ namespace Candy {
 		CopyComponentIfExists<Rigidbody2DComponent>(newEntity, entity);
 		CopyComponentIfExists<BoxCollider2DComponent>(newEntity, entity);
 		CopyComponentIfExists<CircleCollider2DComponent>(newEntity, entity);
+		CopyComponentIfExists<ScriptComponent>(newEntity, entity);
 	}
 
 	Entity Scene::GetPrimaryCameraEntity()

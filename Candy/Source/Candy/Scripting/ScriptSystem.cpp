@@ -9,14 +9,22 @@
 
 #include <pybind11/embed.h>
 
+#include <filesystem>
+#include <windows.h>
+
 namespace py = pybind11;
 
+extern void PyBindings_ForceLink();
+
 namespace Candy {
+
+static bool s_PythonInitialized = false;
 
 struct ScriptInstance
 {
     py::object PyObject;
     ScriptObject* Script = nullptr;
+    Entity StoredEntity;
 };
 
 ScriptSystem::ScriptSystem()
@@ -30,14 +38,36 @@ ScriptSystem::~ScriptSystem()
 
 void ScriptSystem::InitPython()
 {
+    if (s_PythonInitialized)
+        return;
+
+    ::PyBindings_ForceLink();  // Ensure PYBIND11_EMBEDDED_MODULE gets linked
+
+    // Resolve scripts directory relative to the executable
+    std::filesystem::path exePath = []() {
+        wchar_t buf[MAX_PATH];
+        GetModuleFileNameW(nullptr, buf, MAX_PATH);
+        return std::filesystem::path(buf);
+    }();
+    std::filesystem::path scriptsDir = exePath.parent_path() // .../Candy_Editor/
+        .parent_path()  // .../Debug-windows-x86_64/
+        .parent_path()  // .../bin/
+        .parent_path()  // <project_root>/
+        / "assets" / "scripts";
+
     Py_Initialize();
 
     py::module_ sys = py::module_::import("sys");
-    sys.attr("path").attr("append")("assets/scripts");
+    sys.attr("path").attr("append")(scriptsDir.string());
+
+    s_PythonInitialized = true;
 }
 
 void ScriptSystem::ShutdownPython()
 {
+    if (!s_PythonInitialized)
+        return;
+
     for (auto& [id, instance] : m_Instances)
     {
         if (instance->Script)
@@ -46,6 +76,7 @@ void ScriptSystem::ShutdownPython()
     m_Instances.clear();
 
     Py_Finalize();
+    s_PythonInitialized = false;
 }
 
 void ScriptSystem::InstantiateScript(Entity& entity)
@@ -63,15 +94,22 @@ void ScriptSystem::InstantiateScript(Entity& entity)
     try
     {
         py::object pyModule = py::module_::import(className.c_str());
-        py::object pyClass = pyModule.attr(className.c_str());
-        py::object pyInstance = pyClass();
 
-        auto* scriptObj = pyInstance.cast<ScriptObject*>();
-        scriptObj->m_Entity = &entity;
+        // Conventions: ClassName field is lowercase filename, Python class is capitalized
+        std::string classAttr = className;
+        if (!classAttr.empty())
+            classAttr[0] = (char)std::toupper((unsigned char)classAttr[0]);
+        py::object pyClass = pyModule.attr(classAttr.c_str());
+        py::object pyInstance = pyClass();
 
         auto instance = std::make_unique<ScriptInstance>();
         instance->PyObject = pyInstance;
+        instance->StoredEntity = entity;
+
+        auto* scriptObj = pyInstance.cast<ScriptObject*>();
+        scriptObj->m_Entity = &instance->StoredEntity;
         instance->Script = scriptObj;
+
         m_Instances[uuid] = std::move(instance);
 
         scriptObj->OnConstruct();

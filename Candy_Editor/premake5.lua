@@ -27,6 +27,10 @@ project "Candy_Editor"
 		"Candy"
 	}
 
+	if PythonLibDir and PythonLibDir ~= "" then
+		links { PythonLibDir .. "/" .. PythonLibName }
+	end
+
 	filter "system:windows"
 		systemversion "latest"
 
