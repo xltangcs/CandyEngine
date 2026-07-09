@@ -155,4 +155,19 @@ namespace Candy {
 		ScriptComponent() = default;
 		ScriptComponent(const ScriptComponent&) = default;
 	};
+
+	// Audio
+
+	struct AudioSourceComponent
+	{
+		std::string SoundPath;
+		float Volume = 1.0f;
+		bool Looping = false;
+		bool PlayOnStart = false;
+
+		void* RuntimeHandle = nullptr;  // ma_sound* at runtime
+
+		AudioSourceComponent() = default;
+		AudioSourceComponent(const AudioSourceComponent&) = default;
+	};
 }

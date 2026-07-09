@@ -19,7 +19,9 @@ project "Candy"
 		"ThirdParty/glm/glm/**.hpp",
 		"ThirdParty/glm/glm/**.inl",
 		"ThirdParty/ImGuizmo/src/ImGuizmo.h",
-		"ThirdParty/ImGuizmo/src/ImGuizmo.cpp"
+		"ThirdParty/ImGuizmo/src/ImGuizmo.cpp",
+		"ThirdParty/miniaudio/**.h",
+		"ThirdParty/miniaudio/**.cpp"
 	}
 	defines{
 		"_CRT_SECURE_NO_WARNINGS",
@@ -42,7 +44,8 @@ project "Candy"
 		"%{IncludeDir.box2d}",
 		"%{IncludeDir.ImGuizmo}",
 		"%{IncludeDir.pybind11}",
-		"%{IncludeDir.Python3}"
+		"%{IncludeDir.Python3}",
+		"ThirdParty/miniaudio"
 	}
 
     links 
@@ -63,6 +66,12 @@ project "Candy"
 	flags { "NoPCH" }
 
 	filter "files:Source/Candy/Scripting/**.cpp"
+	flags { "NoPCH" }
+
+	filter "files:Source/Candy/Audio/**.cpp"
+	flags { "NoPCH" }
+
+	filter "files:ThirdParty/miniaudio/**.cpp"
 	flags { "NoPCH" }
 
 	filter "system:windows"

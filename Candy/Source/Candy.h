@@ -19,6 +19,9 @@
 #include "Candy/Scene/Components.h"
 #include "Candy/Scene/ScriptableEntity.h"
 
+//-------------- Audio ---------------
+#include "Candy/Audio/AudioEngine.h"
+
 //-------------- Renderer ---------------
 #include "Candy/Renderer/Renderer.h"
 #include "Candy/Renderer/Renderer2D.h"

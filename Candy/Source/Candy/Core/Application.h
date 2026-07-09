@@ -4,6 +4,7 @@
 #include "Candy/Core/Window.h"
 #include "Candy/Core/Timestep.h"
 #include "Candy/Core/LayerStack.h"
+#include "Candy/Audio/AudioEngine.h"
 
 #include "Candy/Events/Event.h"
 #include "Candy/Events/ApplicationEvent.h"

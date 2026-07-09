@@ -7,6 +7,7 @@
 #include "Candy/Renderer/EditorCamera.h"
 #include "Candy/Scene/SceneCamera.h"
 #include "Candy/Scripting/ScriptSystem.h"
+#include "Candy/Audio/AudioSystem.h"
 
 
 class b2World;

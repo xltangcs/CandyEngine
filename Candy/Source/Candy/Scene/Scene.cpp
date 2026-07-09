@@ -98,6 +98,7 @@ namespace Candy {
 		CopyComponent<BoxCollider2DComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<CircleCollider2DComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<ScriptComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<AudioSourceComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 
 		return newScene;
 	}
@@ -133,12 +134,14 @@ namespace Candy {
 		}
 
 		m_ScriptSystem.OnRuntimeStart();
+		AudioSystem::OnRuntimeStart(*this);
 		OnPhysics2DStart();
 	}
 
 	void Scene::OnRuntimeStop()
 	{
 		OnPhysics2DStop();
+		AudioSystem::OnRuntimeStop(*this);
 		m_ScriptSystem.OnRuntimeStop();
 	}
 
@@ -156,6 +159,9 @@ namespace Candy {
 	{
 		// Update Python scripts
 		m_ScriptSystem.OnUpdateRuntime(ts);
+
+		// Update audio
+		AudioSystem::OnUpdateRuntime(*this, ts);
 
 		// Update native scripts
 		{
@@ -310,6 +316,7 @@ namespace Candy {
 		CopyComponentIfExists<BoxCollider2DComponent>(newEntity, entity);
 		CopyComponentIfExists<CircleCollider2DComponent>(newEntity, entity);
 		CopyComponentIfExists<ScriptComponent>(newEntity, entity);
+		CopyComponentIfExists<AudioSourceComponent>(newEntity, entity);
 	}
 
 	Entity Scene::GetPrimaryCameraEntity()
@@ -471,6 +478,11 @@ namespace Candy {
 
 	template<>
 	void Scene::OnComponentAdded<ScriptComponent>(Entity entity, ScriptComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<AudioSourceComponent>(Entity entity, AudioSourceComponent& component)
 	{
 	}
 }

@@ -18,6 +18,7 @@ namespace Candy {
 		m_Window->SetEventCallback(CANDY_BIND_EVENT_FN(Application::OnEvent));
 
 		Renderer::Init();
+		AudioEngine::Init();
 
 		m_ImGuiLayer = new ImGuiLayer();
 		PushOverlay(m_ImGuiLayer);
@@ -25,6 +26,7 @@ namespace Candy {
 
 	Application::~Application()
 	{
+		AudioEngine::Shutdown();
 		Renderer::Shutdown();
 	}
 

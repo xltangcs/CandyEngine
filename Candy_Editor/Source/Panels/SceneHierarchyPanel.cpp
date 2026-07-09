@@ -301,6 +301,15 @@ namespace Candy {
 				}
 			}
 
+			if (!m_SelectionContext.HasComponent<AudioSourceComponent>())
+			{
+				if (ImGui::MenuItem("Audio Source"))
+				{
+					m_SelectionContext.AddComponent<AudioSourceComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
 			ImGui::EndPopup();
 		}
 
@@ -458,6 +467,23 @@ namespace Candy {
 			{
 				component.ClassName = buffer;
 			}
+		});
+
+		DrawComponent<AudioSourceComponent>("Audio Source", entity, [](auto& component)
+		{
+			char buffer[256];
+			memset(buffer, 0, sizeof(buffer));
+			std::strncpy(buffer, component.SoundPath.c_str(), sizeof(buffer));
+			ImGui::Text("Sound Path");
+			ImGui::SameLine();
+			if (ImGui::InputText("##SoundPath", buffer, sizeof(buffer)))
+			{
+				component.SoundPath = buffer;
+			}
+
+			ImGui::DragFloat("Volume", &component.Volume, 0.01f, 0.0f, 1.0f);
+			ImGui::Checkbox("Looping", &component.Looping);
+			ImGui::Checkbox("Play On Start", &component.PlayOnStart);
 		});
 	}
 
