@@ -481,6 +481,19 @@ namespace Candy {
 				component.SoundPath = buffer;
 			}
 
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
+				{
+					const wchar_t* path = (const wchar_t*)payload->Data;
+					std::filesystem::path fullPath = std::filesystem::path(g_AssetPath) / path;
+					component.SoundPath = fullPath.string();
+					std::strncpy(buffer, component.SoundPath.c_str(), sizeof(buffer) - 1);
+					buffer[sizeof(buffer) - 1] = '\0';
+				}
+				ImGui::EndDragDropTarget();
+			}
+
 			ImGui::DragFloat("Volume", &component.Volume, 0.01f, 0.0f, 1.0f);
 			ImGui::Checkbox("Looping", &component.Looping);
 			ImGui::Checkbox("Play On Start", &component.PlayOnStart);
