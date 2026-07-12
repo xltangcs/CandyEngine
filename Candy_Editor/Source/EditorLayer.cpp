@@ -309,7 +309,8 @@ namespace Candy {
 
 		m_ViewportFocused = ImGui::IsWindowFocused();
 		m_ViewportHovered = ImGui::IsWindowHovered();
-		Application::Get().GetImGuiLayer()->BlockEvents(!m_ViewportFocused && !m_ViewportHovered);
+		bool blockEvents = (!m_ViewportFocused && !m_ViewportHovered) && !io.WantCaptureKeyboard;
+		Application::Get().GetImGuiLayer()->BlockEvents(blockEvents);
 
 		ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
 		m_ViewportSize = { viewportPanelSize.x, viewportPanelSize.y };
