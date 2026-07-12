@@ -76,6 +76,8 @@ Candy::Application* Candy::CreateApplication() {
 - 日志: `CANDY_CORE_*`（引擎内部） / `CANDY_*`（客户端/编辑器）
 - 入口 include: `#include "Candy.h"`（聚合所有公共头）
 - 新增源文件放到对应 `Source/` 下即可（premake 通过 `Source/**.cpp` glob 包含），新增第三方源需加 `NoPCH` flag
+- 缩进使用 Tab，与现有 ~95% 文件保持一致
+- 行尾使用 CRLF（回车+换行），与现有大部分文件保持一致
 
 ## Python 绑定现状
 

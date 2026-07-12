@@ -11,6 +11,8 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 
+#include <unordered_map>
+
 namespace Candy {
 
 	struct IDComponent
@@ -169,5 +171,41 @@ namespace Candy {
 
 		AudioSourceComponent() = default;
 		AudioSourceComponent(const AudioSourceComponent&) = default;
+	};
+
+	// UI
+
+	struct TextBlockUIData
+	{
+		std::string Text;
+		glm::vec4 Color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		glm::vec2 Position = { 0.0f, 0.0f };
+		float FontSize = 24.0f;
+		bool Visible = true;
+	};
+
+	struct UITextBlockComponent
+	{
+		std::unordered_map<std::string, TextBlockUIData> TextBlocks;
+
+		UITextBlockComponent() = default;
+		UITextBlockComponent(const UITextBlockComponent&) = default;
+	};
+
+	struct ButtonUIData
+	{
+		std::string Text;
+		glm::vec2 Size = { 200.0f, 50.0f };
+		glm::vec2 Position = { 0.0f, 0.0f };
+		std::string OnClick;
+		bool Visible = true;
+	};
+
+	struct UIButtonComponent
+	{
+		std::unordered_map<std::string, ButtonUIData> Buttons;
+
+		UIButtonComponent() = default;
+		UIButtonComponent(const UIButtonComponent&) = default;
 	};
 }

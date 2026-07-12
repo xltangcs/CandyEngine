@@ -46,6 +46,11 @@ namespace Candy {
 		{
 			return m_Registry.view<Components...>();
 		}
+
+		entt::registry& GetRegistry() { return m_Registry; }
+		const entt::registry& GetRegistry() const { return m_Registry; }
+
+		ScriptSystem& GetScriptSystem() { return m_ScriptSystem; }
 	private:
 		template<typename T>
 		void OnComponentAdded(Entity entity, T& component);

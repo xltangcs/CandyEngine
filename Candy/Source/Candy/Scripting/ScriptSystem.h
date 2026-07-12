@@ -8,26 +8,28 @@
 
 namespace Candy
 {
-    class Entity;
-    class ScriptObject;
-    struct ScriptInstance;
+	class Entity;
+	class ScriptObject;
+	struct ScriptInstance;
 
-    class ScriptSystem {
-    public:
-        ScriptSystem();
-        ~ScriptSystem();
+	class ScriptSystem {
+	public:
+		ScriptSystem();
+		~ScriptSystem();
 
-        void InitPython();
-        void ShutdownPython();
+		void InitPython();
+		void ShutdownPython();
 
-        void InstantiateScript(Entity& entity);
-        void DestroyScript(UUID entityID);
+		void InstantiateScript(Entity& entity);
+		void DestroyScript(UUID entityID);
 
-        void OnRuntimeStart();
-        void OnUpdateRuntime(Timestep ts);
-        void OnRuntimeStop();
+		void OnRuntimeStart();
+		void OnUpdateRuntime(Timestep ts);
+		void OnRuntimeStop();
 
-    private:
-        std::unordered_map<UUID, std::unique_ptr<ScriptInstance>> m_Instances;
-    };
+		void CallFunction(Entity entity, const std::string& funcName);
+
+	private:
+		std::unordered_map<UUID, std::unique_ptr<ScriptInstance>> m_Instances;
+	};
 }

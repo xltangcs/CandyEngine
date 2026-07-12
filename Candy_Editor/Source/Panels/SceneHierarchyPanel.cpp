@@ -310,6 +310,24 @@ namespace Candy {
 				}
 			}
 
+			if (!m_SelectionContext.HasComponent<UITextBlockComponent>())
+			{
+				if (ImGui::MenuItem("Text Block"))
+				{
+					m_SelectionContext.AddComponent<UITextBlockComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
+			if (!m_SelectionContext.HasComponent<UIButtonComponent>())
+			{
+				if (ImGui::MenuItem("Button"))
+				{
+					m_SelectionContext.AddComponent<UIButtonComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
 			ImGui::EndPopup();
 		}
 
@@ -497,6 +515,100 @@ namespace Candy {
 			ImGui::DragFloat("Volume", &component.Volume, 0.01f, 0.0f, 1.0f);
 			ImGui::Checkbox("Looping", &component.Looping);
 			ImGui::Checkbox("Play On Start", &component.PlayOnStart);
+		});
+
+		DrawComponent<UITextBlockComponent>("Text Blocks", entity, [](auto& component)
+		{
+			std::string toRemove;
+			float lineHeight = ImGui::GetFrameHeight();
+
+			for (auto& [key, tb] : component.TextBlocks)
+			{
+				ImGui::PushID(key.c_str());
+				bool open = ImGui::CollapsingHeader(key.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap);
+				ImGui::SameLine(ImGui::GetContentRegionAvail().x - lineHeight);
+				if (ImGui::Button("X", ImVec2{ lineHeight, lineHeight }))
+					toRemove = key;
+				if (open)
+				{
+					ImGui::Indent();
+
+					char buf[256];
+					memset(buf, 0, sizeof(buf));
+					std::strncpy(buf, tb.Text.c_str(), sizeof(buf));
+					if (ImGui::InputText("Text", buf, sizeof(buf)))
+						tb.Text = buf;
+
+					ImGui::ColorEdit4("Color", glm::value_ptr(tb.Color));
+					ImGui::DragFloat2("Position", glm::value_ptr(tb.Position));
+					ImGui::DragFloat("Font Size", &tb.FontSize, 1.0f, 1.0f, 200.0f);
+					ImGui::Checkbox("Visible", &tb.Visible);
+
+					ImGui::Unindent();
+				}
+				ImGui::PopID();
+			}
+			if (!toRemove.empty())
+				component.TextBlocks.erase(toRemove);
+
+			ImGui::Separator();
+			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x * 0.5f - 60.0f);
+			if (ImGui::Button("+ TextBlock", ImVec2{ 120.0f, 0.0f }))
+			{
+				static uint32_t s_TextBlockCounter = 0;
+				std::string key = "TextBlock_" + std::to_string(++s_TextBlockCounter);
+				component.TextBlocks[key] = TextBlockUIData();
+			}
+		});
+
+		DrawComponent<UIButtonComponent>("Buttons", entity, [](auto& component)
+		{
+			std::string toRemove;
+			float lineHeight = ImGui::GetFrameHeight();
+
+			for (auto& [key, btn] : component.Buttons)
+			{
+				ImGui::PushID(key.c_str());
+				bool open = ImGui::CollapsingHeader(key.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap);
+				ImGui::SameLine(ImGui::GetContentRegionAvail().x - lineHeight);
+				if (ImGui::Button("X", ImVec2{ lineHeight, lineHeight }))
+					toRemove = key;
+				if (open)
+				{
+					ImGui::Indent();
+
+					char buf[256];
+					memset(buf, 0, sizeof(buf));
+					std::strncpy(buf, btn.Text.c_str(), sizeof(buf));
+					if (ImGui::InputText("Text", buf, sizeof(buf)))
+						btn.Text = buf;
+
+					ImGui::DragFloat2("Size", glm::value_ptr(btn.Size));
+					ImGui::DragFloat2("Position", glm::value_ptr(btn.Position));
+
+					char funcBuf[256];
+					memset(funcBuf, 0, sizeof(funcBuf));
+					std::strncpy(funcBuf, btn.OnClick.c_str(), sizeof(funcBuf));
+					if (ImGui::InputText("OnClick", funcBuf, sizeof(funcBuf)))
+						btn.OnClick = funcBuf;
+
+					ImGui::Checkbox("Visible", &btn.Visible);
+
+					ImGui::Unindent();
+				}
+				ImGui::PopID();
+			}
+			if (!toRemove.empty())
+				component.Buttons.erase(toRemove);
+
+			ImGui::Separator();
+			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x * 0.5f - 60.0f);
+			if (ImGui::Button("+ Button", ImVec2{ 120.0f, 0.0f }))
+			{
+				static uint32_t s_ButtonCounter = 0;
+				std::string key = "Button_" + std::to_string(++s_ButtonCounter);
+				component.Buttons[key] = ButtonUIData();
+			}
 		});
 	}
 

@@ -60,6 +60,7 @@ namespace Candy {
 		operator uint32_t() const { return (uint32_t)m_EntityHandle; }
 		UUID GetUUID() { return GetComponent<IDComponent>().ID; }
 		const std::string& GetName() { return GetComponent<TagComponent>().Tag; }
+		Scene* GetScene() const { return m_Scene; }
 
 		bool operator==(const Entity& other) const
 		{

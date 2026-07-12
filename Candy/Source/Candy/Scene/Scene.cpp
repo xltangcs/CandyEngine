@@ -99,6 +99,8 @@ namespace Candy {
 		CopyComponent<CircleCollider2DComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<ScriptComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<AudioSourceComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<UITextBlockComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<UIButtonComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 
 		return newScene;
 	}
@@ -317,6 +319,8 @@ namespace Candy {
 		CopyComponentIfExists<CircleCollider2DComponent>(newEntity, entity);
 		CopyComponentIfExists<ScriptComponent>(newEntity, entity);
 		CopyComponentIfExists<AudioSourceComponent>(newEntity, entity);
+		CopyComponentIfExists<UITextBlockComponent>(newEntity, entity);
+		CopyComponentIfExists<UIButtonComponent>(newEntity, entity);
 	}
 
 	Entity Scene::GetPrimaryCameraEntity()
@@ -483,6 +487,16 @@ namespace Candy {
 
 	template<>
 	void Scene::OnComponentAdded<AudioSourceComponent>(Entity entity, AudioSourceComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<UITextBlockComponent>(Entity entity, UITextBlockComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<UIButtonComponent>(Entity entity, UIButtonComponent& component)
 	{
 	}
 }

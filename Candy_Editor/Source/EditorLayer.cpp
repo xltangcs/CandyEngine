@@ -3,9 +3,11 @@
 #include <imgui/imgui.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <sstream>
 
 #include "Candy/Scene/SceneSerializer.h"
 #include "Candy/Utils/PlatformUtils.h"
+#include "Candy/UI/UISystem.h"
 
 #include "ImGuizmo.h"
 
@@ -44,8 +46,26 @@ namespace Candy {
 		// Python 脚本测试实体
 		auto cube = m_ActiveScene->CreateEntity("Cube");
 		cube.AddComponent<SpriteRendererComponent>(glm::vec4{ 1.0f, 0.5f, 0.0f, 1.0f });
+		
 		auto& sc = cube.AddComponent<ScriptComponent>();
 		sc.ClassName = "cube";
+
+		auto bgm = m_ActiveScene->CreateEntity("BGM");
+		auto& asc = bgm.AddComponent<AudioSourceComponent>();
+		asc.Looping = false;
+		asc.PlayOnStart = true;
+		asc.SoundPath = "assets\\Audio\\jump.mp3";
+
+		// HUD: TextBlocks showing Cube XYZ
+		auto hud = m_ActiveScene->CreateEntity("HUD");
+		auto& uiText = hud.AddComponent<UITextBlockComponent>();
+		TextBlockUIData tb;
+		tb.Text = "Cube XYZ: (0.00, 0.00, 0.00)";
+		tb.Color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		tb.Position = { 640.0f, 20.0f };
+		tb.FontSize = 200.0f;
+		tb.Visible = true;
+		uiText.TextBlocks["CubeXYZ"] = tb;
 
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 	}
@@ -310,6 +330,9 @@ namespace Candy {
 				tc.Scale = scale;
 			}
 		}
+
+		// UI System
+		UISystem::Render(*m_ActiveScene, ImVec2(m_ViewportBounds[0].x, m_ViewportBounds[0].y));
 		
 		ImGui::End();
 		ImGui::PopStyleVar();

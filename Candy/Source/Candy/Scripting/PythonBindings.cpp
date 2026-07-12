@@ -119,7 +119,10 @@ PYBIND11_EMBEDDED_MODULE(candy, m)
         .def("get_component", &GetComponentFromEntity, py::arg("type"),
              "Get a component by type name (e.g. \"TransformComponent\")")
         .def("has_component", &EntityHasComponent, py::arg("type"),
-             "Check if this entity has a component by type name");
+             "Check if this entity has a component by type name")
+        .def_property_readonly("scene", [](Candy::Entity& self) -> py::object {
+            return py::cast(self.GetScene(), py::return_value_policy::reference);
+        });
 
     // --- ScriptObject ---
     py::class_<Candy::ScriptObject, PyScriptObject>(m, "ScriptObject")
@@ -132,6 +135,24 @@ PYBIND11_EMBEDDED_MODULE(candy, m)
             if (entity)
                 return py::cast(entity, py::return_value_policy::reference);
             return py::none();
+        });
+
+    // --- Scene ---
+    py::class_<Candy::Scene>(m, "Scene")
+        .def("find_entity_by_tag", [](Candy::Scene& self, const std::string& tag) -> py::object {
+            auto view = self.GetAllEntitiesWith<Candy::TagComponent>();
+            for (auto e : view)
+            {
+                if (view.get<Candy::TagComponent>(e).Tag == tag)
+                    return py::cast(Candy::Entity{e, &self}, py::return_value_policy::reference);
+            }
+            return py::none();
+        })
+        .def("create_entity", [](Candy::Scene& self, const std::string& name) -> Candy::Entity {
+            return self.CreateEntity(name);
+        })
+        .def("destroy_entity", [](Candy::Scene& self, Candy::Entity& entity) {
+            self.DestroyEntity(entity);
         });
 
     // --- Module-level functions ---
