@@ -57,11 +57,13 @@ namespace Candy {
 
 		if (m_Context)
 		{
-			m_Context->m_Registry.each([&](auto entityID)
-				{
-					Entity entity{ entityID , m_Context.get() };
-					DrawEntityNode(entity);
-				});
+			for (const auto [entityID] : m_Context->m_Registry.storage<entt::entity>().reach())
+			{
+				Entity entity{ entityID , m_Context.get() };
+				if (!entity)
+					return;
+				DrawEntityNode(entity);
+			}
 
 			if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
 				m_SelectionContext = {};
