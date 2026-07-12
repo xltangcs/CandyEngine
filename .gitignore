@@ -32,3 +32,8 @@ Candy_Editor/CandyProfile-*.json
 
 # Python
 __pycache__/
+
+Saved/
+Doc/
+
+**.user

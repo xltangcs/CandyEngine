@@ -22,6 +22,7 @@ namespace Candy {
 		void BlockEvents(bool block) { m_BlockEvents = block; }
 
 		void SetDarkThemeColors();
+		static void RebuildFont(const std::string& fontPath);
 	private:
 		bool m_BlockEvents = true;
 		float m_Time = 0.0f;

@@ -3,6 +3,7 @@
 #include "Candy/Core/Log.h"
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/basic_file_sink.h>
+#include <filesystem>
 
 namespace Candy {
 
@@ -10,9 +11,11 @@ namespace Candy {
 	Ref<spdlog::logger> Log::s_ClientLogger;
 	void Log::Init()
 	{
+		std::filesystem::create_directories("Saved");
+
 		std::vector<spdlog::sink_ptr> logSinks;
 		logSinks.emplace_back(CreateRef<spdlog::sinks::stdout_color_sink_mt>());
-		logSinks.emplace_back(CreateRef<spdlog::sinks::basic_file_sink_mt>("CanadyEngine.log", true));
+		logSinks.emplace_back(CreateRef<spdlog::sinks::basic_file_sink_mt>("Saved/CandyEngine.log", true));
 
 		logSinks[0]->set_pattern("%^[%T] %n: %v%$");
 		logSinks[1]->set_pattern("[%T] [%l] %n: %v");

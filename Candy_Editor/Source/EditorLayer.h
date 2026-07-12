@@ -40,6 +40,13 @@ namespace Candy {
 
 		// UI Panels
 		void UI_Toolbar();
+		void UI_ProjectSettings();
+		void UI_EditorSettings();
+
+		void SaveEditorSettings();
+		void LoadEditorSettings();
+		void SaveEditorState();
+		void LoadEditorState();
 
 	private:
 		Candy::OrthographicCameraController m_CameraController;
@@ -81,6 +88,17 @@ namespace Candy {
 
 		// Editor resources
 		Ref<Texture2D> m_IconPlay, m_IconStop, m_IconSimulate;
+
+		// Settings
+		bool m_ShowProjectSettings = false;
+		bool m_ShowEditorSettings = false;
+		float m_FontSize = 18.0f;
+		std::string m_FontPath = "Assets/fonts/opensans/OpenSans-Regular.ttf";
+
+		std::string m_LastScenePath;
+		int m_WindowWidth = 1280;
+		int m_WindowHeight = 720;
+		bool m_WindowMaximized = false;
 	};
 
 }

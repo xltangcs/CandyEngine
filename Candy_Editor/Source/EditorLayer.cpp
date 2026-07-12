@@ -9,10 +9,14 @@
 #include "Candy/Utils/PlatformUtils.h"
 #include "Candy/UI/UISystem.h"
 
+#include <imgui/misc/cpp/imgui_stdlib.h>
 #include "ImGuizmo.h"
 
 #include "Candy/Math/Math.h"
 
+#include <yaml-cpp/yaml.h>
+#include <fstream>
+#include <GLFW/glfw3.h>
 
 namespace Candy {
 
@@ -28,9 +32,9 @@ namespace Candy {
 		CANDY_PROFILE_FUNCTION();
 
 		m_CheckerboardTexture = Texture2D::Create("Assets/textures/Checkerboard.png");
-		m_IconPlay = Texture2D::Create("../Resources/Icons/PlayButton.png");
-		m_IconStop = Texture2D::Create("../Resources/Icons/StopButton.png");
-		m_IconSimulate = Texture2D::Create("../Resources/Icons/SimulateButton.png");
+		m_IconPlay = Texture2D::Create("Assets/Icons/PlayButton.png");
+		m_IconStop = Texture2D::Create("Assets/Icons/StopButton.png");
+		m_IconSimulate = Texture2D::Create("Assets/Icons/SimulateButton.png");
 
 		FramebufferSpecification fbSpec;
 		fbSpec.Attachments = { FramebufferTextureFormat::RGBA8, FramebufferTextureFormat::RED_INTEGER, FramebufferTextureFormat::Depth };
@@ -43,36 +47,82 @@ namespace Candy {
 
 		m_EditorCamera = EditorCamera(30.0f, 1.778f, 0.1f, 1000.0f);
 
-		// Python 脚本测试实体
-		auto cube = m_ActiveScene->CreateEntity("Cube");
-		cube.AddComponent<SpriteRendererComponent>(glm::vec4{ 1.0f, 0.5f, 0.0f, 1.0f });
-		
-		auto& sc = cube.AddComponent<ScriptComponent>();
-		sc.ClassName = "cube";
+		LoadEditorSettings();
+		ImGuiLayer::RebuildFont(m_FontPath);
 
-		auto bgm = m_ActiveScene->CreateEntity("BGM");
-		auto& asc = bgm.AddComponent<AudioSourceComponent>();
-		asc.Looping = false;
-		asc.PlayOnStart = true;
-		asc.SoundPath = "assets\\Audio\\jump.mp3";
-
-		// HUD: TextBlocks showing Cube XYZ
-		auto hud = m_ActiveScene->CreateEntity("HUD");
-		auto& uiText = hud.AddComponent<UITextBlockComponent>();
-		TextBlockUIData tb;
-		tb.Text = "Cube XYZ: (0.00, 0.00, 0.00)";
-		tb.Color = { 1.0f, 1.0f, 1.0f, 1.0f };
-		tb.Position = { 640.0f, 20.0f };
-		tb.FontSize = 200.0f;
-		tb.Visible = true;
-		uiText.TextBlocks["CubeXYZ"] = tb;
+		LoadEditorState();
+		if (!m_LastScenePath.empty() && std::filesystem::exists(m_LastScenePath))
+			OpenScene(m_LastScenePath);
 
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
+
+		// Apply persisted window size
+		GLFWwindow* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow());
+		if (m_WindowMaximized)
+			glfwMaximizeWindow(window);
+		else
+			glfwSetWindowSize(window, m_WindowWidth, m_WindowHeight);
 	}
 
 	void EditorLayer::OnDetach()
 	{
 		CANDY_PROFILE_FUNCTION();
+		SaveEditorSettings();
+		SaveEditorState();
+	}
+
+	void EditorLayer::SaveEditorSettings()
+	{
+		std::filesystem::create_directories("Config");
+		YAML::Emitter out;
+		out << YAML::BeginMap;
+		out << YAML::Key << "EditorSettings" << YAML::Value << YAML::BeginMap;
+		out << YAML::Key << "FontSize" << YAML::Value << m_FontSize;
+		out << YAML::Key << "FontPath" << YAML::Value << m_FontPath;
+		out << YAML::EndMap << YAML::EndMap;
+		std::ofstream("Config/EditorSettings.yaml") << out.c_str();
+	}
+
+	void EditorLayer::LoadEditorSettings()
+	{
+		auto path = std::filesystem::path("Config/EditorSettings.yaml");
+		if (!std::filesystem::exists(path)) return;
+		auto doc = YAML::LoadFile(path.string());
+		auto settings = doc["EditorSettings"];
+		if (!settings) return;
+		if (settings["FontSize"]) m_FontSize = settings["FontSize"].as<float>();
+		if (settings["FontPath"]) m_FontPath = settings["FontPath"].as<std::string>();
+	}
+
+	void EditorLayer::SaveEditorState()
+	{
+		std::filesystem::create_directories("Saved");
+		GLFWwindow* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow());
+		int w, h;
+		glfwGetWindowSize(window, &w, &h);
+
+		YAML::Emitter out;
+		out << YAML::BeginMap;
+		out << YAML::Key << "EditorState" << YAML::Value << YAML::BeginMap;
+		out << YAML::Key << "LastScenePath" << YAML::Value << m_LastScenePath;
+		out << YAML::Key << "WindowWidth" << YAML::Value << w;
+		out << YAML::Key << "WindowHeight" << YAML::Value << h;
+		out << YAML::Key << "WindowMaximized" << YAML::Value << (bool)glfwGetWindowAttrib(window, GLFW_MAXIMIZED);
+		out << YAML::EndMap << YAML::EndMap;
+		std::ofstream("Saved/EditorState.yaml") << out.c_str();
+	}
+
+	void EditorLayer::LoadEditorState()
+	{
+		auto path = std::filesystem::path("Saved/EditorState.yaml");
+		if (!std::filesystem::exists(path)) return;
+		auto doc = YAML::LoadFile(path.string());
+		auto state = doc["EditorState"];
+		if (!state) return;
+		if (state["LastScenePath"]) m_LastScenePath = state["LastScenePath"].as<std::string>();
+		if (state["WindowWidth"]) m_WindowWidth = state["WindowWidth"].as<int>();
+		if (state["WindowHeight"]) m_WindowHeight = state["WindowHeight"].as<int>();
+		if (state["WindowMaximized"]) m_WindowMaximized = state["WindowMaximized"].as<bool>();
 	}
 
 	void EditorLayer::OnUpdate(Timestep ts)
@@ -155,6 +205,8 @@ namespace Candy {
 	{
 		CANDY_PROFILE_FUNCTION();
 
+		ImGui::PushFont(nullptr, m_FontSize);
+
 		// Note: Switch this to true to enable dockspace
 		static bool dockspaceOpen = true;
 		static bool opt_fullscreen_persistant = true;
@@ -207,6 +259,7 @@ namespace Candy {
 
 		style.WindowMinSize.x = minWinSizeX;
 
+		// ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 8));
 		if (ImGui::BeginMenuBar())
 		{
 			if (ImGui::BeginMenu("File"))
@@ -221,6 +274,9 @@ namespace Candy {
 				if (ImGui::MenuItem("Open...", "Ctrl+O"))
 					OpenScene();
 
+				if (ImGui::MenuItem("Save...", "Ctrl+S"))
+					SaveScene();
+				
 				if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S"))
 					SaveSceneAs();
 
@@ -228,9 +284,51 @@ namespace Candy {
 				ImGui::EndMenu();
 			}
 
+			if (ImGui::BeginMenu("Setting"))
+			{
+				if (ImGui::MenuItem("Project Settings"))
+					m_ShowProjectSettings = true;
+
+				if (ImGui::MenuItem("Editor Settings"))
+					m_ShowEditorSettings = true;
+
+				ImGui::EndMenu();
+			}
+
+			{
+				bool enabled = (bool)m_ActiveScene;
+				ImVec4 tint = ImVec4(1, 1, 1, 1);
+				if (!enabled) tint.w = 0.5f;
+
+				float size = ImGui::GetFrameHeight() - 4.0f;
+				float tw = size * 2.0f + ImGui::GetStyle().ItemSpacing.x;
+				float remaining = ImGui::GetWindowContentRegionMax().x - ImGui::GetCursorPosX();
+				if (remaining > tw)
+					ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (remaining - tw) * 0.5f);
+			
+				Ref<Texture2D> playIcon = (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate) ? m_IconPlay : m_IconStop;
+				if (ImGui::ImageButton("##PlayStop", (ImTextureID)playIcon->GetRendererID(), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0.0f, 0.0f, 0.0f, 0.0f), tint) && enabled)
+				{
+					if (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate)
+						OnScenePlay();
+					else if (m_SceneState == SceneState::Play)
+						OnSceneStop();
+				}
+				ImGui::SameLine();
+				Ref<Texture2D> simIcon = (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Play) ? m_IconSimulate : m_IconStop;
+				if (ImGui::ImageButton("##Simulate", (ImTextureID)simIcon->GetRendererID(), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0.0f, 0.0f, 0.0f, 0.0f), tint) && enabled)
+				{
+					if (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Play)
+						OnSceneSimulate();
+					else if (m_SceneState == SceneState::Simulate)
+						OnSceneStop();
+				}
+			}
+
 			ImGui::EndMenuBar();
 		}
-
+		// ImGui::PopStyleVar();
+		
 		m_SceneHierarchyPanel.OnImGuiRender();
 		m_ContentBrowserPanel.OnImGuiRender();
 
@@ -337,55 +435,62 @@ namespace Candy {
 		ImGui::End();
 		ImGui::PopStyleVar();
 
-		UI_Toolbar();
+		if (m_ShowProjectSettings) UI_ProjectSettings();
+		if (m_ShowEditorSettings) UI_EditorSettings();
 
+		ImGui::End();
+
+		ImGui::PopFont();
+	}
+
+	void EditorLayer::UI_ProjectSettings()
+	{
+		ImGui::Begin("Project Setting", &m_ShowProjectSettings);
 		ImGui::End();
 	}
 
-	void EditorLayer::UI_Toolbar()
+	void EditorLayer::UI_EditorSettings()
 	{
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 2));
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(0, 0));
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-		auto& colors = ImGui::GetStyle().Colors;
-		const auto& buttonHovered = colors[ImGuiCol_ButtonHovered];
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(buttonHovered.x, buttonHovered.y, buttonHovered.z, 0.5f));
-		const auto& buttonActive = colors[ImGuiCol_ButtonActive];
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(buttonActive.x, buttonActive.y, buttonActive.z, 0.5f));
+		ImGui::SetNextWindowSizeConstraints(ImVec2(200, 100), ImVec2(FLT_MAX, FLT_MAX));
+		ImGui::Begin("Editor Settings", &m_ShowEditorSettings);
 
-		ImGui::Begin("##toolbar", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-		bool toolbarEnabled = (bool)m_ActiveScene;
-
-		ImVec4 tintColor = ImVec4(1, 1, 1, 1);
-		if (!toolbarEnabled)
-			tintColor.w = 0.5f;
-
-		float size = ImGui::GetWindowHeight() - 4.0f;
+		if (ImGui::BeginTable("settings", 2, ImGuiTableFlags_SizingFixedFit))
 		{
-			Ref<Texture2D> icon = (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate) ? m_IconPlay : m_IconStop;
-			ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * 0.5f) - (size * 0.5f));
-			if (ImGui::ImageButton("##PlayStop", (ImTextureID)icon->GetRendererID(), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0.0f, 0.0f, 0.0f, 0.0f), tintColor) && toolbarEnabled)
-			{
-				if (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate)
-					OnScenePlay();
-				else if (m_SceneState == SceneState::Play)
-					OnSceneStop();
-			}
-		}
-		ImGui::SameLine();
-		{
-			Ref<Texture2D> icon = (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Play) ? m_IconSimulate : m_IconStop;		//ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * 0.5f) - (size * 0.5f));
-			if (ImGui::ImageButton("##Simulate", (ImTextureID)icon->GetRendererID(), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0.0f, 0.0f, 0.0f, 0.0f), tintColor) && toolbarEnabled)
-			{
-				if (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Play)
-					OnSceneSimulate();
-				else if (m_SceneState == SceneState::Simulate)
-					OnSceneStop();
-			}
-		}
-		ImGui::PopStyleVar(2);
-		ImGui::PopStyleColor(3);
+			ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed);
+			ImGui::TableSetupColumn("Control", ImGuiTableColumnFlags_WidthStretch);
 
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text("Font Size");
+			ImGui::TableSetColumnIndex(1);
+			ImGui::SliderFloat("##FontSize", &m_FontSize, 12.0f, 48.0f, "%.0f px");
+
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text("Font File");
+			ImGui::TableSetColumnIndex(1);
+			{
+				// ImGui::SetNextItemWidth(-ImGui::GetFrameHeightWithSpacing());
+			ImGui::InputText("##fontPath", &m_FontPath);
+			if (ImGui::IsItemDeactivatedAfterEdit())
+			{
+				ImGuiLayer::RebuildFont(m_FontPath);
+				SaveEditorSettings();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("..."))
+			{
+				std::string filepath = FileDialogs::OpenFile("TrueType Font (*.ttf)\0*.ttf\0");
+				if (!filepath.empty())
+				{
+					m_FontPath = filepath;
+					ImGuiLayer::RebuildFont(m_FontPath);
+					SaveEditorSettings();
+				}
+			}
+			}
+			ImGui::EndTable();
+		}
 
 		ImGui::End();
 	}
@@ -542,6 +647,7 @@ namespace Candy {
 		m_ActiveScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 		m_EditorScenePath = std::filesystem::path();
+		m_LastScenePath.clear();
 	}
 
 	void EditorLayer::OpenScene()
@@ -574,6 +680,7 @@ namespace Candy {
 
 			m_ActiveScene = m_EditorScene;
 			m_EditorScenePath = path;
+			m_LastScenePath = path.string();
 		}
 	}
 

@@ -8,11 +8,10 @@
 #include <imgui.h> 
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
-
 #include "ImGuizmo.h"
-		 
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
+#include <filesystem>
 
 namespace Candy {
 
@@ -33,6 +32,9 @@ namespace Candy {
 		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
 		//io.ConfigFlags |= ImGuiConfigFlags_ViewportsNoTaskBarIcons;
 		//io.ConfigFlags |= ImGuiConfigFlags_ViewportsNoMerge;
+
+		std::filesystem::create_directories("Saved");
+		io.IniFilename = "Saved/imgui.ini";
 
 		io.Fonts->AddFontFromFileTTF("Assets/fonts/opensans/OpenSans-Bold.ttf", 18.0f);
 		io.FontDefault = io.Fonts->AddFontFromFileTTF("Assets/fonts/opensans/OpenSans-Regular.ttf", 18.0f);
@@ -100,6 +102,13 @@ namespace Candy {
 			ImGui::RenderPlatformWindowsDefault();
 			glfwMakeContextCurrent(backup_current_context);
 		}
+	}
+
+	void ImGuiLayer::RebuildFont(const std::string& fontPath)
+	{
+		ImGuiIO& io = ImGui::GetIO();
+		io.Fonts->ClearFonts();
+		io.FontDefault = io.Fonts->AddFontFromFileTTF(fontPath.c_str());
 	}
 
 	void ImGuiLayer::SetDarkThemeColors()

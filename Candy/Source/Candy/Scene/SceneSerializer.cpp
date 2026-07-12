@@ -259,6 +259,79 @@ namespace Candy {
 			out << YAML::EndMap; // CircleCollider2DComponent
 		}
 
+		if (entity.HasComponent<ScriptComponent>())
+		{
+			out << YAML::Key << "ScriptComponent";
+			out << YAML::BeginMap; // ScriptComponent
+
+			auto& sc = entity.GetComponent<ScriptComponent>();
+			out << YAML::Key << "ClassName" << YAML::Value << sc.ClassName;
+
+			out << YAML::EndMap; // ScriptComponent
+		}
+
+		if (entity.HasComponent<AudioSourceComponent>())
+		{
+			out << YAML::Key << "AudioSourceComponent";
+			out << YAML::BeginMap; // AudioSourceComponent
+
+			auto& asc = entity.GetComponent<AudioSourceComponent>();
+			out << YAML::Key << "SoundPath" << YAML::Value << asc.SoundPath;
+			out << YAML::Key << "Volume" << YAML::Value << asc.Volume;
+			out << YAML::Key << "Looping" << YAML::Value << asc.Looping;
+			out << YAML::Key << "PlayOnStart" << YAML::Value << asc.PlayOnStart;
+
+			out << YAML::EndMap; // AudioSourceComponent
+		}
+
+		if (entity.HasComponent<UITextBlockComponent>())
+		{
+			out << YAML::Key << "UITextBlockComponent";
+			out << YAML::BeginMap; // UITextBlockComponent
+
+			auto& ui = entity.GetComponent<UITextBlockComponent>();
+			out << YAML::Key << "TextBlocks";
+			out << YAML::BeginMap; // TextBlocks
+			for (auto& [key, tb] : ui.TextBlocks)
+			{
+				out << YAML::Key << key;
+				out << YAML::BeginMap; // TextBlock
+				out << YAML::Key << "Text" << YAML::Value << tb.Text;
+				out << YAML::Key << "Color" << YAML::Value << tb.Color;
+				out << YAML::Key << "Position" << YAML::Value << tb.Position;
+				out << YAML::Key << "FontSize" << YAML::Value << tb.FontSize;
+				out << YAML::Key << "Visible" << YAML::Value << tb.Visible;
+				out << YAML::EndMap; // TextBlock
+			}
+			out << YAML::EndMap; // TextBlocks
+
+			out << YAML::EndMap; // UITextBlockComponent
+		}
+
+		if (entity.HasComponent<UIButtonComponent>())
+		{
+			out << YAML::Key << "UIButtonComponent";
+			out << YAML::BeginMap; // UIButtonComponent
+
+			auto& ui = entity.GetComponent<UIButtonComponent>();
+			out << YAML::Key << "Buttons";
+			out << YAML::BeginMap; // Buttons
+			for (auto& [key, btn] : ui.Buttons)
+			{
+				out << YAML::Key << key;
+				out << YAML::BeginMap; // Button
+				out << YAML::Key << "Text" << YAML::Value << btn.Text;
+				out << YAML::Key << "Size" << YAML::Value << btn.Size;
+				out << YAML::Key << "Position" << YAML::Value << btn.Position;
+				out << YAML::Key << "OnClick" << YAML::Value << btn.OnClick;
+				out << YAML::Key << "Visible" << YAML::Value << btn.Visible;
+				out << YAML::EndMap; // Button
+			}
+			out << YAML::EndMap; // Buttons
+
+			out << YAML::EndMap; // UIButtonComponent
+		}
+
 		out << YAML::EndMap; // Entity
 
 	}
@@ -406,6 +479,67 @@ namespace Candy {
 					cc2d.Friction = circleCollider2DComponent["Friction"].as<float>();
 					cc2d.Restitution = circleCollider2DComponent["Restitution"].as<float>();
 					cc2d.RestitutionThreshold = circleCollider2DComponent["RestitutionThreshold"].as<float>();
+				}
+
+				auto scriptComponent = entity["ScriptComponent"];
+				if (scriptComponent)
+				{
+					auto& sc = deserializedEntity.AddComponent<ScriptComponent>();
+					sc.ClassName = scriptComponent["ClassName"].as<std::string>();
+				}
+
+				auto audioSourceComponent = entity["AudioSourceComponent"];
+				if (audioSourceComponent)
+				{
+					auto& asc = deserializedEntity.AddComponent<AudioSourceComponent>();
+					asc.SoundPath = audioSourceComponent["SoundPath"].as<std::string>();
+					asc.Volume = audioSourceComponent["Volume"].as<float>();
+					asc.Looping = audioSourceComponent["Looping"].as<bool>();
+					asc.PlayOnStart = audioSourceComponent["PlayOnStart"].as<bool>();
+				}
+
+				auto uiTextBlockComponent = entity["UITextBlockComponent"];
+				if (uiTextBlockComponent)
+				{
+					auto& ui = deserializedEntity.AddComponent<UITextBlockComponent>();
+					auto textBlocks = uiTextBlockComponent["TextBlocks"];
+					if (textBlocks)
+					{
+						for (auto tbNode : textBlocks)
+						{
+							auto key = tbNode.first.as<std::string>();
+							auto& tbData = tbNode.second;
+							TextBlockUIData tb;
+							tb.Text = tbData["Text"].as<std::string>();
+							tb.Color = tbData["Color"].as<glm::vec4>();
+							tb.Position = tbData["Position"].as<glm::vec2>();
+							tb.FontSize = tbData["FontSize"].as<float>();
+							tb.Visible = tbData["Visible"].as<bool>();
+							ui.TextBlocks[key] = tb;
+						}
+					}
+				}
+
+				auto uiButtonComponent = entity["UIButtonComponent"];
+				if (uiButtonComponent)
+				{
+					auto& ui = deserializedEntity.AddComponent<UIButtonComponent>();
+					auto buttons = uiButtonComponent["Buttons"];
+					if (buttons)
+					{
+						for (auto btnNode : buttons)
+						{
+							auto key = btnNode.first.as<std::string>();
+							auto& btnData = btnNode.second;
+							ButtonUIData btn;
+							btn.Text = btnData["Text"].as<std::string>();
+							btn.Size = btnData["Size"].as<glm::vec2>();
+							btn.Position = btnData["Position"].as<glm::vec2>();
+							btn.OnClick = btnData["OnClick"].as<std::string>();
+							btn.Visible = btnData["Visible"].as<bool>();
+							ui.Buttons[key] = btn;
+						}
+					}
 				}
 			}
 		}

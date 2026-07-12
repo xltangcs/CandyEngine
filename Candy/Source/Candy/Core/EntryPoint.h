@@ -12,15 +12,15 @@ int main(int argc, char** argv)
 
 	CANDY_CORE_INFO("Initialized Log!");
 	
-	CANDY_PROFILE_BEGIN_SESSION("Startup", "CandyProfile-Startup.json");
+	CANDY_PROFILE_BEGIN_SESSION("Startup", "Saved/CandyProfile-Startup.json");
 	auto app = Candy::CreateApplication();
 	CANDY_PROFILE_END_SESSION();
 
-	CANDY_PROFILE_BEGIN_SESSION("Runtime", "CandyProfile-Runtime.json");
+	CANDY_PROFILE_BEGIN_SESSION("Runtime", "Saved/CandyProfile-Runtime.json");
 	app->Run();
 	CANDY_PROFILE_END_SESSION();
 
-	CANDY_PROFILE_BEGIN_SESSION("Shutdown", "CandyProfile-Shutdown.json");
+	CANDY_PROFILE_BEGIN_SESSION("Shutdown", "Saved/CandyProfile-Shutdown.json");
 	delete app;
 	CANDY_PROFILE_END_SESSION();
 }
