@@ -1,3 +1,5 @@
 EditorSettings:
-  FontSize: 26
+  FontSize: 25
   FontPath: Assets/fonts/opensans/OpenSans-Regular.ttf
+  ThumbnailSize: 100.658997
+  ThumbnailPadding: 11.6940002

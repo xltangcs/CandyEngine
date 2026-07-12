@@ -18,6 +18,7 @@ project "Candy_Editor"
 		"%{wks.location}/Candy/ThirdParty/spdlog/include",
 		"%{wks.location}/Candy/Source",
 		"%{wks.location}/Candy/ThirdParty",
+		"%{wks.location}/Candy_Editor/Source",
 
 		"%{IncludeDir.glm}",
 		"%{IncludeDir.entt}",

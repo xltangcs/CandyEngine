@@ -1,5 +1,28 @@
 Scene: TestScene
 Entities:
+  - Entity: 7028300387292532713
+    TagComponent:
+      Tag: Cube
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SpriteRendererComponent:
+      Color: [1, 0.5, 0, 1]
+    ScriptComponent:
+      ClassName: cube
+  - Entity: 10453616027141309842
+    TagComponent:
+      Tag: BGM
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    AudioSourceComponent:
+      SoundPath: Assets\Audio\jump.mp3
+      Volume: 1
+      Looping: false
+      PlayOnStart: false
   - Entity: 11875080259632199413
     TagComponent:
       Tag: HUD
@@ -15,26 +38,3 @@ Entities:
           Position: [733, 239]
           FontSize: 72
           Visible: true
-  - Entity: 10453616027141309842
-    TagComponent:
-      Tag: BGM
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    AudioSourceComponent:
-      SoundPath: Assets\Audio\jump.mp3
-      Volume: 1
-      Looping: false
-      PlayOnStart: false
-  - Entity: 7028300387292532713
-    TagComponent:
-      Tag: Cube
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    SpriteRendererComponent:
-      Color: [1, 0.5, 0, 1]
-    ScriptComponent:
-      ClassName: cube

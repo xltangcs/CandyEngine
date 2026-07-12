@@ -1,5 +1,6 @@
 #include "CandyPCH.h"
 #include "ContentBrowserPanel.h"
+#include "Settings/CandyEditorSettings.h"
 
 #include <imgui/imgui.h>
 
@@ -27,14 +28,14 @@ namespace Candy {
 			}
 		}
 
-		static float padding = 16.0f;
-		static float thumbnailSize = 80.0f;
+		auto& editorSettings = CandyEditorSettings::Get();
+		float thumbnailSize = editorSettings.ThumbnailSize;
+		float padding = editorSettings.ThumbnailPadding;
 		float cellSize = thumbnailSize + padding;
 
 		float panelWidth = ImGui::GetContentRegionAvail().x;
 		int columnCount = (int)(panelWidth / cellSize);
-		if (columnCount < 1)
-			columnCount = 1;
+		columnCount = std::max(1, columnCount);
 
 		ImGui::Columns(columnCount, 0, false);
 
@@ -71,9 +72,6 @@ namespace Candy {
 		}
 
 		ImGui::Columns(1);
-
-		ImGui::SliderFloat("Thumbnail Size", &thumbnailSize, 16, 512);
-		ImGui::SliderFloat("Padding", &padding, 0, 32);
 
 		// TODO: status bar
 		ImGui::End();

@@ -14,8 +14,6 @@
 
 #include "Candy/Math/Math.h"
 
-#include <yaml-cpp/yaml.h>
-#include <fstream>
 #include <GLFW/glfw3.h>
 
 namespace Candy {
@@ -47,82 +45,30 @@ namespace Candy {
 
 		m_EditorCamera = EditorCamera(30.0f, 1.778f, 0.1f, 1000.0f);
 
-		LoadEditorSettings();
-		ImGuiLayer::RebuildFont(m_FontPath);
+		auto& editorSettings = CandyEditorSettings::Get();
+		editorSettings.Load();
+		ImGuiLayer::RebuildFont(editorSettings.FontPath);
 
-		LoadEditorState();
-		if (!m_LastScenePath.empty() && std::filesystem::exists(m_LastScenePath))
-			OpenScene(m_LastScenePath);
+		auto& editorState = CandyEditorState::Get();
+		editorState.Load();
+		if (!editorState.LastScenePath.empty() && std::filesystem::exists(editorState.LastScenePath))
+			OpenScene(editorState.LastScenePath);
 
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 
 		// Apply persisted window size
 		GLFWwindow* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow());
-		if (m_WindowMaximized)
+		if (editorState.WindowMaximized)
 			glfwMaximizeWindow(window);
 		else
-			glfwSetWindowSize(window, m_WindowWidth, m_WindowHeight);
+			glfwSetWindowSize(window, editorState.WindowWidth, editorState.WindowHeight);
 	}
 
 	void EditorLayer::OnDetach()
 	{
 		CANDY_PROFILE_FUNCTION();
-		SaveEditorSettings();
-		SaveEditorState();
-	}
-
-	void EditorLayer::SaveEditorSettings()
-	{
-		std::filesystem::create_directories("Config");
-		YAML::Emitter out;
-		out << YAML::BeginMap;
-		out << YAML::Key << "EditorSettings" << YAML::Value << YAML::BeginMap;
-		out << YAML::Key << "FontSize" << YAML::Value << m_FontSize;
-		out << YAML::Key << "FontPath" << YAML::Value << m_FontPath;
-		out << YAML::EndMap << YAML::EndMap;
-		std::ofstream("Config/EditorSettings.yaml") << out.c_str();
-	}
-
-	void EditorLayer::LoadEditorSettings()
-	{
-		auto path = std::filesystem::path("Config/EditorSettings.yaml");
-		if (!std::filesystem::exists(path)) return;
-		auto doc = YAML::LoadFile(path.string());
-		auto settings = doc["EditorSettings"];
-		if (!settings) return;
-		if (settings["FontSize"]) m_FontSize = settings["FontSize"].as<float>();
-		if (settings["FontPath"]) m_FontPath = settings["FontPath"].as<std::string>();
-	}
-
-	void EditorLayer::SaveEditorState()
-	{
-		std::filesystem::create_directories("Saved");
-		GLFWwindow* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow());
-		int w, h;
-		glfwGetWindowSize(window, &w, &h);
-
-		YAML::Emitter out;
-		out << YAML::BeginMap;
-		out << YAML::Key << "EditorState" << YAML::Value << YAML::BeginMap;
-		out << YAML::Key << "LastScenePath" << YAML::Value << m_LastScenePath;
-		out << YAML::Key << "WindowWidth" << YAML::Value << w;
-		out << YAML::Key << "WindowHeight" << YAML::Value << h;
-		out << YAML::Key << "WindowMaximized" << YAML::Value << (bool)glfwGetWindowAttrib(window, GLFW_MAXIMIZED);
-		out << YAML::EndMap << YAML::EndMap;
-		std::ofstream("Saved/EditorState.yaml") << out.c_str();
-	}
-
-	void EditorLayer::LoadEditorState()
-	{
-		auto path = std::filesystem::path("Saved/EditorState.yaml");
-		if (!std::filesystem::exists(path)) return;
-		auto doc = YAML::LoadFile(path.string());
-		auto state = doc["EditorState"];
-		if (!state) return;
-		if (state["LastScenePath"]) m_LastScenePath = state["LastScenePath"].as<std::string>();
-		if (state["WindowWidth"]) m_WindowWidth = state["WindowWidth"].as<int>();
-		if (state["WindowHeight"]) m_WindowHeight = state["WindowHeight"].as<int>();
-		if (state["WindowMaximized"]) m_WindowMaximized = state["WindowMaximized"].as<bool>();
+		CandyEditorSettings::Get().Save();
+		CandyEditorState::Get().Save();
 	}
 
 	void EditorLayer::OnUpdate(Timestep ts)
@@ -205,7 +151,7 @@ namespace Candy {
 	{
 		CANDY_PROFILE_FUNCTION();
 
-		ImGui::PushFont(nullptr, m_FontSize);
+		ImGui::PushFont(nullptr, CandyEditorSettings::Get().FontSize);
 
 		// Note: Switch this to true to enable dockspace
 		static bool dockspaceOpen = true;
@@ -287,10 +233,10 @@ namespace Candy {
 			if (ImGui::BeginMenu("Setting"))
 			{
 				if (ImGui::MenuItem("Project Settings"))
-					m_ShowProjectSettings = true;
+					CandyEditorState::Get().ShowProjectSettings = true;
 
 				if (ImGui::MenuItem("Editor Settings"))
-					m_ShowEditorSettings = true;
+					CandyEditorState::Get().ShowEditorSettings = true;
 
 				ImGui::EndMenu();
 			}
@@ -435,65 +381,15 @@ namespace Candy {
 		ImGui::End();
 		ImGui::PopStyleVar();
 
-		if (m_ShowProjectSettings) UI_ProjectSettings();
-		if (m_ShowEditorSettings) UI_EditorSettings();
+		if (CandyEditorState::Get().ShowProjectSettings) CandyProjectSettings::Get().OnImGuiRender();
+		if (CandyEditorState::Get().ShowEditorSettings) CandyEditorSettings::Get().OnImGuiRender();
 
 		ImGui::End();
 
 		ImGui::PopFont();
 	}
 
-	void EditorLayer::UI_ProjectSettings()
-	{
-		ImGui::Begin("Project Setting", &m_ShowProjectSettings);
-		ImGui::End();
-	}
 
-	void EditorLayer::UI_EditorSettings()
-	{
-		ImGui::SetNextWindowSizeConstraints(ImVec2(200, 100), ImVec2(FLT_MAX, FLT_MAX));
-		ImGui::Begin("Editor Settings", &m_ShowEditorSettings);
-
-		if (ImGui::BeginTable("settings", 2, ImGuiTableFlags_SizingFixedFit))
-		{
-			ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed);
-			ImGui::TableSetupColumn("Control", ImGuiTableColumnFlags_WidthStretch);
-
-			ImGui::TableNextRow();
-			ImGui::TableSetColumnIndex(0);
-			ImGui::Text("Font Size");
-			ImGui::TableSetColumnIndex(1);
-			ImGui::SliderFloat("##FontSize", &m_FontSize, 12.0f, 48.0f, "%.0f px");
-
-			ImGui::TableNextRow();
-			ImGui::TableSetColumnIndex(0);
-			ImGui::Text("Font File");
-			ImGui::TableSetColumnIndex(1);
-			{
-				// ImGui::SetNextItemWidth(-ImGui::GetFrameHeightWithSpacing());
-			ImGui::InputText("##fontPath", &m_FontPath);
-			if (ImGui::IsItemDeactivatedAfterEdit())
-			{
-				ImGuiLayer::RebuildFont(m_FontPath);
-				SaveEditorSettings();
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("..."))
-			{
-				std::string filepath = FileDialogs::OpenFile("TrueType Font (*.ttf)\0*.ttf\0");
-				if (!filepath.empty())
-				{
-					m_FontPath = filepath;
-					ImGuiLayer::RebuildFont(m_FontPath);
-					SaveEditorSettings();
-				}
-			}
-			}
-			ImGui::EndTable();
-		}
-
-		ImGui::End();
-	}
 
 	void EditorLayer::OnEvent(Event& e)
 	{
@@ -647,7 +543,7 @@ namespace Candy {
 		m_ActiveScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 		m_EditorScenePath = std::filesystem::path();
-		m_LastScenePath.clear();
+		CandyEditorState::Get().LastScenePath.clear();
 	}
 
 	void EditorLayer::OpenScene()
@@ -680,7 +576,7 @@ namespace Candy {
 
 			m_ActiveScene = m_EditorScene;
 			m_EditorScenePath = path;
-			m_LastScenePath = path.string();
+			CandyEditorState::Get().LastScenePath = path.string();
 		}
 	}
 
