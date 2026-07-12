@@ -48,6 +48,9 @@ py::object GetComponentFromEntity(Candy::Entity& entity, const std::string& type
     if (type == "TransformComponent")
         return py::cast(&entity.GetComponent<Candy::TransformComponent>(), py::return_value_policy::reference);
 
+    if (type == "UITextBlockComponent")
+        return py::cast(&entity.GetComponent<Candy::UITextBlockComponent>(), py::return_value_policy::reference);
+
     throw std::runtime_error("Unknown component type: " + type);
 }
 
@@ -55,6 +58,9 @@ bool EntityHasComponent(Candy::Entity& entity, const std::string& type)
 {
     if (type == "TransformComponent")
         return entity.HasComponent<Candy::TransformComponent>();
+
+    if (type == "UITextBlockComponent")
+        return entity.HasComponent<Candy::UITextBlockComponent>();
 
     return false;
 }
@@ -107,12 +113,48 @@ PYBIND11_EMBEDDED_MODULE(candy, m)
             return "Vec3(" + std::to_string(v.x) + ", " + std::to_string(v.y) + ", " + std::to_string(v.z) + ")";
         });
 
+    // --- Vec4 ---
+    py::class_<glm::vec4>(m, "Vec4")
+        .def(py::init<>())
+        .def(py::init<float, float, float, float>())
+        .def_readwrite("r", &glm::vec4::r)
+        .def_readwrite("g", &glm::vec4::g)
+        .def_readwrite("b", &glm::vec4::b)
+        .def_readwrite("a", &glm::vec4::a)
+        .def("__repr__", [](const glm::vec4& v) {
+            return "Vec4(" + std::to_string(v.r) + ", " + std::to_string(v.g) + ", " + std::to_string(v.b) + ", " + std::to_string(v.a) + ")";
+        });
+
+    // --- Vec2 ---
+    py::class_<glm::vec2>(m, "Vec2")
+        .def(py::init<>())
+        .def(py::init<float, float>())
+        .def_readwrite("x", &glm::vec2::x)
+        .def_readwrite("y", &glm::vec2::y)
+        .def("__repr__", [](const glm::vec2& v) {
+            return "Vec2(" + std::to_string(v.x) + ", " + std::to_string(v.y) + ")";
+        });
+
     // --- TransformComponent ---
     py::class_<Candy::TransformComponent>(m, "TransformComponent")
         .def(py::init<>())
         .def_readwrite("Translation", &Candy::TransformComponent::Translation)
         .def_readwrite("Rotation",    &Candy::TransformComponent::Rotation)
         .def_readwrite("Scale",       &Candy::TransformComponent::Scale);
+
+    // --- TextBlockUIData ---
+    py::class_<Candy::TextBlockUIData>(m, "TextBlockUIData")
+        .def(py::init<>())
+        .def_readwrite("Text",     &Candy::TextBlockUIData::Text)
+        .def_readwrite("Color",    &Candy::TextBlockUIData::Color)
+        .def_readwrite("Position", &Candy::TextBlockUIData::Position)
+        .def_readwrite("FontSize", &Candy::TextBlockUIData::FontSize)
+        .def_readwrite("Visible",  &Candy::TextBlockUIData::Visible);
+
+    // --- UITextBlockComponent ---
+    py::class_<Candy::UITextBlockComponent>(m, "UITextBlockComponent")
+        .def(py::init<>())
+        .def_readwrite("TextBlocks", &Candy::UITextBlockComponent::TextBlocks);
 
     // --- Entity ---
     py::class_<Candy::Entity>(m, "Entity")
