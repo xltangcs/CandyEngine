@@ -152,6 +152,7 @@ namespace Candy {
 
 	struct ScriptComponent
 	{
+		std::string ScriptPath;
 		std::string ClassName;
 
 		ScriptComponent() = default;

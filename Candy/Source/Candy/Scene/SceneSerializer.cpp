@@ -265,6 +265,7 @@ namespace Candy {
 			out << YAML::BeginMap; // ScriptComponent
 
 			auto& sc = entity.GetComponent<ScriptComponent>();
+			out << YAML::Key << "ScriptPath" << YAML::Value << sc.ScriptPath;
 			out << YAML::Key << "ClassName" << YAML::Value << sc.ClassName;
 
 			out << YAML::EndMap; // ScriptComponent
@@ -485,6 +486,7 @@ namespace Candy {
 				if (scriptComponent)
 				{
 					auto& sc = deserializedEntity.AddComponent<ScriptComponent>();
+					sc.ScriptPath = scriptComponent["ScriptPath"].as<std::string>();
 					sc.ClassName = scriptComponent["ClassName"].as<std::string>();
 				}
 

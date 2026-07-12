@@ -53,7 +53,7 @@ void ScriptSystem::InitPython()
         .parent_path()  // .../Debug-windows-x86_64/
         .parent_path()  // .../bin/
         .parent_path()  // <project_root>/
-        / "assets" / "scripts";
+        / "Candy_Editor" / "Assets" / "Scripts";
 
     Py_Initialize();
 
@@ -79,11 +79,27 @@ void ScriptSystem::ShutdownPython()
     s_PythonInitialized = false;
 }
 
+static std::string ScriptPathToModuleName(const std::string& scriptPath)
+{
+    // "Assets/Scripts/enemies/goblin.py" → "enemies.goblin"
+    std::filesystem::path p(scriptPath);
+    std::string name = p.replace_extension("").generic_string();
+
+    // Strip "Assets/Scripts/" prefix
+    const std::string prefix = "Assets/Scripts/";
+    if (name.find(prefix) == 0)
+        name = name.substr(prefix.size());
+
+    // Replace / with .
+    std::replace(name.begin(), name.end(), '/', '.');
+
+    return name;
+}
+
 void ScriptSystem::InstantiateScript(Entity& entity)
 {
     UUID uuid = entity.GetUUID();
     auto& sc = entity.GetComponent<ScriptComponent>();
-    const std::string& className = sc.ClassName;
 
     if (m_Instances.find(uuid) != m_Instances.end())
     {
@@ -93,13 +109,13 @@ void ScriptSystem::InstantiateScript(Entity& entity)
 
     try
     {
-        py::object pyModule = py::module_::import(className.c_str());
+        // Derive module name from ScriptPath
+        std::string moduleName = ScriptPathToModuleName(sc.ScriptPath);
 
-        // Conventions: ClassName field is lowercase filename, Python class is capitalized
-        std::string classAttr = className;
-        if (!classAttr.empty())
-            classAttr[0] = (char)std::toupper((unsigned char)classAttr[0]);
-        py::object pyClass = pyModule.attr(classAttr.c_str());
+        py::object pyModule = py::module_::import(moduleName.c_str());
+
+        // ClassName is the actual Python class name
+        py::object pyClass = pyModule.attr(sc.ClassName.c_str());
         py::object pyInstance = pyClass();
 
         auto instance = std::make_unique<ScriptInstance>();
@@ -116,11 +132,11 @@ void ScriptSystem::InstantiateScript(Entity& entity)
     }
     catch (const py::error_already_set& e)
     {
-        CANDY_CORE_ERROR("Python error instantiating script '{0}': {1}", className, e.what());
+        CANDY_CORE_ERROR("Python error instantiating script '{0}': {1}", sc.ClassName, e.what());
     }
     catch (const std::exception& e)
     {
-        CANDY_CORE_ERROR("Failed to instantiate script '{0}': {1}", className, e.what());
+        CANDY_CORE_ERROR("Failed to instantiate script '{0}': {1}", sc.ClassName, e.what());
     }
 }
 

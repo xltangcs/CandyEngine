@@ -5,8 +5,11 @@
 #include "SceneHierarchyPanel.h"
 
 #include "Candy/Scene/Components.h"
+#include "Candy/Utils/PlatformUtils.h"
 
 #include <cstring>
+#include <regex>
+#include <fstream>
 
 /* The Microsoft C++ compiler is non-compliant with the C++ standard and needs
  * the following definition to disable a security warning on std::strncpy().
@@ -19,6 +22,23 @@
 namespace Candy {
 
 	extern const std::filesystem::path g_AssetPath;
+
+	static std::string ParsePythonClassName(const std::filesystem::path& filePath)
+	{
+		std::filesystem::path absPath = std::filesystem::absolute(filePath);
+		std::ifstream file(absPath);
+		if (!file.is_open())
+			return {};
+
+		std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+		std::regex pattern(R"(class\s+(\w+)\s*\([^)]*\bcandy\b\s*\.\s*ScriptObject\b[^)]*\))");
+		std::smatch match;
+		if (std::regex_search(content, match, pattern))
+			return match[1];
+
+		return {};
+	}
 
 	SceneHierarchyPanel::SceneHierarchyPanel(const Ref<Scene>& context)
 	{
@@ -63,6 +83,29 @@ namespace Candy {
 		{
 			DrawComponents(m_SelectionContext);
 		}
+
+		ImGui::InvisibleButton("##ScriptDropZone", ImGui::GetContentRegionAvail());
+		
+		if (ImGui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
+			{
+				const wchar_t* path = (const wchar_t*)payload->Data;
+				std::filesystem::path fullPath = std::filesystem::path(g_AssetPath) / path;
+				if (fullPath.extension() == ".py" && m_SelectionContext)
+				{
+					auto& sc = m_SelectionContext.HasComponent<ScriptComponent>()
+						? m_SelectionContext.GetComponent<ScriptComponent>()
+						: m_SelectionContext.AddComponent<ScriptComponent>();
+					sc.ScriptPath = fullPath.string();
+					std::string parsedName = ParsePythonClassName(fullPath);
+					if (!parsedName.empty())
+						sc.ClassName = parsedName;
+				}
+			}
+			ImGui::EndDragDropTarget();
+		}
+
 		ImGui::End();
 	}
 
@@ -92,6 +135,27 @@ namespace Candy {
 				entityDeleted = true;
 
 			ImGui::EndPopup();
+		}
+
+		// Drag-drop target for .py script files
+		if (ImGui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
+			{
+				const wchar_t* path = (const wchar_t*)payload->Data;
+				std::filesystem::path fullPath = std::filesystem::path(g_AssetPath) / path;
+				if (fullPath.extension() == ".py")
+				{
+					auto& sc = entity.HasComponent<ScriptComponent>()
+						? entity.GetComponent<ScriptComponent>()
+						: entity.AddComponent<ScriptComponent>();
+					sc.ScriptPath = fullPath.string();
+					std::string parsedName = ParsePythonClassName(fullPath);
+					if (!parsedName.empty())
+						sc.ClassName = parsedName;
+				}
+			}
+			ImGui::EndDragDropTarget();
 		}
 
 		if (opened)
@@ -477,14 +541,61 @@ namespace Candy {
 		DrawComponent<ScriptComponent>("Script", entity, [](auto& component)
 		{
 			char buffer[256];
+
+			// ScriptPath
+			memset(buffer, 0, sizeof(buffer));
+			std::strncpy(buffer, component.ScriptPath.c_str(), sizeof(buffer));
+			ImGui::Text("ScriptPath");
+			ImGui::SameLine();
+			ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 80.0f);
+			if (ImGui::InputText("##ScriptPath", buffer, sizeof(buffer)))
+				component.ScriptPath = buffer;
+			ImGui::PopItemWidth();
+
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
+				{
+					const wchar_t* path = (const wchar_t*)payload->Data;
+					std::filesystem::path fullPath = std::filesystem::path(g_AssetPath) / path;
+					if (fullPath.extension() == ".py")
+					{
+						component.ScriptPath = fullPath.string();
+						std::strncpy(buffer, component.ScriptPath.c_str(), sizeof(buffer) - 1);
+						buffer[sizeof(buffer) - 1] = '\0';
+
+						std::string parsedName = ParsePythonClassName(fullPath);
+						if (!parsedName.empty())
+							component.ClassName = parsedName;
+					}
+				}
+				ImGui::EndDragDropTarget();
+			}
+			
+			ImGui::SameLine();
+			if (ImGui::Button("..."))
+			{
+				std::string filepath = FileDialogs::OpenFile("Python Script (*.py)\0*.py\0");
+				if (!filepath.empty())
+				{
+					std::filesystem::path relPath = std::filesystem::relative(std::filesystem::path(filepath), std::filesystem::current_path());
+					component.ScriptPath = relPath.string();
+					std::strncpy(buffer, component.ScriptPath.c_str(), sizeof(buffer) - 1);
+					buffer[sizeof(buffer) - 1] = '\0';
+
+					std::string parsedName = ParsePythonClassName(filepath);
+					if (!parsedName.empty())
+						component.ClassName = parsedName;
+				}
+			}
+			
+			// ClassName
 			memset(buffer, 0, sizeof(buffer));
 			std::strncpy(buffer, component.ClassName.c_str(), sizeof(buffer));
-			ImGui::Text("Class Name");
+			ImGui::Text("ClassName");
 			ImGui::SameLine();
 			if (ImGui::InputText("##ClassName", buffer, sizeof(buffer)))
-			{
 				component.ClassName = buffer;
-			}
 		});
 
 		DrawComponent<AudioSourceComponent>("Audio Source", entity, [](auto& component)
