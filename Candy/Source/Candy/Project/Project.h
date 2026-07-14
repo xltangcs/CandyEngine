@@ -3,20 +3,16 @@
 #include "Candy/Core/Base.h"
 
 #include <filesystem>
-#include <map>
 #include <string>
 
-namespace Candy {
+#include "../../../../Candy_Editor/Source/Settings/ProjectSettings.h"
 
-	struct ProjectSettings
-	{
-		std::string ContentDirectory = "Content";
-		std::string DefaultScene = "Scenes/Default.candy";
-		uint32_t DefaultWidth = 1280;
-		uint32_t DefaultHeight = 720;
-		std::string WindowTitle = "";
-		std::map<std::string, std::string> CustomSettings;
-	};
+namespace Candy
+{
+	class ProjectSettings;
+}
+
+namespace Candy {
 
 	class Project : public std::enable_shared_from_this<Project>
 	{
@@ -30,11 +26,9 @@ namespace Candy {
 
 		const std::filesystem::path& GetProjectFileName() const { return m_ProjectFileName; }
 		std::filesystem::path GetProjectDirectory() const { return m_ProjectFileName.parent_path(); }
-		std::filesystem::path GetContentDirectory() const { return GetProjectDirectory() / m_Settings.ContentDirectory; }
-		std::filesystem::path GetFullStartScenePath() const { return GetContentDirectory() / m_Settings.DefaultScene; }
+		std::filesystem::path GetFullStartScenePath() const { return GetProjectDirectory() / "Content" / GetProjectDefaultScene(); }
 
-		ProjectSettings& GetSettings() { return m_Settings; }
-		const ProjectSettings& GetSettings() const { return m_Settings; }
+		static const std::string& GetProjectDefaultScene() { return ProjectSettings::Get().DefaultScene; }
 
 		friend class ProjectSerializer;
 
@@ -43,7 +37,6 @@ namespace Candy {
 
 		std::string m_Name;
 		std::filesystem::path m_ProjectFileName;
-		ProjectSettings m_Settings;
 	};
 
 }

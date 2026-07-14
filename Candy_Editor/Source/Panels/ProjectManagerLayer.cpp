@@ -10,6 +10,8 @@
 #include <fstream>
 #include <filesystem>
 
+#include "GLFW/glfw3.h"
+
 namespace Candy {
 		
 	ProjectManagerLayer::ProjectManagerLayer()
@@ -19,15 +21,31 @@ namespace Candy {
 
 	void ProjectManagerLayer::OnAttach()
 	{
+		auto& editorState = EditorState::Get();
+		editorState.Load();
+		
+		auto& editorSettings = EditorSettings::Get();
+		editorSettings.Load();
+		ImGuiLayer::RebuildFont(editorSettings.m_FontPath);
+
+		GLFWwindow* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow());
+		if (editorState.WindowMaximized)
+			glfwMaximizeWindow(window);
+		else
+			glfwSetWindowSize(window, editorState.WindowWidth, editorState.WindowHeight);
+		
 		m_RecentProjects = RecentProjects::Load();
 	}
 
 	void ProjectManagerLayer::OnDetach()
 	{
+		EditorState::Get().Save();
 	}
 
 	void ProjectManagerLayer::OnImGuiRender()
 	{
+		ImGui::PushFont(nullptr, EditorSettings::Get().m_FontSize);
+		
 		ImGuiViewport* viewport = ImGui::GetMainViewport();
 		ImGui::SetNextWindowPos(viewport->Pos);
 		ImGui::SetNextWindowSize(viewport->Size);
@@ -147,6 +165,8 @@ namespace Candy {
 			RenderNewProjectDialog();
 
 		ImGui::End();
+
+		ImGui::PopFont();
 	}
 
 	void ProjectManagerLayer::OpenProject()

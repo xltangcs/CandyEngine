@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Candy/Core/Base.h"
-
+#include <filesystem>
 #ifdef CANDY_PLATFORM_WINDOWS
 
 extern Candy::Application* Candy::CreateApplication();

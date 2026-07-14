@@ -4,7 +4,12 @@
 
 namespace Candy::ProjectUtils {
 
+	std::filesystem::path GetEnginePath();
+	std::filesystem::path GetEngineContentPath();
+	std::filesystem::path GetEngineShadersPath();
+	
+	std::filesystem::path GetProjectPath();
 	std::filesystem::path GetProjectContentPath();
-	std::filesystem::path GetEngineAssetsPath();
+	std::filesystem::path GetProjectConfigPath();
 
 }

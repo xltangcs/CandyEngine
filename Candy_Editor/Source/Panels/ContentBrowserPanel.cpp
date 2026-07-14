@@ -1,6 +1,6 @@
 #include "CandyPCH.h"
 #include "ContentBrowserPanel.h"
-#include "Settings/CandyEditorSettings.h"
+#include "Settings/EditorSettings.h"
 
 #include <imgui/imgui.h>
 #include "Candy/Core/Application.h"
@@ -27,9 +27,9 @@ namespace Candy {
 			}
 		}
 
-		auto& editorSettings = CandyEditorSettings::Get();
-		float thumbnailSize = editorSettings.ThumbnailSize;
-		float padding = editorSettings.ThumbnailPadding;
+		auto& editorSettings = EditorSettings::Get();
+		float thumbnailSize = editorSettings.m_ThumbnailSize;
+		float padding = editorSettings.m_ThumbnailPadding;
 		float cellSize = thumbnailSize + padding;
 
 		float panelWidth = ImGui::GetContentRegionAvail().x;

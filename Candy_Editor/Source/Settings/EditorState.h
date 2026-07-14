@@ -4,10 +4,10 @@
 
 namespace Candy {
 
-	class CandyEditorState
+	class EditorState
 	{
 	public:
-		static CandyEditorState& Get();
+		static EditorState& Get();
 
 		void Save();
 		void Load();
@@ -20,7 +20,7 @@ namespace Candy {
 		bool ShowEditorSettings = false;
 
 	private:
-		CandyEditorState() = default;
+		EditorState() = default;
 	};
 
 }

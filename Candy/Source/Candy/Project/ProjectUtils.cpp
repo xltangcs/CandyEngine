@@ -3,16 +3,35 @@
 #include "Candy/Core/Application.h"
 
 namespace Candy::ProjectUtils {
+	
+	std::filesystem::path GetEnginePath()
+	{
+		return std::filesystem::path("..") / "Candy";
+	}
+
+	std::filesystem::path GetEngineContentPath()
+	{
+		return GetEnginePath() / "Content";
+	}
+
+	std::filesystem::path GetEngineShadersPath()
+	{
+		return GetEnginePath() / "Content" / "Shaders";
+	}
+
+	std::filesystem::path GetProjectPath()
+	{
+		auto project = Application::Get().GetProject();
+		return project ? project->GetProjectDirectory() : std::filesystem::current_path();
+	}
 
 	std::filesystem::path GetProjectContentPath()
 	{
-		auto project = Application::Get().GetProject();
-		return project ? project->GetContentDirectory() : std::filesystem::path("Content");
+		return GetProjectPath() / "Content";
 	}
 
-	std::filesystem::path GetEngineAssetsPath()
+	std::filesystem::path GetProjectConfigPath()
 	{
-		return std::filesystem::path("Assets");
+		return GetProjectPath() / "Config";
 	}
-
 }

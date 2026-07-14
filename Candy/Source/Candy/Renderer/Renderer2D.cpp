@@ -5,7 +5,7 @@
 #include "Candy/Renderer/VertexArray.h"
 #include "Candy/Renderer/UniformBuffer.h"
 #include "Candy/Renderer/RenderCommand.h"
-
+#include "Candy/Project/ProjectUtils.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -165,9 +165,10 @@ namespace Candy {
 		for (uint32_t i = 0; i < s_Data.MaxTextureSlots; i++)
 			samplers[i] = i;
 
-		s_Data.QuadShader = Shader::Create("Assets/shaders/Renderer2D_Quad.glsl");
-		s_Data.CircleShader = Shader::Create("Assets/shaders/Renderer2D_Circle.glsl");
-		s_Data.LineShader = Shader::Create("Assets/shaders/Renderer2D_Line.glsl");
+		const auto& shadersPath = ProjectUtils::GetEngineShadersPath();
+		s_Data.QuadShader = Shader::Create((shadersPath / "Renderer2D_Quad.glsl").string());
+		s_Data.CircleShader = Shader::Create((shadersPath / "Renderer2D_Circle.glsl").string());
+		s_Data.LineShader = Shader::Create((shadersPath / "Renderer2D_Line.glsl").string());
 
 		s_Data.TextureSlots[0] = s_Data.WhiteTexture;
 

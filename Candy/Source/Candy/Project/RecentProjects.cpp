@@ -30,13 +30,32 @@ namespace Candy {
 				entry.Name = node["name"].as<std::string>();
 				entry.Path = node["path"].as<std::string>();
 				entry.LastOpened = node["lastOpened"].as<std::string>();
-				entries.push_back(entry);
+				if (std::filesystem::exists(entry.Path))
+					entries.push_back(entry);
 			}
 		}
 		catch (...)
 		{
 			CANDY_CORE_WARN("Failed to load recent projects");
+			return entries;
 		}
+
+		// Rewrite to prune invalid entries
+		YAML::Emitter out;
+		out << YAML::BeginSeq;
+		for (const auto& e : entries)
+		{
+			out << YAML::BeginMap;
+			out << YAML::Key << "name" << YAML::Value << e.Name;
+			out << YAML::Key << "path" << YAML::Value << e.Path;
+			out << YAML::Key << "lastOpened" << YAML::Value << e.LastOpened;
+			out << YAML::EndMap;
+		}
+		out << YAML::EndSeq;
+
+		std::ofstream fout(path);
+		fout << out.c_str();
+
 		return entries;
 	}
 

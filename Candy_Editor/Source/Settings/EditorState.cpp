@@ -1,5 +1,5 @@
 #include "CandyPCH.h"
-#include "CandyEditorState.h"
+#include "EditorState.h"
 
 #include <yaml-cpp/yaml.h>
 #include <fstream>
@@ -9,13 +9,13 @@
 
 namespace Candy {
 
-	CandyEditorState& CandyEditorState::Get()
+	EditorState& EditorState::Get()
 	{
-		static CandyEditorState instance;
+		static EditorState instance;
 		return instance;
 	}
 
-	void CandyEditorState::Save()
+	void EditorState::Save()
 	{
 		std::filesystem::create_directories("Saved");
 		GLFWwindow* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow());
@@ -30,12 +30,12 @@ namespace Candy {
 		out << YAML::Key << "WindowHeight" << YAML::Value << h;
 		out << YAML::Key << "WindowMaximized" << YAML::Value << (bool)glfwGetWindowAttrib(window, GLFW_MAXIMIZED);
 		out << YAML::EndMap << YAML::EndMap;
-		std::ofstream("Saved/EditorState.yaml") << out.c_str();
+		std::ofstream("Saved/EditorState.candy") << out.c_str();
 	}
 
-	void CandyEditorState::Load()
+	void EditorState::Load()
 	{
-		auto path = std::filesystem::path("Saved/EditorState.yaml");
+		auto path = std::filesystem::path("Saved/EditorState.candy");
 		if (!std::filesystem::exists(path)) return;
 		auto doc = YAML::LoadFile(path.string());
 		auto s = doc["EditorState"];

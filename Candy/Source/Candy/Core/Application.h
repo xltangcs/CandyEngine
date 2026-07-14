@@ -60,9 +60,11 @@ namespace Candy {
 
 		Scope<Window> m_Window;
 		ImGuiLayer* m_ImGuiLayer;
-		LayerStack m_LayerStack;
+		
 		Ref<Project> m_ActiveProject;
 
+		LayerStack m_LayerStack;
+		
 		Layer* m_PendingPopLayer = nullptr;
 		Layer* m_PendingPushLayer = nullptr;
 

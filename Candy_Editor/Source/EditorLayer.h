@@ -2,9 +2,9 @@
 
 #include "Candy.h"
 #include "Candy/Project/RecentProjects.h"
-#include "Settings/CandyEditorSettings.h"
-#include "Settings/CandyEditorState.h"
-#include "Settings/CandyProjectSettings.h"
+#include "Settings/EditorSettings.h"
+#include "Settings/EditorState.h"
+#include "Settings/ProjectSettings.h"
 #include "Panels/SceneHierarchyPanel.h"
 #include "Panels/ContentBrowserPanel.h"
 #include "Candy/Renderer/EditorCamera.h"
@@ -43,8 +43,6 @@ namespace Candy {
 		void OnDuplicateEntity();
 
 		// Project
-		void NewProject();
-		void OpenProject();
 		void OpenRecent(const std::filesystem::path& path);
 
 		// UI Panels
@@ -91,6 +89,7 @@ namespace Candy {
 		// Editor resources
 		Ref<Texture2D> m_IconPlay, m_IconStop, m_IconSimulate;
 
+		bool m_SceneDirty = false;
 		std::vector<RecentProjectEntry> m_RecentProjects;
 	};
 

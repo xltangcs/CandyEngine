@@ -17,6 +17,7 @@
 #include <GLFW/glfw3.h>
 
 #include "Candy/Project/ProjectUtils.h"
+#include "Panels/ProjectManagerLayer.h"
 
 namespace Candy {
 
@@ -45,18 +46,19 @@ namespace Candy {
 
 		m_EditorCamera = EditorCamera(30.0f, 1.778f, 0.1f, 1000.0f);
 
-		auto& editorSettings = CandyEditorSettings::Get();
+		auto& editorSettings = EditorSettings::Get();
 		editorSettings.Load();
-		ImGuiLayer::RebuildFont(editorSettings.FontPath);
+		ImGuiLayer::RebuildFont(editorSettings.m_FontPath);
 
 		m_RecentProjects = RecentProjects::Load();
 
-		auto& editorState = CandyEditorState::Get();
+		auto& editorState = EditorState::Get();
 		editorState.Load();
 
 		auto project = Application::Get().GetProject();
 		if (project)
 		{
+			ProjectSettings::Get().Load();
 			auto scenePath = project->GetFullStartScenePath();
 			if (std::filesystem::exists(scenePath))
 				OpenScene(scenePath);
@@ -79,8 +81,9 @@ namespace Candy {
 	void EditorLayer::OnDetach()
 	{
 		CANDY_PROFILE_FUNCTION();
-		CandyEditorSettings::Get().Save();
-		CandyEditorState::Get().Save();
+		EditorSettings::Get().Save();
+		ProjectSettings::Get().Save();
+		EditorState::Get().Save();
 	}
 
 	void EditorLayer::OnUpdate(Timestep ts)
@@ -163,8 +166,8 @@ namespace Candy {
 	{
 		CANDY_PROFILE_FUNCTION();
 
-		ImGui::PushFont(nullptr, CandyEditorSettings::Get().FontSize);
-
+		ImGui::PushFont(nullptr, EditorSettings::Get().m_FontSize);
+		
 		// Note: Switch this to true to enable dockspace
 		static bool dockspaceOpen = true;
 		static bool opt_fullscreen_persistant = true;
@@ -222,32 +225,21 @@ namespace Candy {
 		{
 			if (ImGui::BeginMenu("File"))
 			{
-				if (ImGui::BeginMenu("New"))
-				{
-					if (ImGui::MenuItem("Project...", "Ctrl+Shift+N"))
-						NewProject();
-					if (ImGui::MenuItem("Scene", "Ctrl+N"))
-						NewScene();
-					ImGui::EndMenu();
-				}
-
-				if (ImGui::BeginMenu("Open"))
-				{
-					if (ImGui::MenuItem("Project..."))
-						OpenProject();
-					if (ImGui::MenuItem("Scene...", "Ctrl+O"))
-						OpenScene();
-					ImGui::EndMenu();
-				}
-
+				if (ImGui::MenuItem("New Scene", "Ctrl+N"))
+					NewScene();
+				if (ImGui::MenuItem("Open Scene...", "Ctrl+O"))
+					OpenScene();
+				
+				ImGui::Separator();
+				
 				if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
 					SaveScene();
 
 				if (ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S"))
 					SaveSceneAs();
-
+				
 				ImGui::Separator();
-
+				
 				if (ImGui::BeginMenu("Recent Projects"))
 				{
 					if (m_RecentProjects.empty())
@@ -266,6 +258,14 @@ namespace Candy {
 				}
 
 				ImGui::Separator();
+				
+				if (ImGui::MenuItem("Open Project Manager...", "Ctrl+Shift+N"))
+				{
+					Application::Get().SchedulePopLayer(this);
+					Application::Get().SchedulePushLayer(new ProjectManagerLayer());
+				}
+
+				ImGui::Separator();
 
 				if (ImGui::MenuItem("Exit")) Application::Get().Close();
 				ImGui::EndMenu();
@@ -274,10 +274,10 @@ namespace Candy {
 			if (ImGui::BeginMenu("Setting"))
 			{
 				if (ImGui::MenuItem("Project Settings"))
-					CandyEditorState::Get().ShowProjectSettings = true;
+					EditorState::Get().ShowProjectSettings = true;
 
 				if (ImGui::MenuItem("Editor Settings"))
-					CandyEditorState::Get().ShowEditorSettings = true;
+					EditorState::Get().ShowEditorSettings = true;
 
 				ImGui::EndMenu();
 			}
@@ -423,8 +423,8 @@ namespace Candy {
 		ImGui::End();
 		ImGui::PopStyleVar();
 
-		if (CandyEditorState::Get().ShowProjectSettings) CandyProjectSettings::Get().OnImGuiRender();
-		if (CandyEditorState::Get().ShowEditorSettings) CandyEditorSettings::Get().OnImGuiRender();
+		if (EditorState::Get().ShowProjectSettings) ProjectSettings::Get().OnImGuiRender();
+		if (EditorState::Get().ShowEditorSettings) EditorSettings::Get().OnImGuiRender();
 
 		ImGui::End();
 
@@ -455,7 +455,10 @@ namespace Candy {
 			case Key::N:
 			{
 				if (control && shift)
-					NewProject();
+				{
+					Application::Get().SchedulePopLayer(this);
+					Application::Get().SchedulePushLayer(new ProjectManagerLayer());
+				}
 				else if (control)
 					NewScene();
 
@@ -587,7 +590,7 @@ namespace Candy {
 		m_ActiveScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 		m_EditorScenePath = std::filesystem::path();
-		CandyEditorState::Get().LastScenePath.clear();
+		EditorState::Get().LastScenePath.clear();
 	}
 
 	void EditorLayer::OpenScene()
@@ -620,7 +623,7 @@ namespace Candy {
 
 			m_ActiveScene = m_EditorScene;
 			m_EditorScenePath = path;
-			CandyEditorState::Get().LastScenePath = path.string();
+			EditorState::Get().LastScenePath = path.string();
 		}
 	}
 
@@ -697,50 +700,6 @@ namespace Candy {
 			m_EditorScene->DuplicateEntity(selectedEntity);
 	}
 
-	void EditorLayer::NewProject()
-	{
-		std::string filepath = FileDialogs::SaveFile("Candy Project (*.candyproj)\0*.candyproj\0");
-		if (filepath.empty())
-			return;
-
-		std::filesystem::path path(filepath);
-		std::string name = path.stem().string();
-		std::filesystem::path directory = path.parent_path();
-
-		Application::Get().CreateProject(directory, name);
-		auto project = Application::Get().GetProject();
-		if (project)
-		{
-			RecentProjects::Add(project->GetName(), project->GetProjectFileName().string());
-			m_RecentProjects = RecentProjects::Load();
-
-			// Open default scene
-			auto scenePath = project->GetFullStartScenePath();
-			if (std::filesystem::exists(scenePath))
-				OpenScene(scenePath);
-		}
-	}
-
-	void EditorLayer::OpenProject()
-	{
-		std::string filepath = FileDialogs::OpenFile("Candy Project (*.candyproj)\0*.candyproj\0");
-		if (filepath.empty())
-			return;
-
-		Application::Get().LoadProject(filepath);
-		auto project = Application::Get().GetProject();
-		if (project)
-		{
-			RecentProjects::Add(project->GetName(), project->GetProjectFileName().string());
-			m_RecentProjects = RecentProjects::Load();
-
-			// Open default scene
-			auto scenePath = project->GetFullStartScenePath();
-			if (std::filesystem::exists(scenePath))
-				OpenScene(scenePath);
-		}
-	}
-
 	void EditorLayer::OpenRecent(const std::filesystem::path& path)
 	{
 		if (!std::filesystem::exists(path))
@@ -753,6 +712,7 @@ namespace Candy {
 		auto project = Application::Get().GetProject();
 		if (project)
 		{
+			ProjectSettings::Get().Load();
 			RecentProjects::Add(project->GetName(), project->GetProjectFileName().string());
 			m_RecentProjects = RecentProjects::Load();
 
