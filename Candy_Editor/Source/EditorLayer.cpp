@@ -18,7 +18,13 @@
 
 namespace Candy {
 
-	extern const std::filesystem::path g_AssetPath;
+	static std::filesystem::path GetContentPath()
+	{
+		auto project = Application::Get().GetProject();
+		if (project)
+			return project->GetContentDirectory();
+		return std::filesystem::path("Content");
+	}
 
 	EditorLayer::EditorLayer()
 		: Layer("EditorLayer"), m_CameraController(1280.0f / 720.0f), m_SquareColor({ 0.2f, 0.3f, 0.8f, 1.0f })
@@ -49,10 +55,22 @@ namespace Candy {
 		editorSettings.Load();
 		ImGuiLayer::RebuildFont(editorSettings.FontPath);
 
+		m_RecentProjects = RecentProjects::Load();
+
 		auto& editorState = CandyEditorState::Get();
 		editorState.Load();
-		if (!editorState.LastScenePath.empty() && std::filesystem::exists(editorState.LastScenePath))
+
+		auto project = Application::Get().GetProject();
+		if (project)
+		{
+			auto scenePath = project->GetFullStartScenePath();
+			if (std::filesystem::exists(scenePath))
+				OpenScene(scenePath);
+		}
+		else if (!editorState.LastScenePath.empty() && std::filesystem::exists(editorState.LastScenePath))
+		{
 			OpenScene(editorState.LastScenePath);
+		}
 
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 
@@ -210,21 +228,50 @@ namespace Candy {
 		{
 			if (ImGui::BeginMenu("File"))
 			{
-				// Disabling fullscreen would allow the window to be moved to the front of other windows, 
-				// which we can't undo at the moment without finer window depth/z control.
-				//ImGui::MenuItem("Fullscreen", NULL, &opt_fullscreen_persistant);
+				if (ImGui::BeginMenu("New"))
+				{
+					if (ImGui::MenuItem("Project...", "Ctrl+Shift+N"))
+						NewProject();
+					if (ImGui::MenuItem("Scene", "Ctrl+N"))
+						NewScene();
+					ImGui::EndMenu();
+				}
 
-				if (ImGui::MenuItem("New", "Ctrl+N"))
-					NewScene();
+				if (ImGui::BeginMenu("Open"))
+				{
+					if (ImGui::MenuItem("Project..."))
+						OpenProject();
+					if (ImGui::MenuItem("Scene...", "Ctrl+O"))
+						OpenScene();
+					ImGui::EndMenu();
+				}
 
-				if (ImGui::MenuItem("Open...", "Ctrl+O"))
-					OpenScene();
-
-				if (ImGui::MenuItem("Save...", "Ctrl+S"))
+				if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
 					SaveScene();
-				
-				if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S"))
+
+				if (ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S"))
 					SaveSceneAs();
+
+				ImGui::Separator();
+
+				if (ImGui::BeginMenu("Recent Projects"))
+				{
+					if (m_RecentProjects.empty())
+					{
+						ImGui::MenuItem("(none)", nullptr, false, false);
+					}
+					else
+					{
+						for (const auto& entry : m_RecentProjects)
+						{
+							if (ImGui::MenuItem(entry.Name.c_str()))
+								OpenRecent(entry.Path);
+						}
+					}
+					ImGui::EndMenu();
+				}
+
+				ImGui::Separator();
 
 				if (ImGui::MenuItem("Exit")) Application::Get().Close();
 				ImGui::EndMenu();
@@ -323,7 +370,7 @@ namespace Candy {
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 			{
 				const wchar_t* path = (const wchar_t*)payload->Data;
-				OpenScene(std::filesystem::path(g_AssetPath) / path);
+				OpenScene(GetContentPath() / path);
 			}
 			ImGui::EndDragDropTarget();
 		}
@@ -413,7 +460,9 @@ namespace Candy {
 		{
 			case Key::N:
 			{
-				if (control)
+				if (control && shift)
+					NewProject();
+				else if (control)
 					NewScene();
 
 				break;
@@ -652,5 +701,70 @@ namespace Candy {
 		Entity selectedEntity = m_SceneHierarchyPanel.GetSelectedEntity();
 		if (selectedEntity)
 			m_EditorScene->DuplicateEntity(selectedEntity);
+	}
+
+	void EditorLayer::NewProject()
+	{
+		std::string filepath = FileDialogs::SaveFile("Candy Project (*.candyproj)\0*.candyproj\0");
+		if (filepath.empty())
+			return;
+
+		std::filesystem::path path(filepath);
+		std::string name = path.stem().string();
+		std::filesystem::path directory = path.parent_path();
+
+		Application::Get().CreateProject(directory, name);
+		auto project = Application::Get().GetProject();
+		if (project)
+		{
+			RecentProjects::Add(project->GetName(), project->GetProjectFileName().string());
+			m_RecentProjects = RecentProjects::Load();
+
+			// Open default scene
+			auto scenePath = project->GetFullStartScenePath();
+			if (std::filesystem::exists(scenePath))
+				OpenScene(scenePath);
+		}
+	}
+
+	void EditorLayer::OpenProject()
+	{
+		std::string filepath = FileDialogs::OpenFile("Candy Project (*.candyproj)\0*.candyproj\0");
+		if (filepath.empty())
+			return;
+
+		Application::Get().LoadProject(filepath);
+		auto project = Application::Get().GetProject();
+		if (project)
+		{
+			RecentProjects::Add(project->GetName(), project->GetProjectFileName().string());
+			m_RecentProjects = RecentProjects::Load();
+
+			// Open default scene
+			auto scenePath = project->GetFullStartScenePath();
+			if (std::filesystem::exists(scenePath))
+				OpenScene(scenePath);
+		}
+	}
+
+	void EditorLayer::OpenRecent(const std::filesystem::path& path)
+	{
+		if (!std::filesystem::exists(path))
+		{
+			CANDY_CORE_WARN("Recent project no longer exists: {0}", path.string());
+			return;
+		}
+
+		Application::Get().LoadProject(path);
+		auto project = Application::Get().GetProject();
+		if (project)
+		{
+			RecentProjects::Add(project->GetName(), project->GetProjectFileName().string());
+			m_RecentProjects = RecentProjects::Load();
+
+			auto scenePath = project->GetFullStartScenePath();
+			if (std::filesystem::exists(scenePath))
+				OpenScene(scenePath);
+		}
 	}
 }

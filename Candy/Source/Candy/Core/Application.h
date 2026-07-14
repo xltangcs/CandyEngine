@@ -5,6 +5,7 @@
 #include "Candy/Core/Timestep.h"
 #include "Candy/Core/LayerStack.h"
 #include "Candy/Audio/AudioEngine.h"
+#include "Candy/Project/Project.h"
 
 #include "Candy/Events/Event.h"
 #include "Candy/Events/ApplicationEvent.h"
@@ -25,12 +26,28 @@ namespace Candy {
 
 		void PushLayer(Layer* layer);
 		void PushOverlay(Layer* layer);
+		void PopLayer(Layer* layer);
+		void PopOverlay(Layer* layer);
 
 		inline Window& GetWindow() { return *m_Window; }
 		void Close();
 
 		ImGuiLayer* GetImGuiLayer() { return m_ImGuiLayer; }
 		inline static Application& Get() { return *s_Instance; }
+
+		// Project management
+		Ref<Project> GetProject() const { return m_ActiveProject; }
+		void LoadProject(const std::filesystem::path& projectFile);
+		void CreateProject(const std::filesystem::path& directory, const std::string& name);
+		void CloseProject();
+		bool IsProjectLoaded() const { return m_ActiveProject != nullptr; }
+
+		void UpdateWindowTitle();
+
+		// Deferred layer transitions (safe to call from within layer callbacks)
+		void SchedulePopLayer(Layer* layer);
+		void SchedulePushLayer(Layer* layer);
+		void ProcessScheduledLayerChanges();
 
 	private:
 		void Run();
@@ -44,6 +61,11 @@ namespace Candy {
 		Scope<Window> m_Window;
 		ImGuiLayer* m_ImGuiLayer;
 		LayerStack m_LayerStack;
+		Ref<Project> m_ActiveProject;
+
+		Layer* m_PendingPopLayer = nullptr;
+		Layer* m_PendingPushLayer = nullptr;
+
 		static Application* s_Instance;
 
 		friend int ::main(int argc, char** argv);

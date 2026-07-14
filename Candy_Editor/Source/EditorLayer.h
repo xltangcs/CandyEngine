@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Candy.h"
+#include "Candy/Project/RecentProjects.h"
 #include "Settings/CandyEditorSettings.h"
 #include "Settings/CandyEditorState.h"
 #include "Settings/CandyProjectSettings.h"
@@ -40,6 +41,11 @@ namespace Candy {
 		void OnSceneStop();
 
 		void OnDuplicateEntity();
+
+		// Project
+		void NewProject();
+		void OpenProject();
+		void OpenRecent(const std::filesystem::path& path);
 
 		// UI Panels
 		void UI_Toolbar();
@@ -84,6 +90,8 @@ namespace Candy {
 
 		// Editor resources
 		Ref<Texture2D> m_IconPlay, m_IconStop, m_IconSimulate;
+
+		std::vector<RecentProjectEntry> m_RecentProjects;
 	};
 
 }

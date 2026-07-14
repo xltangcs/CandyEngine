@@ -3,14 +3,20 @@
 #include "Settings/CandyEditorSettings.h"
 
 #include <imgui/imgui.h>
+#include "Candy/Core/Application.h"
 
 namespace Candy {
 
-	// Once we have projects, change this
-	extern const std::filesystem::path g_AssetPath = "Assets";
+	static std::filesystem::path GetContentPath()
+	{
+		auto project = Application::Get().GetProject();
+		if (project)
+			return project->GetContentDirectory();
+		return std::filesystem::path("Content");
+	}
 
 	ContentBrowserPanel::ContentBrowserPanel()
-		: m_CurrentDirectory(g_AssetPath)
+		: m_CurrentDirectory(GetContentPath())
 	{
 		m_DirectoryIcon = Texture2D::Create("Assets/Icons/ContentBrowser/DirectoryIcon.png");
 		m_FileIcon = Texture2D::Create("Assets/Icons/ContentBrowser/FileIcon.png");
@@ -20,7 +26,7 @@ namespace Candy {
 	{
 		ImGui::Begin("Content Browser");
 
-		if (m_CurrentDirectory != std::filesystem::path(g_AssetPath))
+		if (m_CurrentDirectory != GetContentPath())
 		{
 			if (ImGui::Button("<-"))
 			{
@@ -34,16 +40,15 @@ namespace Candy {
 		float cellSize = thumbnailSize + padding;
 
 		float panelWidth = ImGui::GetContentRegionAvail().x;
-		int columnCount = (int)(panelWidth / cellSize);
+		int columnCount = static_cast<int>(panelWidth / cellSize);
 		columnCount = std::max(1, columnCount);
 
 		ImGui::Columns(columnCount, 0, false);
-
-
+		
 		for (auto& directoryEntry : std::filesystem::directory_iterator(m_CurrentDirectory))
 		{
 			const auto& path = directoryEntry.path();
-			auto relativePath = std::filesystem::relative(path, g_AssetPath);
+			auto relativePath = std::filesystem::relative(path, GetContentPath());
 			std::string filenameString = relativePath.filename().string();
 			ImGui::PushID(filenameString.c_str());
 			Ref<Texture2D> icon = directoryEntry.is_directory() ? m_DirectoryIcon : m_FileIcon;

@@ -19,6 +19,9 @@
 #include "Candy/Scene/Components.h"
 #include "Candy/Scene/ScriptableEntity.h"
 
+//-------------- Project ---------------
+#include "Candy/Project/Project.h"
+
 //-------------- Audio ---------------
 #include "Candy/Audio/AudioEngine.h"
 

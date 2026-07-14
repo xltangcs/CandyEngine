@@ -23,6 +23,8 @@ namespace Candy {
 		void SetVSync(bool enabled) override;
 		bool IsVSync() const override;
 
+		void SetTitle(const std::string& title) override { glfwSetWindowTitle(m_Window, title.c_str()); }
+
 		inline virtual void* GetNativeWindow() const { return m_Window; }
 	private:
 		virtual void Init(const WindowProps& props);

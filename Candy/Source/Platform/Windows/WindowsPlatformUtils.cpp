@@ -3,6 +3,9 @@
 #include "Candy/Utils/PlatformUtils.h"
 
 #include <commdlg.h>
+#include <shlobj.h>
+#include <shobjidl.h>
+#include <objbase.h>
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
@@ -57,6 +60,45 @@ namespace Candy {
 			return ofn.lpstrFile;
 		}
 		return std::string();
+	}
+
+	std::string FileDialogs::OpenFolder()
+	{
+		IFileOpenDialog* pFileOpen = nullptr;
+		HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL,
+			IID_IFileOpenDialog, reinterpret_cast<void**>(&pFileOpen));
+		if (FAILED(hr))
+			return std::string();
+
+		DWORD dwOptions;
+		pFileOpen->GetOptions(&dwOptions);
+		pFileOpen->SetOptions(dwOptions | FOS_PICKFOLDERS);
+
+		hr = pFileOpen->Show(nullptr);
+		std::string result;
+		if (SUCCEEDED(hr))
+		{
+			IShellItem* pItem;
+			hr = pFileOpen->GetResult(&pItem);
+			if (SUCCEEDED(hr))
+			{
+				PWSTR pszPath;
+				hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszPath);
+				if (SUCCEEDED(hr))
+				{
+					int size = WideCharToMultiByte(CP_UTF8, 0, pszPath, -1, nullptr, 0, nullptr, nullptr);
+					if (size > 0)
+					{
+						result.resize(size - 1);
+						WideCharToMultiByte(CP_UTF8, 0, pszPath, -1, &result[0], size, nullptr, nullptr);
+					}
+					CoTaskMemFree(pszPath);
+				}
+				pItem->Release();
+			}
+		}
+		pFileOpen->Release();
+		return result;
 	}
 
 }

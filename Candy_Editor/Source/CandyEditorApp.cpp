@@ -2,6 +2,7 @@
 #include <Candy/Core/EntryPoint.h>
 
 #include "EditorLayer.h"
+#include "Panels/ProjectManagerLayer.h"
 
 namespace Candy {
 
@@ -9,9 +10,13 @@ namespace Candy {
 	{
 	public:
 		CandyEditor()
-			: Application("Candy Editor")
+			: Application("Candy Engine")
 		{
+#if 0
 			PushLayer(new EditorLayer());
+#else
+			PushLayer(new ProjectManagerLayer());
+#endif
 		}
 
 		~CandyEditor()

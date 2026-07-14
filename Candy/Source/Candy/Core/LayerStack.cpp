@@ -43,7 +43,6 @@ namespace Candy {
 			overlay->OnDetach();
 			m_Layers.erase(it);
 		}
-			
 	}
 
 }

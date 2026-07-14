@@ -4,6 +4,7 @@
 #include "Candy/Core/Log.h"
 #include "Candy/Core/Input.h"
 #include "Candy/Renderer/Renderer.h"
+#include "Candy/Project/ProjectSerializer.h"
 
 #include <glfw/glfw3.h>
 
@@ -38,6 +39,16 @@ namespace Candy {
 	void Application::PushOverlay(Layer* layer)
 	{
 		m_LayerStack.PushOverlay(layer);
+	}
+
+	void Application::PopLayer(Layer* layer)
+	{
+		m_LayerStack.PopLayer(layer);
+	}
+
+	void Application::PopOverlay(Layer* overlay)
+	{
+		m_LayerStack.PopOverlay(overlay);
 	}
 
 	void Application::Close()
@@ -81,6 +92,8 @@ namespace Candy {
 			m_ImGuiLayer->End();
 
 			m_Window->OnUpdate();
+
+			ProcessScheduledLayerChanges();
 		}
 	}
 
@@ -99,10 +112,73 @@ namespace Candy {
 		return false;
 	}
 
+	void Application::LoadProject(const std::filesystem::path& projectFile)
+	{
+		auto project = Project::Load(projectFile);
+		if (project)
+		{
+			m_ActiveProject = project;
+			UpdateWindowTitle();
+		}
+	}
+
+	void Application::CreateProject(const std::filesystem::path& directory, const std::string& name)
+	{
+		auto project = Project::New(directory, name);
+		if (project)
+		{
+			m_ActiveProject = project;
+			UpdateWindowTitle();
+		}
+	}
+
+	void Application::CloseProject()
+	{
+		m_ActiveProject.reset();
+		UpdateWindowTitle();
+	}
+
+	void Application::UpdateWindowTitle()
+	{
+		if (m_ActiveProject)
+		{
+			std::string title = m_ActiveProject->GetName() + " - Candy Engine";
+			m_Window->SetTitle(title);
+		}
+		else
+		{
+			m_Window->SetTitle("Candy Engine");
+		}
+	}
+
 	bool Application::OnWindowClose(WindowCloseEvent& e)
 	{
 		m_Running = false;
 		return true;
+	}
+
+	void Application::SchedulePopLayer(Layer* layer)
+	{
+		m_PendingPopLayer = layer;
+	}
+
+	void Application::SchedulePushLayer(Layer* layer)
+	{
+		m_PendingPushLayer = layer;
+	}
+
+	void Application::ProcessScheduledLayerChanges()
+	{
+		if (m_PendingPopLayer)
+		{
+			m_LayerStack.PopLayer(m_PendingPopLayer);
+			m_PendingPopLayer = nullptr;
+		}
+		if (m_PendingPushLayer)
+		{
+			m_LayerStack.PushLayer(m_PendingPushLayer);
+			m_PendingPushLayer = nullptr;
+		}
 	}
 
 }
