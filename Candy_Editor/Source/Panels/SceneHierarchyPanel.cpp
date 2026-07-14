@@ -12,6 +12,7 @@
 #include <fstream>
 
 #include "Candy/Core/Application.h"
+#include "Candy/Project/ProjectUtils.h"
 
 /* The Microsoft C++ compiler is non-compliant with the C++ standard and needs
  * the following definition to disable a security warning on std::strncpy().
@@ -22,14 +23,6 @@
 
 
 namespace Candy {
-
-	static std::filesystem::path GetContentPath()
-	{
-		auto project = Application::Get().GetProject();
-		if (project)
-			return project->GetContentDirectory();
-		return std::filesystem::path("Content");
-	}
 	
 	static std::string ParsePythonClassName(const std::filesystem::path& filePath)
 	{
@@ -101,7 +94,7 @@ namespace Candy {
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 			{
 				const wchar_t* path = (const wchar_t*)payload->Data;
-				std::filesystem::path fullPath = std::filesystem::path(GetContentPath()) / path;
+				std::filesystem::path fullPath = std::filesystem::path(ProjectUtils::GetProjectContentPath()) / path;
 				if (fullPath.extension() == ".py" && m_SelectionContext)
 				{
 					auto& sc = m_SelectionContext.HasComponent<ScriptComponent>()
@@ -153,7 +146,7 @@ namespace Candy {
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 			{
 				const wchar_t* path = (const wchar_t*)payload->Data;
-				std::filesystem::path fullPath = std::filesystem::path(GetContentPath()) / path;
+				std::filesystem::path fullPath = std::filesystem::path(ProjectUtils::GetProjectContentPath()) / path;
 				if (fullPath.extension() == ".py")
 				{
 					auto& sc = entity.HasComponent<ScriptComponent>()
@@ -483,7 +476,7 @@ namespace Candy {
 					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 					{
 						const wchar_t* path = (const wchar_t*)payload->Data;
-						std::filesystem::path texturePath = std::filesystem::path(GetContentPath()) / path;
+						std::filesystem::path texturePath = std::filesystem::path(ProjectUtils::GetProjectContentPath()) / path;
 						Ref<Texture2D> texture = Texture2D::Create(texturePath.string());
 						if (texture->IsLoaded())
 							component.Texture = texture;
@@ -567,7 +560,7 @@ namespace Candy {
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 				{
 					const wchar_t* path = (const wchar_t*)payload->Data;
-					std::filesystem::path fullPath = std::filesystem::path(GetContentPath()) / path;
+					std::filesystem::path fullPath = std::filesystem::path(ProjectUtils::GetProjectContentPath()) / path;
 					if (fullPath.extension() == ".py")
 					{
 						component.ScriptPath = fullPath.string();
@@ -625,7 +618,7 @@ namespace Candy {
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 				{
 					const wchar_t* path = (const wchar_t*)payload->Data;
-					std::filesystem::path fullPath = std::filesystem::path(GetContentPath()) / path;
+					std::filesystem::path fullPath = std::filesystem::path(ProjectUtils::GetProjectContentPath()) / path;
 					component.SoundPath = fullPath.string();
 					std::strncpy(buffer, component.SoundPath.c_str(), sizeof(buffer) - 1);
 					buffer[sizeof(buffer) - 1] = '\0';

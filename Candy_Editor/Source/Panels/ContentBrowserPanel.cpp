@@ -4,19 +4,12 @@
 
 #include <imgui/imgui.h>
 #include "Candy/Core/Application.h"
+#include "Candy/Project/ProjectUtils.h"
 
 namespace Candy {
 
-	static std::filesystem::path GetContentPath()
-	{
-		auto project = Application::Get().GetProject();
-		if (project)
-			return project->GetContentDirectory();
-		return std::filesystem::path("Content");
-	}
-
 	ContentBrowserPanel::ContentBrowserPanel()
-		: m_CurrentDirectory(GetContentPath())
+		: m_CurrentDirectory(ProjectUtils::GetProjectContentPath())
 	{
 		m_DirectoryIcon = Texture2D::Create("Assets/Icons/ContentBrowser/DirectoryIcon.png");
 		m_FileIcon = Texture2D::Create("Assets/Icons/ContentBrowser/FileIcon.png");
@@ -26,7 +19,7 @@ namespace Candy {
 	{
 		ImGui::Begin("Content Browser");
 
-		if (m_CurrentDirectory != GetContentPath())
+		if (m_CurrentDirectory != ProjectUtils::GetProjectContentPath())
 		{
 			if (ImGui::Button("<-"))
 			{
@@ -48,7 +41,7 @@ namespace Candy {
 		for (auto& directoryEntry : std::filesystem::directory_iterator(m_CurrentDirectory))
 		{
 			const auto& path = directoryEntry.path();
-			auto relativePath = std::filesystem::relative(path, GetContentPath());
+			auto relativePath = std::filesystem::relative(path, ProjectUtils::GetProjectContentPath());
 			std::string filenameString = relativePath.filename().string();
 			ImGui::PushID(filenameString.c_str());
 			Ref<Texture2D> icon = directoryEntry.is_directory() ? m_DirectoryIcon : m_FileIcon;

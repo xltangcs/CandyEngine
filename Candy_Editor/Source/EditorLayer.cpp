@@ -16,15 +16,9 @@
 
 #include <GLFW/glfw3.h>
 
-namespace Candy {
+#include "Candy/Project/ProjectUtils.h"
 
-	static std::filesystem::path GetContentPath()
-	{
-		auto project = Application::Get().GetProject();
-		if (project)
-			return project->GetContentDirectory();
-		return std::filesystem::path("Content");
-	}
+namespace Candy {
 
 	EditorLayer::EditorLayer()
 		: Layer("EditorLayer"), m_CameraController(1280.0f / 720.0f), m_SquareColor({ 0.2f, 0.3f, 0.8f, 1.0f })
@@ -370,7 +364,7 @@ namespace Candy {
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 			{
 				const wchar_t* path = (const wchar_t*)payload->Data;
-				OpenScene(GetContentPath() / path);
+				OpenScene(ProjectUtils::GetProjectContentPath() / path);
 			}
 			ImGui::EndDragDropTarget();
 		}
