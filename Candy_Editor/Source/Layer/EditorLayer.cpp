@@ -56,7 +56,7 @@ namespace Candy {
 
 		auto& editorSettings = EditorSettings::Get();
 		editorSettings.Load();
-		ImGuiLayer::RebuildFont(editorSettings.m_FontPath);
+		ImGuiLayer::RebuildFont(Application::Get().GetFontPath());
 
 		m_RecentProjects = RecentProjects::Load();
 
@@ -173,8 +173,6 @@ namespace Candy {
 	void EditorLayer::OnImGuiRender()
 	{
 		CANDY_PROFILE_FUNCTION();
-
-		ImGui::PushFont(nullptr, EditorSettings::Get().m_FontSize);
 		
 		// Note: Switch this to true to enable dockspace
 		static bool dockspaceOpen = true;
@@ -435,8 +433,6 @@ namespace Candy {
 		if (EditorState::Get().ShowEditorSettings) EditorSettingsPanel::OnImGuiRender();
 
 		ImGui::End();
-
-		ImGui::PopFont();
 	}
 
 

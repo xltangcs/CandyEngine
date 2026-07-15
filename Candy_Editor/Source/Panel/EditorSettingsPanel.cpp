@@ -3,10 +3,11 @@
 #include <imgui/imgui.h>
 #include <imgui/misc/cpp/imgui_stdlib.h>
 
-#include "Candy/Project/EditorSettings.h"
-#include "Candy/Project/EditorState.h"
+#include "Setting/EditorSettings.h"
+#include "Setting/EditorState.h"
 #include "Candy/Utils/PlatformUtils.h"
 #include "Candy/Imgui/ImguiLayer.h"
+#include "Candy/Core/Application.h"
 
 namespace Candy {
 
@@ -27,17 +28,33 @@ namespace Candy {
 			ImGui::TableSetColumnIndex(0);
 			ImGui::Text("Font Size");
 			ImGui::TableSetColumnIndex(1);
-			ImGui::SliderFloat("##FontSize", &editorSetting.m_FontSize, 12.0f, 48.0f, "%.0f px");
+			float fontSize = Application::Get().GetFontSize();
+			if (ImGui::SliderFloat("##FontSize", &fontSize, 12.0f, 48.0f, "%.0f px"))
+			{
+				Application::Get().SetFontSize(fontSize);
+				ImGuiLayer::RebuildFont(Application::Get().GetFontPath());
+			}
 
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
 			ImGui::Text("Font File");
 			ImGui::TableSetColumnIndex(1);
-			ImGui::InputText("##fontPath", &editorSetting.m_FontPath);
+			static std::string fontPath;
+			static bool fontPathInit = false;
+			if (!fontPathInit)
+			{
+				fontPath = Application::Get().GetFontPath();
+				fontPathInit = true;
+			}
+			ImGui::InputText("##fontPath", &fontPath);
 			if (ImGui::IsItemDeactivatedAfterEdit())
 			{
-				ImGuiLayer::RebuildFont(editorSetting.m_FontPath);
-				editorSetting.Save();
+				if (!fontPath.empty())
+				{
+					Application::Get().SetFontPath(fontPath);
+					ImGuiLayer::RebuildFont(fontPath);
+					editorSetting.Save();
+				}
 			}
 			ImGui::SameLine();
 			if (ImGui::Button("..."))
@@ -45,8 +62,8 @@ namespace Candy {
 				std::string filepath = FileDialogs::OpenFile("TrueType Font (*.ttf)\0*.ttf\0");
 				if (!filepath.empty())
 				{
-					editorSetting.m_FontPath = filepath;
-					ImGuiLayer::RebuildFont(editorSetting.m_FontPath);
+					fontPath = filepath;
+					ImGuiLayer::RebuildFont(fontPath);
 					editorSetting.Save();
 				}
 			}

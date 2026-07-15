@@ -4,7 +4,7 @@
 
 #include "Layer/EditorLayer.h"
 #include "Layer/ProjectManagerLayer.h"
-#include "Candy/Project/EditorSettings.h"
+#include "Setting/EditorSettings.h"
 
 namespace Candy {
 

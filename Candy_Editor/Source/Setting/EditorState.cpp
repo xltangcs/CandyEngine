@@ -1,5 +1,5 @@
 #include "CandyPCH.h"
-#include "Candy/Project/EditorState.h"
+#include "EditorState.h"
 
 #include <yaml-cpp/yaml.h>
 #include <fstream>

@@ -2,8 +2,8 @@
 
 #include "Candy.h"
 #include "Candy/Project/RecentProjects.h"
-#include "Candy/Project/EditorSettings.h"
-#include "Candy/Project/EditorState.h"
+#include "Setting/EditorSettings.h"
+#include "Setting/EditorState.h"
 #include "Candy/Project/ProjectSettings.h"
 #include "Panel/SceneHierarchyPanel.h"
 #include "Panel/ContentBrowserPanel.h"

@@ -84,10 +84,14 @@ namespace Candy {
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
 		ImGuizmo::BeginFrame();
+
+		ImGui::PushFont(nullptr, Application::Get().GetFontSize());
 	}
 
 	void ImGuiLayer::End()
 	{
+		ImGui::PopFont();
+		
 		ImGuiIO& io = ImGui::GetIO();
 		Application& app = Application::Get();
 		io.DisplaySize = ImVec2((float)app.GetWindow().GetWidth(), (float)app.GetWindow().GetHeight());

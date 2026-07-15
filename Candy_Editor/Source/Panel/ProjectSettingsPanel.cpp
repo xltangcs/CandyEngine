@@ -5,7 +5,7 @@
 #include <filesystem>
 
 #include "Candy/Project/ProjectSettings.h"
-#include "Candy/Project/EditorState.h"
+#include "Setting/EditorState.h"
 
 namespace Candy {
 
