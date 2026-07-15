@@ -26,6 +26,7 @@ namespace Candy {
 
 		static Ref<Shader> Create(const std::string& filepath);
 		static Ref<Shader> Create(const std::string& name, const std::string& vertexSrc, const std::string& fragmentSrc);
+		static Ref<Shader> CreateFromSource(const std::string& name, const std::string& source);
 	};
 
 	class ShaderLibrary

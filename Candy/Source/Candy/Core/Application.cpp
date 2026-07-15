@@ -3,6 +3,7 @@
 
 #include "Candy/Core/Log.h"
 #include "Candy/Core/Input.h"
+#include "Candy/Core/FileSystem.h"
 #include "Candy/Renderer/Renderer.h"
 #include "Candy/Project/ProjectSerializer.h"
 
@@ -17,6 +18,11 @@ namespace Candy {
 		s_Instance = this;
 		m_Window = Window::Create(WindowProps(name));
 		m_Window->SetEventCallback(CANDY_BIND_EVENT_FN(Application::OnEvent));
+
+		// Mount engine content
+		auto enginePath = std::filesystem::path("..") / "Candy" / "Content";
+		if (std::filesystem::exists(enginePath))
+			FileSystem::Get().Mount("/engine", enginePath);
 
 		Renderer::Init();
 		AudioEngine::Init();
@@ -119,6 +125,11 @@ namespace Candy {
 		{
 			m_ActiveProject = project;
 			UpdateWindowTitle();
+
+			// Mount project content
+			auto contentDir = project->GetProjectDirectory() / "Content";
+			if (std::filesystem::exists(contentDir))
+				FileSystem::Get().Mount("/project", contentDir);
 		}
 	}
 

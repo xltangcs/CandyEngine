@@ -29,6 +29,17 @@ namespace Candy {
 		CANDY_CORE_ASSERT(false, "Unknown RendererAPI!");
 		return nullptr;
 	}
+
+	Ref<Shader> Shader::CreateFromSource(const std::string& name, const std::string& source)
+	{
+		switch (Renderer::GetAPI())
+		{
+			case RendererAPI::API::None:    CANDY_CORE_ASSERT(false, "RendererAPI::None is currently not supported!"); return nullptr;
+			case RendererAPI::API::OpenGL:  return CreateRef<OpenGLShader>(name, source);
+		}
+		CANDY_CORE_ASSERT(false, "Unknown RendererAPI!");
+		return nullptr;
+	}
 	void ShaderLibrary::Add(const std::string& name, const Ref<Shader>& shader)
 	{
 		CANDY_CORE_ASSERT(!Exists(name), "Shader already exists!");

@@ -43,6 +43,13 @@ namespace Candy {
 		Compile(sources);
 	}
 
+	OpenGLShader::OpenGLShader(const std::string& name, const std::string& source)
+		: m_Name(name)
+	{
+		auto shaderSources = PreProcess(source);
+		Compile(shaderSources);
+	}
+
 	OpenGLShader::~OpenGLShader()
 	{
 		glDeleteProgram(m_RendererID);

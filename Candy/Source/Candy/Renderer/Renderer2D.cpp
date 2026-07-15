@@ -5,6 +5,7 @@
 #include "Candy/Renderer/VertexArray.h"
 #include "Candy/Renderer/UniformBuffer.h"
 #include "Candy/Renderer/RenderCommand.h"
+#include "Candy/Core/FileSystem.h"
 #include "Candy/Project/ProjectUtils.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -166,9 +167,16 @@ namespace Candy {
 			samplers[i] = i;
 
 		const auto& shadersPath = ProjectUtils::GetEngineShadersPath();
-		s_Data.QuadShader = Shader::Create((shadersPath / "Renderer2D_Quad.glsl").string());
-		s_Data.CircleShader = Shader::Create((shadersPath / "Renderer2D_Circle.glsl").string());
-		s_Data.LineShader = Shader::Create((shadersPath / "Renderer2D_Line.glsl").string());
+		auto loadShader = [](const char* name, const char* vfsPath) -> Ref<Shader> {
+			auto source = FileSystem::Get().ReadText(vfsPath);
+			if (source)
+				return Shader::CreateFromSource(name, *source);
+			CANDY_CORE_ERROR("Failed to load shader: {0}", vfsPath);
+			return nullptr;
+		};
+		s_Data.QuadShader = loadShader("Renderer2D_Quad", "/engine/Shaders/Renderer2D_Quad.glsl");
+		s_Data.CircleShader = loadShader("Renderer2D_Circle", "/engine/Shaders/Renderer2D_Circle.glsl");
+		s_Data.LineShader = loadShader("Renderer2D_Line", "/engine/Shaders/Renderer2D_Line.glsl");
 
 		s_Data.TextureSlots[0] = s_Data.WhiteTexture;
 
