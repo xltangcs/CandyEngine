@@ -47,7 +47,7 @@ namespace Candy {
 
 		auto projectNode = data["Project"];
 		m_Project->m_Name = projectNode["Name"].as<std::string>();
-		m_Project->m_ProjectFileName = filepath;
+		m_Project->m_ProjectFileName = std::filesystem::absolute(filepath);
 
 		if (projectNode["DefaultScene"])
 			m_Project->m_DefaultScene = projectNode["DefaultScene"].as<std::string>();

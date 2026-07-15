@@ -9,6 +9,8 @@
 
 #include <glfw/glfw3.h>
 
+#include "Candy/Scripting/ScriptSystem.h"
+
 namespace Candy {
 	Application* Application::s_Instance = nullptr;
 
@@ -26,6 +28,7 @@ namespace Candy {
 
 		Renderer::Init();
 		AudioEngine::Init();
+		ScriptSystem::Get().InitPython();
 
 		m_ImGuiLayer = new ImGuiLayer();
 		PushOverlay(m_ImGuiLayer);
@@ -35,6 +38,7 @@ namespace Candy {
 	{
 		AudioEngine::Shutdown();
 		Renderer::Shutdown();
+		ScriptSystem::Get().ShutdownPython();
 	}
 
 	void Application::PushLayer(Layer* layer)
@@ -83,7 +87,6 @@ namespace Candy {
 			float time = (float)glfwGetTime();
 			Timestep timestep = time - m_LastFrameTime;
 			m_LastFrameTime = time;
-
 			
 			//update layer
 			if (!m_Minimized)

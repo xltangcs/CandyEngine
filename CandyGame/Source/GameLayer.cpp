@@ -24,6 +24,7 @@ namespace Candy {
 		m_ActiveScene = CreateRef<Scene>();
 
 		auto scenePath = project->GetFullStartScenePath();
+		// auto scenePath = ProjectUtils::GetProjectContentPath() / ProjectSettings::Get().DefaultScene;
 		if (std::filesystem::exists(scenePath))
 		{
 			SceneSerializer serializer(m_ActiveScene);

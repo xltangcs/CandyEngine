@@ -127,15 +127,15 @@ namespace Candy {
 
 	void Scene::OnRuntimeStart()
 	{
-		m_ScriptSystem.InitPython();
+		auto& scriptSystem = ScriptSystem::Get();
 
 		auto scriptView = m_Registry.view<ScriptComponent>();
 		for (auto e : scriptView)
 		{
-			m_ScriptSystem.InstantiateScript(Entity{ e, this });
+			scriptSystem.InstantiateScript(Entity{ e, this });
 		}
 
-		m_ScriptSystem.OnRuntimeStart();
+		scriptSystem.OnRuntimeStart();
 		AudioSystem::OnRuntimeStart(*this);
 		OnPhysics2DStart();
 	}
@@ -144,7 +144,7 @@ namespace Candy {
 	{
 		OnPhysics2DStop();
 		AudioSystem::OnRuntimeStop(*this);
-		m_ScriptSystem.OnRuntimeStop();
+		ScriptSystem::Get().OnRuntimeStop();
 	}
 
 	void Scene::OnSimulationStart()
@@ -160,7 +160,7 @@ namespace Candy {
 	void Scene::OnUpdateRuntime(Timestep ts)
 	{
 		// Update Python scripts
-		m_ScriptSystem.OnUpdateRuntime(ts);
+		ScriptSystem::Get().OnUpdateRuntime(ts);
 
 		// Update audio
 		AudioSystem::OnUpdateRuntime(*this, ts);

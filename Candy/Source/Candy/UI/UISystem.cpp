@@ -3,6 +3,7 @@
 #include "Candy/Scene/Scene.h"
 #include "Candy/Scene/Entity.h"
 #include "Candy/Scene/Components.h"
+#include "Candy/Scripting/ScriptSystem.h"
 
 #include <imgui.h>
 
@@ -69,7 +70,7 @@ namespace Candy {
 					ImGui::PopID();
 
 					if (clicked && !btn.OnClick.empty())
-						scene.GetScriptSystem().CallFunction(entity, btn.OnClick);
+						ScriptSystem::Get().CallFunction(entity, btn.OnClick);
 				}
 			}
 		}

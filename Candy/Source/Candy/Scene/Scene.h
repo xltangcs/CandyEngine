@@ -6,7 +6,6 @@
 #include "Candy/Core/UUID.h"
 #include "Candy/Renderer/EditorCamera.h"
 #include "Candy/Scene/SceneCamera.h"
-#include "Candy/Scripting/ScriptSystem.h"
 #include "Candy/Audio/AudioSystem.h"
 
 
@@ -49,8 +48,6 @@ namespace Candy {
 
 		entt::registry& GetRegistry() { return m_Registry; }
 		const entt::registry& GetRegistry() const { return m_Registry; }
-
-		ScriptSystem& GetScriptSystem() { return m_ScriptSystem; }
 	private:
 		template<typename T>
 		void OnComponentAdded(Entity entity, T& component);
@@ -64,7 +61,6 @@ namespace Candy {
 		uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
 
 		b2World* m_PhysicsWorld = nullptr;
-		ScriptSystem m_ScriptSystem;
 		SceneCamera m_FallbackCamera;
 
 		friend class Entity;

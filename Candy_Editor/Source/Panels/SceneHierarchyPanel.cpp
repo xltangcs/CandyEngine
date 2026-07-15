@@ -94,13 +94,14 @@ namespace Candy {
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 			{
 				const wchar_t* path = (const wchar_t*)payload->Data;
-				std::filesystem::path fullPath = std::filesystem::path(ProjectUtils::GetProjectContentPath()) / path;
-				if (fullPath.extension() == ".py" && m_SelectionContext)
+				std::filesystem::path relPath(path);
+				if (relPath.extension() == ".py" && m_SelectionContext)
 				{
 					auto& sc = m_SelectionContext.HasComponent<ScriptComponent>()
 						? m_SelectionContext.GetComponent<ScriptComponent>()
 						: m_SelectionContext.AddComponent<ScriptComponent>();
-					sc.ScriptPath = fullPath.string();
+					sc.ScriptPath = relPath.generic_string();
+					std::filesystem::path fullPath = std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / relPath);
 					std::string parsedName = ParsePythonClassName(fullPath);
 					if (!parsedName.empty())
 						sc.ClassName = parsedName;
@@ -146,13 +147,14 @@ namespace Candy {
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 			{
 				const wchar_t* path = (const wchar_t*)payload->Data;
-				std::filesystem::path fullPath = std::filesystem::path(ProjectUtils::GetProjectContentPath()) / path;
-				if (fullPath.extension() == ".py")
+				std::filesystem::path relPath(path);
+				if (relPath.extension() == ".py")
 				{
 					auto& sc = entity.HasComponent<ScriptComponent>()
 						? entity.GetComponent<ScriptComponent>()
 						: entity.AddComponent<ScriptComponent>();
-					sc.ScriptPath = fullPath.string();
+					sc.ScriptPath = relPath.generic_string();
+					std::filesystem::path fullPath = std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / relPath);
 					std::string parsedName = ParsePythonClassName(fullPath);
 					if (!parsedName.empty())
 						sc.ClassName = parsedName;
@@ -560,13 +562,14 @@ namespace Candy {
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 				{
 					const wchar_t* path = (const wchar_t*)payload->Data;
-					std::filesystem::path fullPath = std::filesystem::path(ProjectUtils::GetProjectContentPath()) / path;
-					if (fullPath.extension() == ".py")
+					std::filesystem::path relPath(path);
+					if (relPath.extension() == ".py")
 					{
-						component.ScriptPath = fullPath.string();
+						component.ScriptPath = relPath.generic_string();
 						std::strncpy(buffer, component.ScriptPath.c_str(), sizeof(buffer) - 1);
 						buffer[sizeof(buffer) - 1] = '\0';
 
+						std::filesystem::path fullPath = std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / relPath);
 						std::string parsedName = ParsePythonClassName(fullPath);
 						if (!parsedName.empty())
 							component.ClassName = parsedName;
@@ -581,8 +584,8 @@ namespace Candy {
 				std::string filepath = FileDialogs::OpenFile("Python Script (*.py)\0*.py\0");
 				if (!filepath.empty())
 				{
-					std::filesystem::path relPath = std::filesystem::relative(std::filesystem::path(filepath), std::filesystem::current_path());
-					component.ScriptPath = relPath.string();
+					std::filesystem::path relPath = std::filesystem::relative(std::filesystem::path(filepath), ProjectUtils::GetProjectContentPath());
+					component.ScriptPath = relPath.generic_string();
 					std::strncpy(buffer, component.ScriptPath.c_str(), sizeof(buffer) - 1);
 					buffer[sizeof(buffer) - 1] = '\0';
 

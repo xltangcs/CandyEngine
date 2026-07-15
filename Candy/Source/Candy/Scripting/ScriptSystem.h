@@ -14,12 +14,11 @@ namespace Candy
 
 	class ScriptSystem {
 	public:
-		ScriptSystem();
-		~ScriptSystem();
+		static ScriptSystem& Get();
 
 		void InitPython();
 		void ShutdownPython();
-
+		
 		void InstantiateScript(Entity& entity);
 		void DestroyScript(UUID entityID);
 
@@ -30,6 +29,12 @@ namespace Candy
 		void CallFunction(Entity entity, const std::string& funcName);
 
 	private:
+		ScriptSystem() = default;
+		~ScriptSystem() = default;
+		ScriptSystem(const ScriptSystem&) = delete;
+		ScriptSystem& operator=(const ScriptSystem&) = delete;
+		
 		std::unordered_map<UUID, std::unique_ptr<ScriptInstance>> m_Instances;
+		bool m_PythonInitialized = false;
 	};
 }

@@ -18,9 +18,7 @@ namespace py = pybind11;
 extern void PyBindings_ForceLink();
 
 namespace Candy {
-
-static bool s_PythonInitialized = false;
-
+    
 struct ScriptInstance
 {
     py::object PyObject;
@@ -28,18 +26,15 @@ struct ScriptInstance
     Entity StoredEntity;
 };
 
-ScriptSystem::ScriptSystem()
+ScriptSystem& ScriptSystem::Get()
 {
-}
-
-ScriptSystem::~ScriptSystem()
-{
-    ShutdownPython();
+    static ScriptSystem s_Instance;
+    return s_Instance;
 }
 
 void ScriptSystem::InitPython()
 {
-    if (s_PythonInitialized)
+    if (m_PythonInitialized)
         return;
 
     ::PyBindings_ForceLink();  // Ensure PYBIND11_EMBEDDED_MODULE gets linked
@@ -59,17 +54,17 @@ void ScriptSystem::InitPython()
     Py_Initialize();
 
     // Resolve scripts directory: project Content/Scripts
-    std::filesystem::path scriptsDir = ProjectUtils::GetProjectContentPath() / "Scripts";
+    std::filesystem::path scriptsDir = std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / "Scripts");
 
     py::module_ sys = py::module_::import("sys");
     sys.attr("path").attr("append")(scriptsDir.string());
 
-    s_PythonInitialized = true;
+    m_PythonInitialized = true;
 }
 
 void ScriptSystem::ShutdownPython()
 {
-    if (!s_PythonInitialized)
+    if (!m_PythonInitialized)
         return;
 
     for (auto& [id, instance] : m_Instances)
@@ -79,25 +74,39 @@ void ScriptSystem::ShutdownPython()
     }
     m_Instances.clear();
 
-    Py_Finalize();
-    s_PythonInitialized = false;
+    // NOTE: Intentionally do NOT call Py_Finalize(). The interpreter is process-global
+    // and reclaimed by the OS on exit. Finalizing it while pybind11's embedded module
+    // ("candy") still has live static type info causes an access violation.
 }
 
-static std::string ScriptPathToModuleName(const std::string& scriptPath)
+// Resolve a ScriptPath to an absolute file path.
+// ScriptPath is relative to project Content/ (new format)
+// or "Assets/Scripts/" (backward compat for old scenes).
+static std::filesystem::path ResolveScriptPath(const std::string& scriptPath)
 {
-    // "Assets/Scripts/enemies/goblin.py" → "enemies.goblin"
     std::filesystem::path p(scriptPath);
-    std::string name = p.replace_extension("").generic_string();
+    if (p.is_absolute())
+        return p;
 
-    // Strip "Assets/Scripts/" prefix
-    const std::string prefix = "Assets/Scripts/";
-    if (name.find(prefix) == 0)
-        name = name.substr(prefix.size());
+    auto contentPath = ProjectUtils::GetProjectContentPath();
 
-    // Replace / with .
-    std::replace(name.begin(), name.end(), '/', '.');
+    // 新格式: Content 相对路径 (e.g. "Scripts/cube.py")
+    auto contentRelative = std::filesystem::absolute(contentPath / p);
+    if (std::filesystem::exists(contentRelative))
+        return contentRelative;
 
-    return name;
+    // 向后兼容: 旧场景存的是 "Assets/Scripts/cube.py"
+    std::string generic = p.generic_string();
+    const std::string oldPrefix = "Assets/Scripts/";
+    if (generic.find(oldPrefix) == 0)
+    {
+        auto stripped = std::filesystem::absolute(
+            contentPath / generic.substr(oldPrefix.size()));
+        if (std::filesystem::exists(stripped))
+            return stripped;
+    }
+
+    return contentRelative;
 }
 
 void ScriptSystem::InstantiateScript(Entity& entity)
@@ -113,10 +122,24 @@ void ScriptSystem::InstantiateScript(Entity& entity)
 
     try
     {
-        // Derive module name from ScriptPath
-        std::string moduleName = ScriptPathToModuleName(sc.ScriptPath);
+        // Resolve script file to absolute path
+        std::filesystem::path scriptFullPath = ResolveScriptPath(sc.ScriptPath);
+        if (!std::filesystem::exists(scriptFullPath))
+        {
+            CANDY_CORE_ERROR("Script file not found: {0}", scriptFullPath.string());
+            return;
+        }
 
-        py::object pyModule = py::module_::import(moduleName.c_str());
+        // Use importlib to load the script by file path (bypasses sys.path)
+        py::module_ util = py::module_::import("importlib.util");
+        py::object spec = util.attr("spec_from_file_location")(sc.ClassName, scriptFullPath.string());
+        if (spec.is_none())
+        {
+            CANDY_CORE_ERROR("Failed to create module spec for '{0}'", scriptFullPath.string());
+            return;
+        }
+        py::object pyModule = util.attr("module_from_spec")(spec);
+        spec.attr("loader").attr("exec_module")(pyModule);
 
         // ClassName is the actual Python class name
         py::object pyClass = pyModule.attr(sc.ClassName.c_str());

@@ -26,6 +26,14 @@ namespace Candy {
 	{
 	}
 
+	EditorLayer::~EditorLayer()
+	{
+		if (m_SceneState == SceneState::Play)
+			m_ActiveScene->OnRuntimeStop();
+		else if (m_SceneState == SceneState::Simulate)
+			m_ActiveScene->OnSimulationStop();
+	}
+
 	void EditorLayer::OnAttach()
 	{
 		CANDY_PROFILE_FUNCTION();
@@ -59,7 +67,7 @@ namespace Candy {
 		if (project)
 		{
 			ProjectSettings::Get().Load();
-			auto scenePath = project->GetFullStartScenePath();
+			auto scenePath = ProjectUtils::GetProjectContentPath() / ProjectSettings::Get().DefaultScene;
 			if (std::filesystem::exists(scenePath))
 				OpenScene(scenePath);
 		}
@@ -716,7 +724,7 @@ namespace Candy {
 			RecentProjects::Add(project->GetName(), project->GetProjectFileName().string());
 			m_RecentProjects = RecentProjects::Load();
 
-			auto scenePath = project->GetFullStartScenePath();
+			auto scenePath = ProjectUtils::GetProjectContentPath() / ProjectSettings::Get().DefaultScene;
 			if (std::filesystem::exists(scenePath))
 				OpenScene(scenePath);
 		}
