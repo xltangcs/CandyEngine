@@ -43,4 +43,5 @@ group ""
 
 include "Candy"
 include "Candy_Editor"
+include "CandyGame"
 --include "Sandbox"

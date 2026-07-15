@@ -21,7 +21,7 @@ public :
 
 };
 
-Candy::Application* Candy::CreateApplication()
+Candy::Application* Candy::CreateApplication(int argc, char** argv)
 {
 	return new Sandbox();
 }

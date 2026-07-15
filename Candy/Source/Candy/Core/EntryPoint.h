@@ -4,7 +4,7 @@
 #include <filesystem>
 #ifdef CANDY_PLATFORM_WINDOWS
 
-extern Candy::Application* Candy::CreateApplication();
+extern Candy::Application* Candy::CreateApplication(int argc, char** argv);
 
 int main(int argc, char** argv)
 {
@@ -13,7 +13,7 @@ int main(int argc, char** argv)
 	CANDY_CORE_INFO("Initialized Log!");
 	
 	CANDY_PROFILE_BEGIN_SESSION("Startup", "Saved/CandyProfile-Startup.json");
-	auto app = Candy::CreateApplication();
+	auto app = Candy::CreateApplication(argc, argv);
 	CANDY_PROFILE_END_SESSION();
 
 	CANDY_PROFILE_BEGIN_SESSION("Runtime", "Saved/CandyProfile-Runtime.json");

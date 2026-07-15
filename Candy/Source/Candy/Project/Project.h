@@ -5,13 +5,6 @@
 #include <filesystem>
 #include <string>
 
-#include "../../../../Candy_Editor/Source/Settings/ProjectSettings.h"
-
-namespace Candy
-{
-	class ProjectSettings;
-}
-
 namespace Candy {
 
 	class Project : public std::enable_shared_from_this<Project>
@@ -26,9 +19,10 @@ namespace Candy {
 
 		const std::filesystem::path& GetProjectFileName() const { return m_ProjectFileName; }
 		std::filesystem::path GetProjectDirectory() const { return m_ProjectFileName.parent_path(); }
-		std::filesystem::path GetFullStartScenePath() const { return GetProjectDirectory() / "Content" / GetProjectDefaultScene(); }
+		std::filesystem::path GetFullStartScenePath() const { return GetProjectDirectory() / "Content" / m_DefaultScene; }
 
-		static const std::string& GetProjectDefaultScene() { return ProjectSettings::Get().DefaultScene; }
+		const std::string& GetDefaultScene() const { return m_DefaultScene; }
+		void SetDefaultScene(const std::string& scene) { m_DefaultScene = scene; }
 
 		friend class ProjectSerializer;
 
@@ -36,6 +30,7 @@ namespace Candy {
 		Project() = default;
 
 		std::string m_Name;
+		std::string m_DefaultScene = "Scenes/Default.candy";
 		std::filesystem::path m_ProjectFileName;
 	};
 

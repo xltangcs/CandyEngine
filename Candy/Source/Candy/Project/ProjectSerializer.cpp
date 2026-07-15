@@ -18,6 +18,7 @@ namespace Candy {
 		out << YAML::Key << "Project" << YAML::Value;
 		out << YAML::BeginMap;
 		out << YAML::Key << "Name" << YAML::Value << m_Project->GetName();
+		out << YAML::Key << "DefaultScene" << YAML::Value << m_Project->GetDefaultScene();
 		out << YAML::EndMap;
 		out << YAML::EndMap;
 
@@ -47,6 +48,9 @@ namespace Candy {
 		auto projectNode = data["Project"];
 		m_Project->m_Name = projectNode["Name"].as<std::string>();
 		m_Project->m_ProjectFileName = filepath;
+
+		if (projectNode["DefaultScene"])
+			m_Project->m_DefaultScene = projectNode["DefaultScene"].as<std::string>();
 
 		return true;
 	}

@@ -34,7 +34,7 @@ namespace Candy {
 		}
 	};
 
-	Application* CreateApplication()
+	Application* CreateApplication(int argc, char** argv)
 	{
 		return new CandyEditor();
 	}
