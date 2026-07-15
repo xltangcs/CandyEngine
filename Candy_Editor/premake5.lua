@@ -33,6 +33,13 @@ project "Candy_Editor"
 
 	if PythonLibDir and PythonLibDir ~= "" then
 		links { PythonLibDir .. "/" .. PythonLibName }
+
+		-- Post-build: copy embedded Python runtime to output directory
+		postbuildcommands {
+			'{COPY} "%{wks.location}/Candy/ThirdParty/Python3/python314.dll" "%{cfg.targetdir}"',
+			'{COPY} "%{wks.location}/Candy/ThirdParty/Python3/python314.zip" "%{cfg.targetdir}"',
+			'{COPY} "%{wks.location}/Candy/ThirdParty/Python3/python314._pth" "%{cfg.targetdir}"',
+		}
 	end
 
 	filter "system:windows"

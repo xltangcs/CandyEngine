@@ -26,39 +26,11 @@ IncludeDir["ImGuizmo"]  = "%{wks.location}/Candy/ThirdParty/ImGuizmo/src"
 IncludeDir["box2d"]  	= "%{wks.location}/Candy/ThirdParty/box2d/include"
 IncludeDir["pybind11"] 	= "%{wks.location}/Candy/ThirdParty/pybind11/include"
 
--- Python3 自动检测（PATH 中的 python，版本 ≥ 3.11）
-local function trim(s)
-    return s and s:match("^(.-)%s*$") or ""
-end
-
-local pyProbe = os.outputof("python -c \"import sys; v=sys.version_info; print(v.major); print(v.minor); print(sys.exec_prefix)\"")
-
-local pyMajor, pyMinor, pyPrefix = nil, nil, nil
-if pyProbe and pyProbe ~= "" then
-    local lines = {}
-    for line in pyProbe:gmatch("([^\n]+)") do
-        table.insert(lines, trim(line))
-    end
-    pyMajor = tonumber(lines[1])
-    pyMinor = tonumber(lines[2])
-    pyPrefix = lines[3]
-end
-
-if pyMajor == 3 and pyMinor >= 11 then
-    IncludeDir["Python3"] = pyPrefix .. "/include"
-    PythonLibDir = pyPrefix .. "/libs"
-    PythonLibName = "python" .. pyMajor .. pyMinor .. ".lib"
-    print("  Python 3." .. pyMinor .. " detected: " .. pyPrefix)
-else
-    if pyMajor then
-        print("WARNING: Python " .. pyMajor .. "." .. pyMinor .. " < 3.11, scripting disabled")
-    else
-        print("WARNING: Python not found in PATH, scripting disabled")
-    end
-    IncludeDir["Python3"] = ""
-    PythonLibDir = ""
-    PythonLibName = ""
-end
+-- Python3: 使用 ThirdParty/Python3 (embedded)
+IncludeDir["Python3"] = "%{wks.location}/Candy/ThirdParty/Python3/include"
+PythonLibDir = "%{wks.location}/Candy/ThirdParty/Python3/libs"
+PythonLibName = "python314.lib"
+print("  Python embedded (ThirdParty/Python3)")
 
 
 group "Dependencies"

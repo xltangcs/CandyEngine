@@ -6,6 +6,7 @@
 #include "Candy/Scene/Components.h"
 #include "Candy/Core/Timestep.h"
 #include "Candy/Core/UUID.h"
+#include "Candy/Project/ProjectUtils.h"
 
 #include <pybind11/embed.h>
 
@@ -43,19 +44,22 @@ void ScriptSystem::InitPython()
 
     ::PyBindings_ForceLink();  // Ensure PYBIND11_EMBEDDED_MODULE gets linked
 
-    // Resolve scripts directory relative to the executable
+    // Resolve exe directory
     std::filesystem::path exePath = []() {
         wchar_t buf[MAX_PATH];
         GetModuleFileNameW(nullptr, buf, MAX_PATH);
         return std::filesystem::path(buf);
     }();
-    std::filesystem::path scriptsDir = exePath.parent_path() // .../Candy_Editor/
-        .parent_path()  // .../Debug-windows-x86_64/
-        .parent_path()  // .../bin/
-        .parent_path()  // <project_root>/
-        / "Candy_Editor" / "Assets" / "Scripts";
+    std::filesystem::path exeDir = exePath.parent_path();
+
+    // Embedded Python: python314.dll, python314.zip, python314._pth next to exe
+    std::wstring pythonHome = exeDir.wstring();
+    Py_SetPythonHome(pythonHome.c_str());
 
     Py_Initialize();
+
+    // Resolve scripts directory: project Content/Scripts
+    std::filesystem::path scriptsDir = ProjectUtils::GetProjectContentPath() / "Scripts";
 
     py::module_ sys = py::module_::import("sys");
     sys.attr("path").attr("append")(scriptsDir.string());
