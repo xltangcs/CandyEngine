@@ -1,41 +1,18 @@
-#include "CandyPCH.h"
-#include "EditorSettings.h"
+#include "EditorSettingsPanel.h"
 
-#include <yaml-cpp/yaml.h>
-#include <fstream>
-#include <filesystem>
 #include <imgui/imgui.h>
 #include <imgui/misc/cpp/imgui_stdlib.h>
+
+#include "Candy/Project/EditorSettings.h"
+#include "Candy/Project/EditorState.h"
 #include "Candy/Utils/PlatformUtils.h"
 #include "Candy/Imgui/ImguiLayer.h"
-#include "EditorState.h"
 
 namespace Candy {
 
-	EditorSettings& EditorSettings::Get()
+	void EditorSettingsPanel::OnImGuiRender()
 	{
-		static EditorSettings instance;
-		return instance;
-	}
-
-	void EditorSettings::Save()
-	{
-		std::filesystem::create_directories("Config");
-		YAML::Emitter out;
-		out << YAML::BeginMap;
-		out << YAML::Key << "EditorSettings" << YAML::Value << YAML::BeginMap;
-		out << YAML::Key << "FontSize" << YAML::Value << m_FontSize;
-		out << YAML::Key << "FontPath" << YAML::Value << m_FontPath;
-		out << YAML::Key << "ThumbnailSize" << YAML::Value << m_ThumbnailSize;
-		out << YAML::Key << "ThumbnailPadding" << YAML::Value << m_ThumbnailPadding;
-		out << YAML::Key << "AutoOpenLastProject" << YAML::Value << m_AutoOpenLastProject;
-		out << YAML::EndMap << YAML::EndMap;
-		std::ofstream("Config/EditorSettings.candy") << out.c_str();
-	}
-
-	void EditorSettings::OnImGuiRender()
-	{
-		auto& editorSetting = Get();
+		auto& editorSetting = EditorSettings::Get();
 		auto& editorState = EditorState::Get();
 
 		ImGui::SetNextWindowSizeConstraints(ImVec2(200, 100), ImVec2(FLT_MAX, FLT_MAX));
@@ -99,20 +76,6 @@ namespace Candy {
 		}
 
 		ImGui::End();
-	}
-
-	void EditorSettings::Load()
-	{
-		auto path = std::filesystem::path("Config/EditorSettings.candy");
-		if (!std::filesystem::exists(path)) return;
-		auto doc = YAML::LoadFile(path.string());
-		auto s = doc["EditorSettings"];
-		if (!s) return;
-		if (s["FontSize"]) m_FontSize = s["FontSize"].as<float>();
-		if (s["FontPath"]) m_FontPath = s["FontPath"].as<std::string>();
-		if (s["ThumbnailSize"]) m_ThumbnailSize = s["ThumbnailSize"].as<float>();
-		if (s["ThumbnailPadding"]) m_ThumbnailPadding = s["ThumbnailPadding"].as<float>();
-		if (s["AutoOpenLastProject"]) m_AutoOpenLastProject = s["AutoOpenLastProject"].as<bool>();
 	}
 
 }

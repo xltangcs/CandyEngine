@@ -23,10 +23,10 @@ Entities:
       Rotation: [0, 0, 0]
       Scale: [1, 1, 1]
     AudioSourceComponent:
-      SoundPath: Assets\Audio\jump.mp3
+      SoundPath: Audio/jump.mp3
       Volume: 1
-      Looping: false
-      PlayOnStart: false
+      Looping: true
+      PlayOnStart: true
   - Entity: 7028300387292532713
     TagComponent:
       Tag: Cube

@@ -1,6 +1,6 @@
 #include "CandyPCH.h"
 #include "ContentBrowserPanel.h"
-#include "Settings/EditorSettings.h"
+#include "Candy/Project/EditorSettings.h"
 
 #include <imgui/imgui.h>
 #include "Candy/Core/Application.h"

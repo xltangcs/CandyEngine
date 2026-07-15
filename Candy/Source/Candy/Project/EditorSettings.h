@@ -9,7 +9,6 @@ namespace Candy {
 	public:
 		static EditorSettings& Get();
 
-		void OnImGuiRender();
 		void Save();
 		void Load();
 

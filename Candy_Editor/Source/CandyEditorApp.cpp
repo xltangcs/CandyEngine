@@ -2,9 +2,9 @@
 #include <Candy/Core/EntryPoint.h>
 #include <Candy/Project/RecentProjects.h>
 
-#include "EditorLayer.h"
-#include "Panels/ProjectManagerLayer.h"
-#include "Settings/EditorSettings.h"
+#include "Layer/EditorLayer.h"
+#include "Layer/ProjectManagerLayer.h"
+#include "Candy/Project/EditorSettings.h"
 
 namespace Candy {
 

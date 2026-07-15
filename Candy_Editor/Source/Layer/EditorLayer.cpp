@@ -17,7 +17,7 @@
 #include <GLFW/glfw3.h>
 
 #include "Candy/Project/ProjectUtils.h"
-#include "Panels/ProjectManagerLayer.h"
+#include "Layer/ProjectManagerLayer.h"
 
 namespace Candy {
 
@@ -431,8 +431,8 @@ namespace Candy {
 		ImGui::End();
 		ImGui::PopStyleVar();
 
-		if (EditorState::Get().ShowProjectSettings) ProjectSettings::Get().OnImGuiRender();
-		if (EditorState::Get().ShowEditorSettings) EditorSettings::Get().OnImGuiRender();
+		if (EditorState::Get().ShowProjectSettings) ProjectSettingsPanel::OnImGuiRender();
+		if (EditorState::Get().ShowEditorSettings) EditorSettingsPanel::OnImGuiRender();
 
 		ImGui::End();
 

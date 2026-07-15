@@ -5,6 +5,7 @@
 #include "Candy/Scene/Scene.h"
 #include "Candy/Scene/Entity.h"
 #include "Candy/Scene/Components.h"
+#include "Candy/Project/ProjectUtils.h"
 
 #include "miniaudio.h"
 
@@ -19,12 +20,16 @@ namespace Candy {
 			auto& asc = entity.GetComponent<AudioSourceComponent>();
 
 			if (!asc.SoundPath.empty() && asc.PlayOnStart)
-			{
-				ma_engine* engine = AudioEngine::GetEngineHandle();
-				if (engine)
 				{
-					ma_sound* sound = new ma_sound();
-					ma_result result = ma_sound_init_from_file(engine, asc.SoundPath.c_str(),
+					auto soundPath = std::filesystem::path(asc.SoundPath);
+					if (soundPath.is_relative())
+						soundPath = std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / soundPath);
+
+					ma_engine* engine = AudioEngine::GetEngineHandle();
+					if (engine)
+					{
+						ma_sound* sound = new ma_sound();
+						ma_result result = ma_sound_init_from_file(engine, soundPath.string().c_str(),
 						MA_SOUND_FLAG_ASYNC, nullptr, nullptr, sound);
 					if (result == MA_SUCCESS)
 					{

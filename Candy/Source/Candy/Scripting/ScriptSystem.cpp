@@ -79,34 +79,13 @@ void ScriptSystem::ShutdownPython()
     // ("candy") still has live static type info causes an access violation.
 }
 
-// Resolve a ScriptPath to an absolute file path.
-// ScriptPath is relative to project Content/ (new format)
-// or "Assets/Scripts/" (backward compat for old scenes).
 static std::filesystem::path ResolveScriptPath(const std::string& scriptPath)
 {
     std::filesystem::path p(scriptPath);
     if (p.is_absolute())
         return p;
 
-    auto contentPath = ProjectUtils::GetProjectContentPath();
-
-    // 新格式: Content 相对路径 (e.g. "Scripts/cube.py")
-    auto contentRelative = std::filesystem::absolute(contentPath / p);
-    if (std::filesystem::exists(contentRelative))
-        return contentRelative;
-
-    // 向后兼容: 旧场景存的是 "Assets/Scripts/cube.py"
-    std::string generic = p.generic_string();
-    const std::string oldPrefix = "Assets/Scripts/";
-    if (generic.find(oldPrefix) == 0)
-    {
-        auto stripped = std::filesystem::absolute(
-            contentPath / generic.substr(oldPrefix.size()));
-        if (std::filesystem::exists(stripped))
-            return stripped;
-    }
-
-    return contentRelative;
+    return std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / p);
 }
 
 void ScriptSystem::InstantiateScript(Entity& entity)

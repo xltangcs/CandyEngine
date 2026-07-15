@@ -621,8 +621,8 @@ namespace Candy {
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 				{
 					const wchar_t* path = (const wchar_t*)payload->Data;
-					std::filesystem::path fullPath = std::filesystem::path(ProjectUtils::GetProjectContentPath()) / path;
-					component.SoundPath = fullPath.string();
+					std::filesystem::path relPath(path);
+					component.SoundPath = relPath.generic_string();
 					std::strncpy(buffer, component.SoundPath.c_str(), sizeof(buffer) - 1);
 					buffer[sizeof(buffer) - 1] = '\0';
 				}

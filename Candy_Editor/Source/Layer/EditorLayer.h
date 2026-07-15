@@ -2,11 +2,13 @@
 
 #include "Candy.h"
 #include "Candy/Project/RecentProjects.h"
-#include "Settings/EditorSettings.h"
-#include "Settings/EditorState.h"
-#include "Settings/ProjectSettings.h"
-#include "Panels/SceneHierarchyPanel.h"
-#include "Panels/ContentBrowserPanel.h"
+#include "Candy/Project/EditorSettings.h"
+#include "Candy/Project/EditorState.h"
+#include "Candy/Project/ProjectSettings.h"
+#include "Panel/SceneHierarchyPanel.h"
+#include "Panel/ContentBrowserPanel.h"
+#include "Panel/EditorSettingsPanel.h"
+#include "Panel/ProjectSettingsPanel.h"
 #include "Candy/Renderer/EditorCamera.h"
 
 namespace Candy {
