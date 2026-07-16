@@ -206,21 +206,21 @@ void ScriptSystem::OnUpdateRuntime(Timestep ts)
     }
 }
 
-	void ScriptSystem::CallFunction(Entity entity, const std::string& funcName)
-	{
-		if (!entity.HasComponent<ScriptComponent>())
-			return;
-		auto uuid = entity.GetComponent<IDComponent>().ID;
-		auto it = m_Instances.find(uuid);
-		if (it == m_Instances.end())
-			return;
-		py::object pyObj = it->second->PyObject;
-		if (py::hasattr(pyObj, funcName.c_str()))
-			pyObj.attr(funcName.c_str())();
-	}
+void ScriptSystem::CallFunction(Entity entity, const std::string& funcName)
+{
+	if (!entity.HasComponent<ScriptComponent>())
+		return;
+	auto uuid = entity.GetComponent<IDComponent>().ID;
+	auto it = m_Instances.find(uuid);
+	if (it == m_Instances.end())
+		return;
+	py::object pyObj = it->second->PyObject;
+	if (py::hasattr(pyObj, funcName.c_str()))
+		pyObj.attr(funcName.c_str())();
+}
 
-	void ScriptSystem::OnRuntimeStop()
-	{
+void ScriptSystem::OnRuntimeStop()
+{
     for (auto& [id, instance] : m_Instances)
     {
         if (instance->Script)

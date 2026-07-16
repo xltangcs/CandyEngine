@@ -4,11 +4,7 @@
 namespace Candy {
 	LayerStack::~LayerStack()
 	{
-		for (Layer* layer : m_Layers)
-		{
-			layer->OnDetach();
-			delete layer;
-		}
+		Clear();
 	}
 
 	void LayerStack::PushLayer(Layer* layer)
@@ -45,4 +41,14 @@ namespace Candy {
 		}
 	}
 
+	void LayerStack::Clear()
+	{
+		for (Layer* layer : m_Layers)
+		{
+			layer->OnDetach();
+			delete layer;
+		}
+		m_Layers.clear();
+		m_LayerInsertIndex = 0;
+	}
 }

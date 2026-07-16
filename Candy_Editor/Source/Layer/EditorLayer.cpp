@@ -34,10 +34,6 @@ namespace Candy {
 
 	EditorLayer::~EditorLayer()
 	{
-		if (m_SceneState == SceneState::Play)
-			m_ActiveScene->OnRuntimeStop();
-		else if (m_SceneState == SceneState::Simulate)
-			m_ActiveScene->OnSimulationStop();
 	}
 
 	void EditorLayer::OnAttach()

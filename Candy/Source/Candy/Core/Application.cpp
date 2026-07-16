@@ -51,6 +51,7 @@ namespace Candy {
 
 	Application::~Application()
 	{
+		m_LayerStack.Clear();
 		AudioEngine::Shutdown();
 		Renderer::Shutdown();
 		ScriptSystem::Get().ShutdownPython();
