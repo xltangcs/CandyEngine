@@ -812,6 +812,14 @@ namespace Candy {
 			ImGui::Combo("##BuildMode", &m_BuildMode, modes, IM_ARRAYSIZE(modes));
 			ImGui::PopItemWidth();
 
+			// Config selector
+			ImGui::Text("Config");
+			ImGui::SameLine();
+			ImGui::PushItemWidth(180);
+			const char* configs[] = { "Debug", "Release", "Dist" };
+			ImGui::Combo("##BuildConfig", &m_BuildConfig, configs, IM_ARRAYSIZE(configs));
+			ImGui::PopItemWidth();
+
 			// Game project name (only relevant for Full Build)
 			if (m_BuildMode == 1)
 			{
@@ -884,7 +892,8 @@ namespace Candy {
 
 		// Resolve paths
 		auto engineRoot = ProjectUtils::GetEnginePath().parent_path(); // e.g. "../../" from editor cwd
-		auto outputDir = "Dist-windows-x86_64";
+		const char* configNames[] = { "Debug", "Release", "Dist" };
+		auto outputDir = std::string(configNames[m_BuildConfig]) + "-windows-x86_64";
 		auto gameExeName = settings.GameProjectName + ".exe";
 		auto binDir = engineRoot / "bin" / outputDir / settings.GameProjectName;
 		auto binExe = binDir / gameExeName;
@@ -903,7 +912,9 @@ namespace Candy {
 			cmd += msbuild;
 			cmd += "\" CandyEngine.sln /t:";
 			cmd += settings.GameProjectName;
-			cmd += " /p:Configuration=Dist /nologo /v:minimal";
+			cmd += " /p:Configuration=";
+			cmd += configNames[m_BuildConfig];
+			cmd += " /nologo /v:minimal";
 			CANDY_CORE_INFO("Running build: {0}", cmd);
 			int rc = std::system(cmd.c_str());
 			if (rc != 0)
@@ -1011,13 +1022,14 @@ namespace Candy {
 		// Resolve paths
 		auto& settings = ProjectSettings::Get();
 		auto engineRoot = ProjectUtils::GetEnginePath().parent_path();
-		auto buildOutputDir = "Dist-windows-x86_64";
+		const char* configNames[] = { "Debug", "Release", "Dist" };
+		auto buildOutputDir = std::string(configNames[m_BuildConfig]) + "-windows-x86_64";
 		auto binDir = engineRoot / "bin" / buildOutputDir / "CandyGame";
 		auto binExe = binDir / "CandyGame.exe";
 
 		if (!std::filesystem::exists(binExe))
 		{
-			CANDY_CORE_ERROR("CandyGame.exe not found at {0}. Build the project in Dist mode first.", binExe.string());
+			CANDY_CORE_ERROR("CandyGame.exe not found at {0}. Build the {1} config first.", binExe.string(), configNames[m_BuildConfig]);
 			return;
 		}
 
