@@ -5,6 +5,7 @@
 #include <yaml-cpp/yaml.h>
 #include <fstream>
 #include <filesystem>
+#include <algorithm>
 
 namespace Candy {
 
@@ -22,9 +23,10 @@ namespace Candy {
 		YAML::Emitter out;
 		out << YAML::BeginMap;
 		out << YAML::Key << "ProjectSettings" << YAML::Value << YAML::BeginMap;
-		out << YAML::Key << "DefaultScene" << YAML::Value << DefaultScene;
+		out << YAML::Key << "DefaultScene" << YAML::Value << std::filesystem::path(DefaultScene).generic_string();
 		out << YAML::Key << "DefaultWidth" << YAML::Value << DefaultWidth;
 		out << YAML::Key << "DefaultHeight" << YAML::Value << DefaultHeight;
+		out << YAML::Key << "GameProjectName" << YAML::Value << GameProjectName;
 		out << YAML::EndMap << YAML::EndMap;
 
 		std::ofstream fout(path);
@@ -40,9 +42,30 @@ namespace Candy {
 		auto s = doc["ProjectSettings"];
 		if (!s) return;
 
-		if (s["DefaultScene"]) DefaultScene = s["DefaultScene"].as<std::string>();
+		if (s["DefaultScene"])
+		{
+			DefaultScene = s["DefaultScene"].as<std::string>();
+			std::replace(DefaultScene.begin(), DefaultScene.end(), '\\', '/');
+		}
 		if (s["DefaultWidth"]) DefaultWidth = s["DefaultWidth"].as<uint32_t>();
 		if (s["DefaultHeight"]) DefaultHeight = s["DefaultHeight"].as<uint32_t>();
+		if (s["GameProjectName"]) GameProjectName = s["GameProjectName"].as<std::string>();
+	}
+
+	void ProjectSettings::LoadFromString(const std::string& yamlContent)
+	{
+		auto doc = YAML::Load(yamlContent);
+		auto s = doc["ProjectSettings"];
+		if (!s) return;
+
+		if (s["DefaultScene"])
+		{
+			DefaultScene = s["DefaultScene"].as<std::string>();
+			std::replace(DefaultScene.begin(), DefaultScene.end(), '\\', '/');
+		}
+		if (s["DefaultWidth"]) DefaultWidth = s["DefaultWidth"].as<uint32_t>();
+		if (s["DefaultHeight"]) DefaultHeight = s["DefaultHeight"].as<uint32_t>();
+		if (s["GameProjectName"]) GameProjectName = s["GameProjectName"].as<std::string>();
 	}
 
 }

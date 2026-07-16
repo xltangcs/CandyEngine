@@ -4,6 +4,9 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <sstream>
+#include <cstdio>
+#include <vector>
+#include <fstream>
 
 #include "Candy/Scene/SceneSerializer.h"
 #include "Candy/Utils/PlatformUtils.h"
@@ -17,7 +20,10 @@
 #include <GLFW/glfw3.h>
 
 #include "Candy/Project/ProjectUtils.h"
+#include "Candy/Core/PakFile.h"
 #include "Layer/ProjectManagerLayer.h"
+
+#include <cstdlib>
 
 namespace Candy {
 
@@ -288,6 +294,13 @@ namespace Candy {
 				ImGui::EndMenu();
 			}
 
+			if (ImGui::BeginMenu("Build"))
+			{
+				if (ImGui::MenuItem("Build and Package..."))
+					m_ShowBuildDialog = true;
+				ImGui::EndMenu();
+			}
+
 			{
 				bool enabled = (bool)m_ActiveScene;
 				ImVec4 tint = ImVec4(1, 1, 1, 1);
@@ -431,6 +444,7 @@ namespace Candy {
 
 		if (EditorState::Get().ShowProjectSettings) ProjectSettingsPanel::OnImGuiRender();
 		if (EditorState::Get().ShowEditorSettings) EditorSettingsPanel::OnImGuiRender();
+		UI_BuildDialog();
 
 		ImGui::End();
 	}
@@ -724,5 +738,392 @@ namespace Candy {
 			if (std::filesystem::exists(scenePath))
 				OpenScene(scenePath);
 		}
+	}
+
+	// Locate MSBuild.exe without relying on PATH (the editor may not be launched
+	// from a VS Developer Command Prompt). Prefer vswhere, fall back to scanning
+	// well-known Visual Studio installation directories.
+	static std::string FindMSBuild()
+	{
+		// 1) vswhere -> MSBuild executable
+		char pf86[512] = { 0 };
+		size_t needed = 0;
+		std::string pf86Str;
+		if (getenv_s(&needed, pf86, sizeof(pf86), "ProgramFiles(x86)") == 0 && pf86[0] != '\0')
+			pf86Str = pf86;
+		else
+			pf86Str = "C:\\Program Files (x86)";
+
+		std::filesystem::path vswhere = std::filesystem::path(pf86Str) / "Microsoft Visual Studio" / "Installer" / "vswhere.exe";
+		if (std::filesystem::exists(vswhere))
+		{
+			std::string cmd = "\"";
+			cmd += vswhere.string();
+			cmd += "\" -latest -requires Microsoft.Component.MSBuild -find \"MSBuild\\**\\MSBuild.exe\" 2>nul";
+			std::string out;
+			FILE* pipe = _popen(cmd.c_str(), "r");
+			if (pipe)
+			{
+				char buf[512];
+				while (fgets(buf, sizeof(buf), pipe))
+					out += buf;
+				_pclose(pipe);
+			}
+			size_t start = out.find_first_not_of(" \t\r\n");
+			if (start != std::string::npos)
+			{
+				size_t end = out.find_first_of("\r\n", start);
+				std::string path = out.substr(start, end - start);
+				if (!path.empty() && std::filesystem::exists(path))
+					return path;
+			}
+		}
+
+		// 2) Fallback: scan common VS 2019/2022 install layouts
+		for (const char* edition : { "Community", "Professional", "Enterprise", "BuildTools" })
+		{
+			std::filesystem::path candidates[] = {
+				std::filesystem::path(pf86Str) / "Microsoft Visual Studio" / "2022" / edition / "MSBuild" / "Current" / "Bin" / "MSBuild.exe",
+				std::filesystem::path("C:\\Program Files\\Microsoft Visual Studio") / "2022" / edition / "MSBuild" / "Current" / "Bin" / "MSBuild.exe",
+				std::filesystem::path(pf86Str) / "Microsoft Visual Studio" / "2019" / edition / "MSBuild" / "Current" / "Bin" / "MSBuild.exe",
+				std::filesystem::path("C:\\Program Files\\Microsoft Visual Studio") / "2019" / edition / "MSBuild" / "Current" / "Bin" / "MSBuild.exe",
+			};
+			for (const auto& p : candidates)
+				if (std::filesystem::exists(p))
+					return p.string();
+		}
+
+		return std::string();
+	}
+
+	void EditorLayer::UI_BuildDialog()
+	{
+		if (m_ShowBuildDialog)
+			ImGui::OpenPopup("Build Game");
+
+		if (ImGui::BeginPopupModal("Build Game", &m_ShowBuildDialog, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			auto& settings = ProjectSettings::Get();
+
+			ImGui::Text("Package the current project into a standalone, playable game.");
+			ImGui::Spacing();
+
+			// Build mode selector
+			ImGui::Text("Build Mode");
+			ImGui::SameLine();
+			ImGui::PushItemWidth(180);
+			const char* modes[] = { "Content Only (no rebuild)", "Full Build (MSBuild)" };
+			ImGui::Combo("##BuildMode", &m_BuildMode, modes, IM_ARRAYSIZE(modes));
+			ImGui::PopItemWidth();
+
+			// Game project name (only relevant for Full Build)
+			if (m_BuildMode == 1)
+			{
+				ImGui::Text("Game Project");
+				ImGui::SameLine();
+				ImGui::PushItemWidth(200);
+				if (ImGui::InputText("##GameProject", &settings.GameProjectName))
+				{
+					if (settings.GameProjectName.empty())
+						settings.GameProjectName = "CandyGame";
+				}
+				if (ImGui::IsItemDeactivatedAfterEdit())
+					settings.Save();
+				ImGui::PopItemWidth();
+			}
+			else
+			{
+				ImGui::Text("Content Only: uses existing CandyGame.exe, no C++ rebuild needed.");
+			}
+
+			// Output directory (where the distributable folder is written)
+			ImGui::Text("Output Dir");
+			ImGui::SameLine();
+			ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 40);
+			ImGui::InputText("##BuildOutput", &m_BuildOutputPath, ImGuiInputTextFlags_EnterReturnsTrue);
+			ImGui::PopItemWidth();
+			ImGui::SameLine();
+			if (ImGui::Button("..."))
+			{
+				std::string dir = FileDialogs::OpenFolder();
+				if (!dir.empty())
+					m_BuildOutputPath = dir;
+			}
+
+			ImGui::Spacing();
+			ImGui::Separator();
+			ImGui::Spacing();
+
+			if (ImGui::Button("Build", ImVec2(120, 0)))
+			{
+				m_ShowBuildDialog = false;
+				if (m_BuildMode == 0)
+					BuildGame_ContentOnly();
+				else
+					BuildGame_Full();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel", ImVec2(120, 0)))
+			{
+				m_ShowBuildDialog = false;
+			}
+
+			ImGui::EndPopup();
+		}
+	}
+
+	void EditorLayer::BuildGame_Full()
+	{
+		auto& settings = ProjectSettings::Get();
+		// Default to CandyGame so the current project builds out of the box
+		if (settings.GameProjectName.empty())
+			settings.GameProjectName = "CandyGame";
+
+		auto project = Application::Get().GetProject();
+		if (!project)
+		{
+			CANDY_CORE_ERROR("No project open. Open a project before building.");
+			return;
+		}
+
+		// Resolve paths
+		auto engineRoot = ProjectUtils::GetEnginePath().parent_path(); // e.g. "../../" from editor cwd
+		auto outputDir = "Dist-windows-x86_64";
+		auto gameExeName = settings.GameProjectName + ".exe";
+		auto binDir = engineRoot / "bin" / outputDir / settings.GameProjectName;
+		auto binExe = binDir / gameExeName;
+
+		// ---------- Step 1: Build the game project ----------
+		auto msbuild = FindMSBuild();
+		if (msbuild.empty())
+		{
+			CANDY_CORE_ERROR("Could not locate MSBuild.exe. Install the 'Desktop development with C++' workload in Visual Studio.");
+			return;
+		}
+		{
+			std::string cmd = "pushd \"";
+			cmd += engineRoot.string();
+			cmd += "\" && \"";
+			cmd += msbuild;
+			cmd += "\" CandyEngine.sln /t:";
+			cmd += settings.GameProjectName;
+			cmd += " /p:Configuration=Dist /nologo /v:minimal";
+			CANDY_CORE_INFO("Running build: {0}", cmd);
+			int rc = std::system(cmd.c_str());
+			if (rc != 0)
+			{
+				CANDY_CORE_ERROR("Build failed (exit code {0}).", rc);
+				return;
+			}
+		}
+
+		if (!std::filesystem::exists(binExe))
+		{
+			CANDY_CORE_ERROR("Build output not found: {0}", binExe.string());
+			return;
+		}
+
+		// ---------- Step 2: Assemble distribution folder ----------
+		auto buildDir = m_BuildOutputPath.empty()
+			? (project->GetProjectDirectory() / "Build")
+			: std::filesystem::path(m_BuildOutputPath);
+		std::filesystem::create_directories(buildDir);
+
+		// Copy game executable
+		std::filesystem::copy_file(binExe, buildDir / gameExeName,
+			std::filesystem::copy_options::overwrite_existing);
+
+		// Copy all DLLs from the build output directory
+		for (auto& entry : std::filesystem::directory_iterator(binDir))
+		{
+			if (entry.path().extension() == ".dll")
+				std::filesystem::copy_file(entry.path(), buildDir / entry.path().filename(),
+					std::filesystem::copy_options::overwrite_existing);
+		}
+
+		// ---------- Step 3: Engine content ----------
+		// Place engine content at Build/Content/ so the standalone game finds it via VFS /engine
+		auto engineContent = ProjectUtils::GetEngineContentPath();
+		if (std::filesystem::exists(engineContent))
+		{
+			auto targetContent = buildDir / "Content";
+			std::filesystem::copy(engineContent, targetContent,
+				std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing);
+			// Also produce a .pak for the VFS fast path
+			PakFile::Pack(engineContent, buildDir / "Content.pak");
+		}
+
+		// ---------- Step 4: Project content ----------
+		// Place the project file and content under Build/<ProjectName>/
+		// The launch script runs: CandyGame.exe "<ProjectName>/<ProjectName>.candyproj"
+		auto projectName = project->GetName();
+		auto projectDestDir = buildDir / projectName;
+		std::filesystem::create_directories(projectDestDir);
+
+		// Copy the .candyproj file
+		auto srcProj = project->GetProjectFileName();
+		if (std::filesystem::exists(srcProj))
+			std::filesystem::copy_file(srcProj, projectDestDir / srcProj.filename(),
+				std::filesystem::copy_options::overwrite_existing);
+
+		// Copy project content
+		auto projectContent = project->GetProjectDirectory() / "Content";
+		if (std::filesystem::exists(projectContent))
+		{
+			auto destContent = projectDestDir / "Content";
+			std::filesystem::copy(projectContent, destContent,
+				std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing);
+			// Also produce a .pak for the VFS fast path
+			PakFile::Pack(projectContent, projectDestDir / "Content.pak");
+		}
+
+		// ---------- Step 5: Launch script ----------
+		{
+			auto batPath = buildDir / "Launch.bat";
+			std::ofstream batFile(batPath);
+			batFile << "@echo off\r\n";
+			batFile << "start \"\" \"" << gameExeName << "\" \""
+				<< projectName << "/" << srcProj.filename().string() << "\"\r\n";
+			batFile.close();
+		}
+
+		// ---------- Step 6: Report packaged contents ----------
+		CANDY_CORE_INFO("Game packaged to: {0}", buildDir.string());
+		CANDY_CORE_INFO("Packaged contents:");
+		std::error_code ec;
+		for (auto it = std::filesystem::recursive_directory_iterator(buildDir, ec);
+			it != std::filesystem::recursive_directory_iterator() && !ec; ++it)
+		{
+			auto rel = std::filesystem::relative(it->path(), buildDir, ec);
+			if (!ec)
+				CANDY_CORE_INFO("  {0}", rel.string());
+		}
+
+		// Open the output folder in the system file explorer
+		FileDialogs::OpenInShell(buildDir.string());
+	}
+
+	void EditorLayer::BuildGame_ContentOnly()
+	{
+		auto project = Application::Get().GetProject();
+		if (!project)
+		{
+			CANDY_CORE_ERROR("No project open. Open a project before building.");
+			return;
+		}
+
+		// Resolve paths
+		auto& settings = ProjectSettings::Get();
+		auto engineRoot = ProjectUtils::GetEnginePath().parent_path();
+		auto buildOutputDir = "Dist-windows-x86_64";
+		auto binDir = engineRoot / "bin" / buildOutputDir / "CandyGame";
+		auto binExe = binDir / "CandyGame.exe";
+
+		if (!std::filesystem::exists(binExe))
+		{
+			CANDY_CORE_ERROR("CandyGame.exe not found at {0}. Build the project in Dist mode first.", binExe.string());
+			return;
+		}
+
+		// ---------- Step 1: Create output directory ----------
+		auto buildDir = m_BuildOutputPath.empty()
+			? (project->GetProjectDirectory() / "Build")
+			: std::filesystem::path(m_BuildOutputPath);
+		std::filesystem::create_directories(buildDir);
+
+		// ---------- Step 2: Copy game executable (renamed to project name) ----------
+		auto projectName = project->GetName();
+		auto gameExeName = projectName + ".exe";
+		std::filesystem::copy_file(binExe, buildDir / gameExeName,
+			std::filesystem::copy_options::overwrite_existing);
+
+		// ---------- Step 3: Copy all DLLs from the build output directory ----------
+		for (auto& entry : std::filesystem::directory_iterator(binDir))
+		{
+			if (entry.path().extension() == ".dll")
+				std::filesystem::copy_file(entry.path(), buildDir / entry.path().filename(),
+					std::filesystem::copy_options::overwrite_existing);
+		}
+
+		// Also copy python314.zip and ._pth if they exist
+		for (auto& entry : std::filesystem::directory_iterator(binDir))
+		{
+			auto ext = entry.path().extension();
+			if (ext == ".zip" || ext == "._pth")
+				std::filesystem::copy_file(entry.path(), buildDir / entry.path().filename(),
+					std::filesystem::copy_options::overwrite_existing);
+		}
+
+		// ---------- Step 4: Create a single .pak with all content ----------
+		// Structure inside the pak:
+		//   engine/        ← engine Content/ files
+		//   project/       ← project Content/ files
+		//   project/Config/  ← project Config/ files (ProjectSetting.candy)
+		//   project.candyproj  ← project descriptor (Name only)
+		auto engineContent = ProjectUtils::GetEngineContentPath();
+		auto projectContent = project->GetProjectDirectory() / "Content";
+		auto projFile = project->GetProjectFileName();
+
+		// Use a temp staging directory to assemble the content
+		auto stagingDir = buildDir / ".staging";
+		std::filesystem::remove_all(stagingDir);
+		std::filesystem::create_directories(stagingDir / "engine");
+		std::filesystem::create_directories(stagingDir / "project");
+
+		// Copy engine content into staging/engine/
+		if (std::filesystem::exists(engineContent))
+		{
+			std::filesystem::copy(engineContent, stagingDir / "engine",
+				std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing);
+		}
+
+		// Copy project content into staging/project/
+		if (std::filesystem::exists(projectContent))
+		{
+			std::filesystem::copy(projectContent, stagingDir / "project",
+				std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing);
+		}
+
+		// Copy project Config/ into staging/project/Config/
+		auto projectConfig = project->GetProjectDirectory() / "Config";
+		if (std::filesystem::exists(projectConfig))
+		{
+			std::filesystem::copy(projectConfig, stagingDir / "project" / "Config",
+				std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing);
+		}
+
+		// Copy the .candyproj file to staging root
+		if (std::filesystem::exists(projFile))
+		{
+			std::filesystem::copy_file(projFile, stagingDir / "project.candyproj",
+				std::filesystem::copy_options::overwrite_existing);
+		}
+
+		// Pack the staging directory into a single .pak
+		auto pakPath = buildDir / (projectName + ".pak");
+		CANDY_CORE_INFO("Packing content into {0}...", pakPath.string());
+		if (!PakFile::Pack(stagingDir, pakPath))
+		{
+			CANDY_CORE_ERROR("Failed to create content pak.");
+			std::filesystem::remove_all(stagingDir);
+			return;
+		}
+
+		// Clean up staging
+		std::filesystem::remove_all(stagingDir);
+
+		// ---------- Step 5: Report ----------
+		CANDY_CORE_INFO("Game packaged to: {0}", buildDir.string());
+		CANDY_CORE_INFO("Packaged contents:");
+		std::error_code ec;
+		for (auto it = std::filesystem::recursive_directory_iterator(buildDir, ec);
+			it != std::filesystem::recursive_directory_iterator() && !ec; ++it)
+		{
+			auto rel = std::filesystem::relative(it->path(), buildDir, ec);
+			if (!ec)
+				CANDY_CORE_INFO("  {0}", rel.string());
+		}
+
+		FileDialogs::OpenInShell(buildDir.string());
 	}
 }

@@ -1,4 +1,4 @@
-Scene: TestScene
+Scene: Scenes/TestScene
 Entities:
   - Entity: 11875080259632199413
     TagComponent:
@@ -60,3 +60,20 @@ Entities:
       Scale: [6, 0.00999999978, 1]
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
+  - Entity: 14928661418593733998
+    TagComponent:
+      Tag: Camera
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    CameraComponent:
+      Camera:
+        ProjectionType: 1
+        PerspectiveFOV: 0.785398185
+        PerspectiveNear: 0.00999999978
+        PerspectiveFar: 1000
+        OrthographicSize: 5
+        OrthographicNear: -1
+        OrthographicFar: 1
+      FixedAspectRatio: false

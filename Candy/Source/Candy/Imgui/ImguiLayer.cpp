@@ -36,8 +36,12 @@ namespace Candy {
 		std::filesystem::create_directories("Saved");
 		io.IniFilename = "Saved/imgui.ini";
 
-		io.Fonts->AddFontFromFileTTF("Assets/fonts/opensans/OpenSans-Bold.ttf", 18.0f);
-		io.FontDefault = io.Fonts->AddFontFromFileTTF("Assets/fonts/opensans/OpenSans-Regular.ttf", 18.0f);
+		if (std::filesystem::exists("Assets/fonts/opensans/OpenSans-Bold.ttf"))
+			io.Fonts->AddFontFromFileTTF("Assets/fonts/opensans/OpenSans-Bold.ttf", 18.0f);
+		if (std::filesystem::exists("Assets/fonts/opensans/OpenSans-Regular.ttf"))
+			io.FontDefault = io.Fonts->AddFontFromFileTTF("Assets/fonts/opensans/OpenSans-Regular.ttf", 18.0f);
+		else
+			io.FontDefault = io.Fonts->AddFontDefault();
 
 		// Setup Dear ImGui style
 		ImGui::StyleColorsDark();
@@ -112,7 +116,10 @@ namespace Candy {
 	{
 		ImGuiIO& io = ImGui::GetIO();
 		io.Fonts->ClearFonts();
-		io.FontDefault = io.Fonts->AddFontFromFileTTF(fontPath.c_str());
+		if (std::filesystem::exists(fontPath))
+			io.FontDefault = io.Fonts->AddFontFromFileTTF(fontPath.c_str());
+		else
+			io.FontDefault = io.Fonts->AddFontDefault();
 	}
 
 	void ImGuiLayer::SetDarkThemeColors()

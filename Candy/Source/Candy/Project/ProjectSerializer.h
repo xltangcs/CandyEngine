@@ -12,6 +12,7 @@ namespace Candy {
 
 		void Serialize(const std::filesystem::path& filepath);
 		bool Deserialize(const std::filesystem::path& filepath);
+		bool Deserialize(const std::string& yamlContent, const std::string& vfsPath);
 	private:
 		Ref<Project> m_Project;
 	};

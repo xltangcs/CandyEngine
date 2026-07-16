@@ -46,6 +46,8 @@ namespace Candy {
 
 		// Project
 		void OpenRecent(const std::filesystem::path& path);
+		void BuildGame();
+		void UI_BuildDialog();
 
 		// UI Panels
 		void UI_Toolbar();
@@ -93,6 +95,14 @@ namespace Candy {
 
 		bool m_SceneDirty = false;
 		std::vector<RecentProjectEntry> m_RecentProjects;
+
+		void BuildGame_Full();
+		void BuildGame_ContentOnly();
+
+		// Build / package dialog state
+		bool m_ShowBuildDialog = false;
+		std::string m_BuildOutputPath;
+		int m_BuildMode = 0; // 0 = Content Only, 1 = Full Build (MSBuild)
 	};
 
 }

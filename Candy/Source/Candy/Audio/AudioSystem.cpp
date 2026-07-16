@@ -6,8 +6,10 @@
 #include "Candy/Scene/Entity.h"
 #include "Candy/Scene/Components.h"
 #include "Candy/Project/ProjectUtils.h"
+#include "Candy/Core/FileSystem.h"
 
 #include "miniaudio.h"
+#include <fstream>
 
 namespace Candy {
 
@@ -24,6 +26,26 @@ namespace Candy {
 					auto soundPath = std::filesystem::path(asc.SoundPath);
 					if (soundPath.is_relative())
 						soundPath = std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / soundPath);
+
+					// VFS fallback: if the file is not on disk (standalone / pak mode),
+					// extract it from the VFS to a temp directory.
+					if (!std::filesystem::exists(soundPath))
+					{
+						auto vfsPath = "/project/" + asc.SoundPath;
+						auto data = FileSystem::Get().Read(vfsPath);
+						if (data)
+						{
+							auto tempDir = std::filesystem::temp_directory_path() / "CandyGame";
+							auto tempPath = tempDir / asc.SoundPath;
+							std::filesystem::create_directories(tempPath.parent_path());
+							{
+								std::ofstream out(tempPath, std::ios::binary);
+								out.write(reinterpret_cast<const char*>(data->data()), data->size());
+							}
+							CANDY_CORE_INFO("Extracted audio to temp: {0}", tempPath.string());
+							soundPath = tempPath;
+						}
+					}
 
 					ma_engine* engine = AudioEngine::GetEngineHandle();
 					if (engine)

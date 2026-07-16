@@ -3,6 +3,8 @@
 #include "Candy/Utils/PlatformUtils.h"
 
 #include <commdlg.h>
+#include <shellapi.h>
+#include <windows.h>
 #include <shlobj.h>
 #include <shobjidl.h>
 #include <objbase.h>
@@ -99,6 +101,19 @@ namespace Candy {
 		}
 		pFileOpen->Release();
 		return result;
+	}
+
+	void FileDialogs::OpenInShell(const std::string& path)
+	{
+		ShellExecuteA(nullptr, "explore", path.c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
+	}
+
+	std::string GetExecutableDirectory()
+	{
+		wchar_t buf[MAX_PATH];
+		GetModuleFileNameW(nullptr, buf, MAX_PATH);
+		std::filesystem::path exePath(buf);
+		return exePath.parent_path().string();
 	}
 
 }

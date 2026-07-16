@@ -19,17 +19,23 @@ namespace Candy {
 
 	Ref<Project> Project::Load(const std::filesystem::path& projectFile)
 	{
-		if (!std::filesystem::exists(projectFile))
-		{
-			CANDY_CORE_ERROR("Project file does not exist: {0}", projectFile.string());
-			return nullptr;
-		}
-
 		Ref<Project> project = Ref<Project>(new Project());
 		ProjectSerializer serializer(project);
 		if (!serializer.Deserialize(projectFile))
 		{
 			CANDY_CORE_ERROR("Failed to deserialize project file: {0}", projectFile.string());
+			return nullptr;
+		}
+		return project;
+	}
+
+	Ref<Project> Project::LoadFromVfs(const std::string& yamlContent, const std::string& vfsProjectPath)
+	{
+		Ref<Project> project = Ref<Project>(new Project());
+		ProjectSerializer serializer(project);
+		if (!serializer.Deserialize(yamlContent, vfsProjectPath))
+		{
+			CANDY_CORE_ERROR("Failed to deserialize project from VFS: {0}", vfsProjectPath);
 			return nullptr;
 		}
 		return project;

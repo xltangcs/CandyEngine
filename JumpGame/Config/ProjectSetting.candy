@@ -1,4 +1,5 @@
 ProjectSettings:
-  DefaultScene: Scenes\TestScene.candy
+  DefaultScene: Scenes/TestScene.candy
   DefaultWidth: 1280
   DefaultHeight: 720
+  GameProjectName: CandyGame

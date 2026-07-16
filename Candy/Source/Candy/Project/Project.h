@@ -12,6 +12,7 @@ namespace Candy {
 	public:
 		static Ref<Project> New(const std::filesystem::path& directory, const std::string& name);
 		static Ref<Project> Load(const std::filesystem::path& projectFile);
+		static Ref<Project> LoadFromVfs(const std::string& yamlContent, const std::string& vfsProjectPath);
 		void Save();
 
 		const std::string& GetName() const { return m_Name; }

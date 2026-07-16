@@ -51,6 +51,92 @@ namespace Candy {
 		return pak;
 	}
 
+	bool PakFile::Pack(const std::filesystem::path& inputDir, const std::filesystem::path& outputPak)
+	{
+		if (!std::filesystem::is_directory(inputDir))
+		{
+			CANDY_CORE_ERROR("PakFile::Pack failed: input directory does not exist: {0}", inputDir.string());
+			return false;
+		}
+
+		// Collect files relative to inputDir
+		struct Entry
+		{
+			std::string path;
+			uint64_t size = 0;
+		};
+		std::vector<Entry> entries;
+		for (auto& e : std::filesystem::recursive_directory_iterator(inputDir))
+		{
+			if (!e.is_regular_file())
+				continue;
+			Entry entry;
+			entry.path = std::filesystem::relative(e.path(), inputDir).generic_string();
+			entry.size = std::filesystem::file_size(e.path());
+			entries.push_back(entry);
+		}
+
+		uint32_t entryCount = static_cast<uint32_t>(entries.size());
+
+		// Layout: header (MAGIC + VERSION + entryCount) + entry table + file data
+		uint64_t headerSize = sizeof(PAK_MAGIC) + sizeof(PAK_VERSION) + sizeof(entryCount);
+		uint64_t entryTableSize = 0;
+		for (auto& e : entries)
+		{
+			entryTableSize += sizeof(uint32_t); // pathLen
+			entryTableSize += e.path.size();    // path
+			entryTableSize += sizeof(uint64_t); // offset
+			entryTableSize += sizeof(uint64_t); // size
+		}
+
+		uint64_t dataOffset = headerSize + entryTableSize;
+		uint64_t currentOffset = dataOffset;
+		std::vector<uint64_t> offsets(entries.size());
+		for (size_t i = 0; i < entries.size(); i++)
+		{
+			offsets[i] = currentOffset;
+			currentOffset += entries[i].size;
+		}
+
+		std::ofstream out(outputPak, std::ios::binary | std::ios::trunc);
+		if (!out.is_open())
+		{
+			CANDY_CORE_ERROR("PakFile::Pack failed: cannot create output file: {0}", outputPak.string());
+			return false;
+		}
+
+		// Header
+		out.write(reinterpret_cast<const char*>(&PAK_MAGIC), sizeof(PAK_MAGIC));
+		out.write(reinterpret_cast<const char*>(&PAK_VERSION), sizeof(PAK_VERSION));
+		out.write(reinterpret_cast<const char*>(&entryCount), sizeof(entryCount));
+
+		// Entry table
+		for (size_t i = 0; i < entries.size(); i++)
+		{
+			uint32_t pathLen = static_cast<uint32_t>(entries[i].path.size());
+			out.write(reinterpret_cast<const char*>(&pathLen), sizeof(pathLen));
+			out.write(entries[i].path.data(), pathLen);
+			out.write(reinterpret_cast<const char*>(&offsets[i]), sizeof(uint64_t));
+			out.write(reinterpret_cast<const char*>(&entries[i].size), sizeof(uint64_t));
+		}
+
+		// File data
+		for (size_t i = 0; i < entries.size(); i++)
+		{
+			std::ifstream in(inputDir / entries[i].path, std::ios::binary);
+			if (!in.is_open())
+			{
+				CANDY_CORE_ERROR("PakFile::Pack failed: cannot read file: {0}", (inputDir / entries[i].path).string());
+				return false;
+			}
+			out << in.rdbuf();
+		}
+
+		out.close();
+		CANDY_CORE_INFO("PakFile::Pack packed {0} files into {1} ({2} bytes)", entryCount, outputPak.string(), currentOffset);
+		return true;
+	}
+
 	bool PakFile::HasFile(const std::string& relativePath) const
 	{
 		return m_Entries.find(relativePath) != m_Entries.end();

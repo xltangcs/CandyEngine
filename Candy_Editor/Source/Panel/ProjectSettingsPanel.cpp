@@ -53,6 +53,13 @@ namespace Candy {
 			if (ImGui::InputInt("##DefaultHeight", (int*)&settings.DefaultHeight))
 				settings.Save();
 
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text("Game Project");
+			ImGui::TableSetColumnIndex(1);
+			ImGui::InputText("##GameProjectName", &settings.GameProjectName);
+			if (ImGui::IsItemDeactivatedAfterEdit())
+				settings.Save();
 			ImGui::EndTable();
 		}
 

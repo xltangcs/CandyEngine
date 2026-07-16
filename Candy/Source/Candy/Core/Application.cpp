@@ -6,6 +6,7 @@
 #include "Candy/Core/FileSystem.h"
 #include "Candy/Renderer/Renderer.h"
 #include "Candy/Project/ProjectSerializer.h"
+#include "Candy/Project/ProjectSettings.h"
 
 #include <glfw/glfw3.h>
 
@@ -21,9 +22,21 @@ namespace Candy {
 		m_Window = Window::Create(WindowProps(name));
 		m_Window->SetEventCallback(CANDY_BIND_EVENT_FN(Application::OnEvent));
 
-		// Mount engine content
+		// Mount engine content: prefer a packed .pak, fall back to the directory.
+		// In editor mode the path resolves relative to the Candy_Editor project folder.
+		// In standalone mode (packaged game) Content sits next to the executable.
 		auto enginePath = std::filesystem::path("..") / "Candy" / "Content";
-		if (std::filesystem::exists(enginePath))
+		{
+			auto checkPak = enginePath;
+			checkPak.replace_extension(".pak");
+			if (!std::filesystem::exists(enginePath) && !std::filesystem::exists(checkPak))
+				enginePath = "Content";
+		}
+		auto enginePak = enginePath;
+		enginePak.replace_extension(".pak");
+		if (std::filesystem::exists(enginePak))
+			FileSystem::Get().Mount("/engine", enginePak);
+		else if (std::filesystem::exists(enginePath))
 			FileSystem::Get().Mount("/engine", enginePath);
 
 		Renderer::Init();
@@ -131,11 +144,37 @@ namespace Candy {
 			m_ActiveProject = project;
 			UpdateWindowTitle();
 
-			// Mount project content
+			// Mount project content: prefer a packed .pak, fall back to the directory
 			auto contentDir = project->GetProjectDirectory() / "Content";
-			if (std::filesystem::exists(contentDir))
+			auto contentPak = project->GetProjectDirectory() / "Content.pak";
+			if (std::filesystem::exists(contentPak))
+				FileSystem::Get().Mount("/project", contentPak);
+			else if (std::filesystem::exists(contentDir))
 				FileSystem::Get().Mount("/project", contentDir);
 		}
+	}
+
+	void Application::LoadProjectFromVfs(const std::string& vfsProjectPath)
+	{
+		auto yamlContent = FileSystem::Get().ReadText(vfsProjectPath);
+		if (!yamlContent)
+		{
+			CANDY_CORE_ERROR("Failed to read project file from VFS: {0}", vfsProjectPath);
+			return;
+		}
+
+		auto project = Project::LoadFromVfs(*yamlContent, vfsProjectPath);
+		if (project)
+		{
+			m_ActiveProject = project;
+			UpdateWindowTitle();
+			// Content is already mounted via the single pak at /
+		}
+
+		// Load ProjectSettings from VFS (Config/ProjectSetting.candy inside the pak)
+		auto configYaml = FileSystem::Get().ReadText("/project/Config/ProjectSetting.candy");
+		if (configYaml)
+			ProjectSettings::Get().LoadFromString(*configYaml);
 	}
 
 	void Application::CreateProject(const std::filesystem::path& directory, const std::string& name)

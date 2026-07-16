@@ -6,11 +6,13 @@
 #include "Candy/Scene/Components.h"
 #include "Candy/Core/Timestep.h"
 #include "Candy/Core/UUID.h"
+#include "Candy/Core/FileSystem.h"
 #include "Candy/Project/ProjectUtils.h"
 
 #include <pybind11/embed.h>
 
 #include <filesystem>
+#include <fstream>
 #include <windows.h>
 
 namespace py = pybind11;
@@ -53,11 +55,13 @@ void ScriptSystem::InitPython()
 
     Py_Initialize();
 
-    // Resolve scripts directory: project Content/Scripts
+    // Resolve scripts directory: project Content/Scripts (filesystem path)
     std::filesystem::path scriptsDir = std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / "Scripts");
-
-    py::module_ sys = py::module_::import("sys");
-    sys.attr("path").attr("append")(scriptsDir.string());
+    if (std::filesystem::exists(scriptsDir))
+    {
+        py::module_ sys = py::module_::import("sys");
+        sys.attr("path").attr("append")(scriptsDir.string());
+    }
 
     m_PythonInitialized = true;
 }
@@ -103,10 +107,37 @@ void ScriptSystem::InstantiateScript(Entity& entity)
     {
         // Resolve script file to absolute path
         std::filesystem::path scriptFullPath = ResolveScriptPath(sc.ScriptPath);
+
+        // VFS fallback: if the script is not on disk (standalone / pak mode),
+        // extract it from the VFS to a temp directory before handing it to Python.
         if (!std::filesystem::exists(scriptFullPath))
         {
-            CANDY_CORE_ERROR("Script file not found: {0}", scriptFullPath.string());
-            return;
+            auto vfsPath = "/project/" + sc.ScriptPath;
+            auto data = FileSystem::Get().Read(vfsPath);
+            if (data)
+            {
+                auto tempDir = std::filesystem::temp_directory_path() / "CandyGame";
+                scriptFullPath = tempDir / sc.ScriptPath;
+                std::filesystem::create_directories(scriptFullPath.parent_path());
+                {
+                    std::ofstream out(scriptFullPath, std::ios::binary);
+                    out.write(reinterpret_cast<const char*>(data->data()), data->size());
+                }
+                CANDY_CORE_INFO("Extracted script to temp: {0}", scriptFullPath.string());
+
+                // Add the temp scripts dir to Python's sys.path once (for import statements)
+                if (m_TempScriptsDir.empty())
+                {
+                    m_TempScriptsDir = tempDir;
+                    py::module_ sys = py::module_::import("sys");
+                    sys.attr("path").attr("append")(m_TempScriptsDir.string());
+                }
+            }
+            else
+            {
+                CANDY_CORE_ERROR("Script file not found: {0} (also tried VFS {1})", ResolveScriptPath(sc.ScriptPath).string(), vfsPath);
+                return;
+            }
         }
 
         // Use importlib to load the script by file path (bypasses sys.path)

@@ -1,9 +1,13 @@
 #include "GameLayer.h"
 
+#include <algorithm>
+
 #include "Candy/Renderer/Renderer2D.h"
 #include "Candy/Renderer/RenderCommand.h"
 #include "Candy/Project/Project.h"
+#include "Candy/Project/ProjectSettings.h"
 #include "Candy/Project/ProjectUtils.h"
+#include "Candy/Core/FileSystem.h"
 
 namespace Candy {
 
@@ -23,26 +27,35 @@ namespace Candy {
 
 		m_ActiveScene = CreateRef<Scene>();
 
-		auto scenePath = project->GetFullStartScenePath();
-		// auto scenePath = ProjectUtils::GetProjectContentPath() / ProjectSettings::Get().DefaultScene;
-		if (std::filesystem::exists(scenePath))
+		auto sceneName = ProjectSettings::Get().DefaultScene;
+		if (sceneName.empty())
 		{
-			SceneSerializer serializer(m_ActiveScene);
-			if (serializer.Deserialize(scenePath.string()))
-			{
-				CANDY_CORE_INFO("Loaded scene: {0}", scenePath.string());
-			}
-			else
-			{
-				CANDY_CORE_ERROR("Failed to load scene: {0}", scenePath.string());
-			}
-		}
-		else
-		{
-			CANDY_CORE_WARN("Start scene not found: {0}", scenePath.string());
+			CANDY_CORE_ERROR("No DefaultScene set in Config/ProjectSetting.candy");
+			return;
 		}
 
-		m_ActiveScene->OnRuntimeStart();
+		// Normalize to forward slashes for VFS path matching
+		std::replace(sceneName.begin(), sceneName.end(), '\\', '/');
+
+		auto vfsScenePath = "/project/" + sceneName;
+		if (FileSystem::Get().Exists(vfsScenePath))
+		{
+			auto yamlContent = FileSystem::Get().ReadText(vfsScenePath);
+			if (yamlContent)
+			{
+				SceneSerializer serializer(m_ActiveScene);
+				if (serializer.DeserializeFromString(*yamlContent))
+				{
+					CANDY_CORE_INFO("Loaded scene from VFS: {0}", vfsScenePath);
+					auto& window = Application::Get().GetWindow();
+					m_ActiveScene->OnViewportResize(window.GetWidth(), window.GetHeight());
+					m_ActiveScene->OnRuntimeStart();
+					return;
+				}
+			}
+		}
+
+		CANDY_CORE_ERROR("Scene not found in VFS: {0}", vfsScenePath);
 	}
 
 	void GameLayer::OnDetach()

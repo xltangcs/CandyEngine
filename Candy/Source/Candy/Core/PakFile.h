@@ -23,6 +23,10 @@ namespace Candy {
 
 		static Ref<PakFile> Open(const std::filesystem::path& pakPath);
 
+		// Pack a directory into a .pak file using the same on-disk format as PakTool.
+		// Returns true on success. The .pak is overwritten if it already exists.
+		static bool Pack(const std::filesystem::path& inputDir, const std::filesystem::path& outputPak);
+
 		bool HasFile(const std::string& relativePath) const;
 		std::optional<std::vector<uint8_t>> ReadFile(const std::string& relativePath) const;
 

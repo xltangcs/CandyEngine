@@ -38,6 +38,7 @@ namespace Candy {
 		// Project management
 		Ref<Project> GetProject() const { return m_ActiveProject; }
 		void LoadProject(const std::filesystem::path& projectFile);
+		void LoadProjectFromVfs(const std::string& vfsProjectPath);
 		void CreateProject(const std::filesystem::path& directory, const std::string& name);
 		void CloseProject();
 		bool IsProjectLoaded() const { return m_ActiveProject != nullptr; }

@@ -18,7 +18,6 @@ namespace Candy {
 		out << YAML::Key << "Project" << YAML::Value;
 		out << YAML::BeginMap;
 		out << YAML::Key << "Name" << YAML::Value << m_Project->GetName();
-		out << YAML::Key << "DefaultScene" << YAML::Value << m_Project->GetDefaultScene();
 		out << YAML::EndMap;
 		out << YAML::EndMap;
 
@@ -28,6 +27,12 @@ namespace Candy {
 
 	bool ProjectSerializer::Deserialize(const std::filesystem::path& filepath)
 	{
+		if (!std::filesystem::exists(filepath))
+		{
+			CANDY_CORE_ERROR("Project file does not exist: {0}", filepath.string());
+			return false;
+		}
+
 		YAML::Node data;
 		try
 		{
@@ -49,8 +54,31 @@ namespace Candy {
 		m_Project->m_Name = projectNode["Name"].as<std::string>();
 		m_Project->m_ProjectFileName = std::filesystem::absolute(filepath);
 
-		if (projectNode["DefaultScene"])
-			m_Project->m_DefaultScene = projectNode["DefaultScene"].as<std::string>();
+		return true;
+	}
+
+	bool ProjectSerializer::Deserialize(const std::string& yamlContent, const std::string& vfsPath)
+	{
+		YAML::Node data;
+		try
+		{
+			data = YAML::Load(yamlContent);
+		}
+		catch (const std::exception& e)
+		{
+			CANDY_CORE_ERROR("Failed to parse project YAML from VFS '{0}': {1}", vfsPath, e.what());
+			return false;
+		}
+
+		if (!data["Project"])
+		{
+			CANDY_CORE_ERROR("Project YAML is missing root 'Project' key");
+			return false;
+		}
+
+		auto projectNode = data["Project"];
+		m_Project->m_Name = projectNode["Name"].as<std::string>();
+		m_Project->m_ProjectFileName = vfsPath;
 
 		return true;
 	}

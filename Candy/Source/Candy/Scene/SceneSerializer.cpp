@@ -385,6 +385,26 @@ namespace Candy {
 			return false;
 		}
 
+		return DeserializeNode(data);
+	}
+
+	bool SceneSerializer::DeserializeFromString(const std::string& yamlContent)
+	{
+		YAML::Node data;
+		try
+		{
+			data = YAML::Load(yamlContent);
+		}
+		catch (YAML::ParserException e)
+		{
+			return false;
+		}
+
+		return DeserializeNode(data);
+	}
+
+	bool SceneSerializer::DeserializeNode(YAML::Node& data)
+	{
 		if (!data["Scene"])
 			return false;
 
@@ -396,7 +416,7 @@ namespace Candy {
 		{
 			for (auto entity : entities)
 			{
-				uint64_t uuid = entity["Entity"].as<uint64_t>(); 
+				uint64_t uuid = entity["Entity"].as<uint64_t>();
 
 				std::string name;
 				auto tagComponent = entity["TagComponent"];
@@ -406,11 +426,9 @@ namespace Candy {
 				CANDY_CORE_TRACE("Deserialized entity with ID = {0}, name = {1}", uuid, name);
 
 				Entity deserializedEntity = m_Scene->CreateEntityWithUUID(uuid, name);
-				//Entity deserializedEntity = m_Scene->CreateEntity(name);
 				auto transformComponent = entity["TransformComponent"];
 				if (transformComponent)
 				{
-					// Entities always have transforms
 					auto& tc = deserializedEntity.GetComponent<TransformComponent>();
 					tc.Translation = transformComponent["Translation"].as<glm::vec3>();
 					tc.Rotation = transformComponent["Rotation"].as<glm::vec3>();
