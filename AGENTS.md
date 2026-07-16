@@ -8,7 +8,7 @@
 git submodule update --init --recursive
 .\Scripts\GenerateProjects.bat    # premake5 → .sln/.vcxproj (均 gitignored)
 msbuild CandyEngine.sln /p:Configuration=Debug
-.\bin\Debug-windows-x86_64\Candy_Editor\Candy_Editor.exe
+.\bin\Debug-windows-x86_64\CandyEditor\CandyEditor.exe
 ```
 
 - `premake5.lua` 是唯一真实构建来源，**不要手动编辑生成的 .sln/.vcxproj**
@@ -37,7 +37,7 @@ msbuild CandyEngine.sln /p:Configuration=Debug
 | 目录 | 目标 | 类型 | 用途 |
 |---|---|---|---|
 | `Candy/Source/` | `Candy` | 静态库 | 引擎核心 |
-| `Candy_Editor/Source/` | `Candy_Editor` | ConsoleApp | 编辑器（链接 `Candy`） |
+| `CandyEditor/Source/` | `CandyEditor` | ConsoleApp | 编辑器（链接 `Candy`） |
 | `Sandbox/Source/` | `Sandbox` | ConsoleApp | 测试 demo（默认不构建） |
 
 ## Entry Point

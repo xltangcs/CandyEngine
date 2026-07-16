@@ -1,4 +1,4 @@
-project "Candy_Editor"
+project "CandyEditor"
 	kind "ConsoleApp"
 	language "C++"
 	cppdialect "C++17"
@@ -18,7 +18,7 @@ project "Candy_Editor"
 		"%{wks.location}/Candy/ThirdParty/spdlog/include",
 		"%{wks.location}/Candy/Source",
 		"%{wks.location}/Candy/ThirdParty",
-		"%{wks.location}/Candy_Editor/Source",
+		"%{wks.location}/CandyEditor/Source",
 
 		"%{IncludeDir.glm}",
 		"%{IncludeDir.entt}",

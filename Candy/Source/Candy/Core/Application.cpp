@@ -23,7 +23,7 @@ namespace Candy {
 		m_Window->SetEventCallback(CANDY_BIND_EVENT_FN(Application::OnEvent));
 
 		// Mount engine content: prefer a packed .pak, fall back to the directory.
-		// In editor mode the path resolves relative to the Candy_Editor project folder.
+		// In editor mode the path resolves relative to the CandyEditor project folder.
 		// In standalone mode (packaged game) Content sits next to the executable.
 		auto enginePath = std::filesystem::path("..") / "Candy" / "Content";
 		{

@@ -1,6 +1,6 @@
 workspace "CandyEngine"		-- sln文件名
 	architecture "x64"	
-	startproject "Candy_Editor"
+	startproject "CandyEditor"
 	configurations{
 		"Debug",
 		"Release",
@@ -42,7 +42,7 @@ group "Dependencies"
 group ""
 
 include "Candy"
-include "Candy_Editor"
+include "CandyEditor"
 include "CandyGame"
 include "PakTool"
 --include "Sandbox"
