@@ -2,37 +2,37 @@
 
 //for use by Candy application
 
-#include "Candy/Core/Assert.h"
-#include "Candy/Core/Base.h"
-#include "Candy/Core/Application.h"
-#include "Candy/Core/Log.h"
-#include "Candy/Core/Layer.h"
-#include "Candy/Core/Input.h"
-#include "Candy/Core/KeyCodes.h"
-#include "Candy/Core/MouseCodes.h"
-#include "Candy/Core/Timestep.h"
+#include "Runtime/Core/Assert.h"
+#include "Runtime/Core/Base.h"
+#include "Runtime/Core/Application.h"
+#include "Runtime/Core/Log.h"
+#include "Runtime/Core/Layer.h"
+#include "Runtime/Core/Input.h"
+#include "Runtime/Core/KeyCodes.h"
+#include "Runtime/Core/MouseCodes.h"
+#include "Runtime/Core/Timestep.h"
 
-#include "Candy/Imgui/ImguiLayer.h"
+#include "Runtime/Imgui/ImguiLayer.h"
 
-#include "Candy/Scene/Scene.h"
-#include "Candy/Scene/Entity.h"
-#include "Candy/Scene/Components.h"
-#include "Candy/Scene/ScriptableEntity.h"
+#include "Runtime/Scene/Scene.h"
+#include "Runtime/Scene/Entity.h"
+#include "Runtime/Scene/Components.h"
+#include "Runtime/Scene/ScriptableEntity.h"
 
 //-------------- Project ---------------
-#include "Candy/Project/Project.h"
+#include "Runtime/Project/Project.h"
 
 //-------------- Audio ---------------
-#include "Candy/Audio/AudioEngine.h"
+#include "Runtime/Audio/AudioEngine.h"
 
 //-------------- Renderer ---------------
-#include "Candy/Renderer/Renderer.h"
-#include "Candy/Renderer/Renderer2D.h"
-#include "Candy/Renderer/RenderCommand.h" 
-#include "Candy/Renderer/Buffer.h"
-#include "Candy/Renderer/Shader.h"
-#include "Candy/Renderer/Texture.h"
-#include "Candy/Renderer/VertexArray.h"
-#include "Candy/Renderer/Framebuffer.h"
-#include "Candy/Renderer/OrthographicCamera.h"
-#include "Candy/Renderer/OrthographicCameraController.h"
+#include "Runtime/Renderer/Renderer.h"
+#include "Runtime/Renderer/Renderer2D.h"
+#include "Runtime/Renderer/RenderCommand.h" 
+#include "Runtime/Renderer/Buffer.h"
+#include "Runtime/Renderer/Shader.h"
+#include "Runtime/Renderer/Texture.h"
+#include "Runtime/Renderer/VertexArray.h"
+#include "Runtime/Renderer/Framebuffer.h"
+#include "Runtime/Renderer/OrthographicCamera.h"
+#include "Runtime/Renderer/OrthographicCameraController.h"

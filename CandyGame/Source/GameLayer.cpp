@@ -2,12 +2,17 @@
 
 #include <algorithm>
 
-#include "Candy/Renderer/Renderer2D.h"
-#include "Candy/Renderer/RenderCommand.h"
-#include "Candy/Project/Project.h"
-#include "Candy/Project/ProjectSettings.h"
-#include "Candy/Project/ProjectUtils.h"
-#include "Candy/Core/FileSystem.h"
+#include "Runtime/Renderer/Renderer2D.h"
+#include "Runtime/Renderer/RenderCommand.h"
+#include "Runtime/Renderer/Framebuffer.h"
+#include "Runtime/Renderer/GameFrameRenderer.h"
+#include "Runtime/Project/Project.h"
+#include "Runtime/Project/ProjectSettings.h"
+#include "Runtime/Project/ProjectUtils.h"
+#include "Runtime/Core/FileSystem.h"
+
+#include <GLFW/glfw3.h>
+#include <imgui/imgui.h>
 
 namespace Candy {
 
@@ -48,7 +53,17 @@ namespace Candy {
 				{
 					CANDY_CORE_INFO("Loaded scene from VFS: {0}", vfsScenePath);
 					auto& window = Application::Get().GetWindow();
-					m_ActiveScene->OnViewportResize(window.GetWidth(), window.GetHeight());
+					auto w = window.GetWidth();
+					auto h = window.GetHeight();
+					m_ActiveScene->OnViewportResize(w, h);
+
+					// Create SwapChainTarget framebuffer (binds to framebuffer 0)
+					FramebufferSpecification fbSpec;
+					fbSpec.Width = w;
+					fbSpec.Height = h;
+					fbSpec.SwapChainTarget = true;
+					m_GameFramebuffer = Framebuffer::Create(fbSpec);
+
 					m_ActiveScene->OnRuntimeStart();
 					return;
 				}
@@ -66,17 +81,50 @@ namespace Candy {
 
 	void GameLayer::OnUpdate(Timestep ts)
 	{
-		if (!m_ActiveScene)
+		if (!m_ActiveScene || !m_GameFramebuffer)
 			return;
 
+		// Resize framebuffer if window changed
+		auto& window = Application::Get().GetWindow();
+		uint32_t w = window.GetWidth();
+		uint32_t h = window.GetHeight();
+		auto& spec = m_GameFramebuffer->GetSpecification();
+		if (spec.Width != w || spec.Height != h)
+			m_GameFramebuffer->Resize(w, h);
+
+		// Update logic (physics, scripts, audio)
+		m_ActiveScene->OnUpdateRuntimeLogic(ts);
+
+		// Render scene + UI into SwapChainTarget (framebuffer 0)
+		// Clear first -- RenderSceneTo no longer clears, caller controls clear order.
+		m_GameFramebuffer->Bind();
 		RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1 });
 		RenderCommand::Clear();
+		GameFrameRenderer::RenderSceneTo(*m_GameFramebuffer, *m_ActiveScene, nullptr);
 
-		m_ActiveScene->OnUpdateRuntime(ts);
+		// Mouse position in window coordinates (fullscreen game = 1:1)
+		float mouseX = (float)Input::GetMouseX();
+		float mouseY = (float)Input::GetMouseY();
+		bool mouseDown = Input::IsMouseButtonPressed(Mouse::ButtonLeft);
+
+		GameFrameRenderer::RenderUITo(*m_GameFramebuffer, *m_ActiveScene, mouseX, mouseY, mouseDown, ts.GetSeconds());
+
+		m_GameFramebuffer->Unbind();
 	}
 
 	void GameLayer::OnEvent(Event& e)
 	{
+		// Handle window resize for SwapChainTarget framebuffer
+		if (e.GetEventType() == EventType::WindowResize)
+		{
+			auto& re = (WindowResizeEvent&)e;
+			if (m_GameFramebuffer)
+				m_GameFramebuffer->Resize(re.GetWidth(), re.GetHeight());
+			// Update scene cameras' aspect ratio -- without this, the scene renders with
+			// the initial aspect and gets stretched when the window is resized.
+			if (m_ActiveScene)
+				m_ActiveScene->OnViewportResize(re.GetWidth(), re.GetHeight());
+		}
 	}
 
 }

@@ -1,9 +1,9 @@
 #pragma once
 
 #include "Candy.h"
-#include "Candy/Scene/Scene.h"
-#include "Candy/Scene/SceneSerializer.h"
-#include "Candy/Scene/Entity.h"
+#include "Runtime/Scene/Scene.h"
+#include "Runtime/Scene/SceneSerializer.h"
+#include "Runtime/Scene/Entity.h"
 
 namespace Candy {
 
@@ -20,6 +20,7 @@ namespace Candy {
 
 	private:
 		Ref<Scene> m_ActiveScene;
+		Ref<Framebuffer> m_GameFramebuffer;
 	};
 
 }

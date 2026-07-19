@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Candy/Core/Base.h"
+#include "Runtime/Core/Base.h"
 
 #ifdef CANDY_PLATFORM_WINDOWS
 	#ifndef NOMINMAX
@@ -22,8 +22,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "Candy/Core/Log.h"
-#include "Candy/Debug/Instrumentor.h"
+#include "Runtime/Core/Log.h"
+#include "Runtime/Debug/Instrumentor.h"
 
 #ifdef CANDY_PLATFORM_WINDOWS
 	#include <Windows.h>

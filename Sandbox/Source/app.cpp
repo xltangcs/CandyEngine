@@ -1,6 +1,6 @@
 #include "Candy.h"
 
-#include "Candy/Core/EntryPoint.h"
+#include "Runtime/Core/EntryPoint.h"
 
 #include "Sandbox2D.h"
 #include "EXampleLayer.h"

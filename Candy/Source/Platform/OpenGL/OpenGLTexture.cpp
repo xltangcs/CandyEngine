@@ -1,6 +1,7 @@
 #include "CandyPCH.h"
 
 #include "Platform/OpenGL/OpenGLTexture.h"
+#include "Runtime/Core/FileSystem.h"
 
 #include <stb_image.h>
 
@@ -26,8 +27,22 @@ namespace Candy {
 	{
 		CANDY_CORE_INFO("The Texture path is {0}", path);
 		int width, height, channels;
-		stbi_set_flip_vertically_on_load(1);
-		stbi_uc* data = stbi_load(path.c_str(), &width, &height, &channels, 0);
+		stbi_uc* data = nullptr;
+
+		if (!path.empty() && path[0] == '/')
+		{
+			auto fileData = FileSystem::Get().Read(path);
+			if (fileData && !fileData->empty())
+			{
+				stbi_set_flip_vertically_on_load(1);
+				data = stbi_load_from_memory(fileData->data(), (int)fileData->size(), &width, &height, &channels, 0);
+			}
+		}
+		else
+		{
+			stbi_set_flip_vertically_on_load(1);
+			data = stbi_load(path.c_str(), &width, &height, &channels, 0);
+		}
 
 		if (data)
 		{

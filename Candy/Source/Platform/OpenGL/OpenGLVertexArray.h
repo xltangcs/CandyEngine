@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Candy/Renderer/VertexArray.h"
+#include "Runtime/Renderer/VertexArray.h"
 
 namespace Candy {
 	class OpenGLVertexArray : public VertexArray

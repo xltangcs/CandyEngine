@@ -1,6 +1,6 @@
 #include "CandyPCH.h"
 
-#include "Candy/Utils/PlatformUtils.h"
+#include "Runtime/Utils/PlatformUtils.h"
 
 #include <commdlg.h>
 #include <shellapi.h>
@@ -12,7 +12,7 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 
-#include "Candy/Core/Application.h"
+#include "Runtime/Core/Application.h"
 
 namespace Candy {
 

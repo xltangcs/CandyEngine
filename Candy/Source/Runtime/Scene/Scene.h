@@ -1,0 +1,72 @@
+#pragma once
+
+#include "entt.hpp"
+
+#include "Runtime/Core/Timestep.h"
+#include "Runtime/Core/UUID.h"
+#include "Runtime/Renderer/EditorCamera.h"
+#include "Runtime/Scene/SceneCamera.h"
+#include "Runtime/Audio/AudioSystem.h"
+
+
+class b2World;
+
+namespace Candy {
+
+	class Entity;
+
+	class Scene
+	{
+	public:
+		Scene();
+		~Scene();
+
+		static Ref<Scene> Copy(Ref<Scene> other);
+
+		Entity CreateEntity(const std::string& name = std::string());
+		Entity CreateEntityWithUUID(UUID uuid, const std::string& name = std::string());
+		void DestroyEntity(Entity entity);
+
+		void OnRuntimeStart();
+		void OnRuntimeStop();
+
+		void OnSimulationStart();
+		void OnSimulationStop();
+
+		void OnUpdateRuntime(Timestep ts);
+		void OnUpdateRuntimeLogic(Timestep ts);
+		void RenderRuntimeScene();
+		void OnUpdateSimulation(Timestep ts, EditorCamera& camera);
+		void OnUpdateSimulationLogic(Timestep ts);
+		void OnUpdateEditor(Timestep ts, EditorCamera& camera);
+		void RenderScene(EditorCamera& camera);
+
+		void OnViewportResize(uint32_t width, uint32_t height);
+		void DuplicateEntity(Entity entity);
+		Entity GetPrimaryCameraEntity();
+		template<typename... Components>
+		auto GetAllEntitiesWith()
+		{
+			return m_Registry.view<Components...>();
+		}
+
+		entt::registry& GetRegistry() { return m_Registry; }
+		const entt::registry& GetRegistry() const { return m_Registry; }
+	private:
+		template<typename T>
+		void OnComponentAdded(Entity entity, T& component);
+
+		void OnPhysics2DStart();
+		void OnPhysics2DStop();
+	private:
+		entt::registry m_Registry;
+		uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
+
+		b2World* m_PhysicsWorld = nullptr;
+		SceneCamera m_FallbackCamera;
+
+		friend class Entity;
+		friend class SceneSerializer;
+		friend class SceneHierarchyPanel;
+	};
+}

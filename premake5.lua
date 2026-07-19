@@ -42,7 +42,7 @@ group "Dependencies"
 group ""
 
 include "Candy"
-include "CandyEditor"
+--include "CandyEditor"
 include "CandyGame"
 include "PakTool"
 --include "Sandbox"

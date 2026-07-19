@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Candy/Renderer/Shader.h"
+#include "Runtime/Renderer/Shader.h"
 #include <glm/glm.hpp>
 
 // TODO: REMOVE!

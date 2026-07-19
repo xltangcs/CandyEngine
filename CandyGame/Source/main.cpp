@@ -1,7 +1,8 @@
 #include <Candy.h>
-#include <Candy/Core/EntryPoint.h>
-#include <Candy/Core/FileSystem.h>
-#include <Candy/Utils/PlatformUtils.h>
+#include <Runtime/Core/EntryPoint.h>
+#include <Runtime/Core/FileSystem.h>
+#include <Runtime/Utils/PlatformUtils.h>
+#include <Runtime/Project/ProjectSettings.h>
 
 #include "GameLayer.h"
 
@@ -11,7 +12,7 @@ namespace Candy {
 	{
 	public:
 		CandyGameApp(int argc, char** argv)
-			: Application("Candy Game")
+			: Application("Candy Game", 1280, 720, false, false)
 		{
 			if (argc >= 2)
 			{
@@ -23,6 +24,7 @@ namespace Candy {
 					return;
 				}
 				LoadProject(projectPath);
+				ProjectSettings::Get().Load();
 			}
 			else
 			{
@@ -50,6 +52,19 @@ namespace Candy {
 
 				LoadProjectFromVfs("/project.candyproj");
 			}
+
+			// Apply window size from ProjectSettings (window is non-resizable in game mode)
+			{
+				auto& ps = ProjectSettings::Get();
+				GetWindow().SetSize(ps.DefaultWidth, ps.DefaultHeight);
+			}
+
+			// VFS .pak mount happens after Application base ctor (which already ran ImGuiLayer::OnAttach).
+			// Reload fonts now so they can be read from VFS.
+			GetImGuiLayer()->ReloadFontsFromVfs();
+			// Standalone game mode: editorContext would otherwise load Saved/imgui.ini and render
+			// leftover editor windows on top of the game UI (Pass 3 overlay). Disable it.
+			GetImGuiLayer()->DisableEditorChrome();
 
 			PushLayer(new GameLayer());
 		}

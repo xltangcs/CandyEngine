@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Candy/Renderer/Texture.h"
+#include "Runtime/Renderer/Texture.h"
 #include <glad/glad.h>
 
 namespace Candy {

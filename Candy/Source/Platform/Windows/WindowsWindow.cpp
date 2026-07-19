@@ -2,13 +2,13 @@
 
 #include "Platform/Windows/WindowsWindow.h"
 
-#include "Candy/Core/Input.h"
+#include "Runtime/Core/Input.h"
 
-#include "Candy/Events/ApplicationEvent.h"
-#include "Candy/Events/MouseEvent.h"
-#include "Candy/Events/KeyEvent.h"
+#include "Runtime/Events/ApplicationEvent.h"
+#include "Runtime/Events/MouseEvent.h"
+#include "Runtime/Events/KeyEvent.h"
 
-#include "Candy/Renderer/Renderer.h"
+#include "Runtime/Renderer/Renderer.h"
 
 #include "Platform/OpenGL/OpenGLContext.h"
 
@@ -39,7 +39,6 @@ namespace Candy {
 
 		CANDY_CORE_INFO("Creating window {0} ({1}, {2})", props.Title, props.Width, props.Height);
 		
-
 		if (s_GLFWWindowCount == 0)
 		{
 			// TODO: glfwTerminate on system shutdown
@@ -51,6 +50,7 @@ namespace Candy {
 				if (Renderer::GetAPI() == RendererAPI::API::OpenGL)
 					glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 		#endif
+		glfwWindowHint(GLFW_RESIZABLE, props.Resizable ? GLFW_TRUE : GLFW_FALSE);
 		m_Window = glfwCreateWindow((int)props.Width, (int)props.Height, m_Data.Title.c_str(), nullptr, nullptr);
 		
 		s_GLFWWindowCount ++;
@@ -167,6 +167,13 @@ namespace Candy {
 	{
 		glfwPollEvents();
 		m_Context->SwapBuffers();
+	}
+
+	void WindowsWindow::SetSize(uint32_t width, uint32_t height)
+	{
+		m_Data.Width = width;
+		m_Data.Height = height;
+		glfwSetWindowSize(m_Window, (int)width, (int)height);
 	}
 
 	void WindowsWindow::SetVSync(bool enabled)

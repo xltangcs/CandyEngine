@@ -1,5 +1,5 @@
 #pragma once
-#include "Candy/Renderer/Buffer.h"
+#include "Runtime/Renderer/Buffer.h"
 namespace Candy {
 	class OpenGLVertexBuffer : public VertexBuffer
 	{

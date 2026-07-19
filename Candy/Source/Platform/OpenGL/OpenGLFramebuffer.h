@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Candy/Renderer/Framebuffer.h"
+#include "Runtime/Renderer/Framebuffer.h"
 
 namespace Candy {
 
@@ -19,11 +19,14 @@ namespace Candy {
 		virtual void ClearAttachment(uint32_t attachmentIndex, int value) override;
 		virtual uint32_t GetColorAttachmentRendererID(uint32_t index = 0) const override 
 		{ 
+			if (m_Specification.SwapChainTarget) return 0;
 			CANDY_CORE_ASSERT(index < m_ColorAttachments.size()); 
 			return m_ColorAttachments[index]; 
 		}
 
 		virtual const FramebufferSpecification& GetSpecification() const override { return m_Specification; }
+
+		bool IsSwapChainTarget() const { return m_Specification.SwapChainTarget; }
 	private:
 		uint32_t m_RendererID = 0;
 		uint32_t m_ColorAttachment = 0;

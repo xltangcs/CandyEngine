@@ -12,8 +12,13 @@ project "Candy"
 
 	
 	files{
-		"Source/**.h",
-		"Source/**.cpp",
+		"Source/Candy.h",
+		"Source/CandyPCH.h",
+		"Source/CandyPCH.cpp",
+		"Source/Platform/**.h",
+		"Source/Platform/**.cpp",
+		"Source/Runtime/**.h",
+		"Source/Runtime/**.cpp",
 		"ThirdParty/stb_image/**.h",
 		"ThirdParty/stb_image/**.cpp",
 		"ThirdParty/glm/glm/**.hpp",
@@ -33,6 +38,7 @@ project "Candy"
 	
 	includedirs{
         "Source",
+        "Source/Runtime",
 		"ThirdParty/spdlog/include",
         "%{IncludeDir.GLFW}",
         "%{IncludeDir.GLAD}",
@@ -65,10 +71,10 @@ project "Candy"
 	filter "files:ThirdParty/ImGuizmo/src/**.cpp"
 	flags { "NoPCH" }
 
-	filter "files:Source/Candy/Scripting/**.cpp"
+	filter "files:Source/Runtime/Scripting/**.cpp"
 	flags { "NoPCH" }
 
-	filter "files:Source/Candy/Audio/**.cpp"
+	filter "files:Source/Runtime/Audio/**.cpp"
 	flags { "NoPCH" }
 
 	filter "files:ThirdParty/miniaudio/**.cpp"
@@ -80,6 +86,67 @@ project "Candy"
 		defines{
 
 		}
+
+	filter "configurations:Debug"
+		defines "CANDY_DEBUG"
+		runtime "Debug"
+		symbols "on"
+
+	filter "configurations:Release"
+		defines "CANDY_RELEASE"
+		runtime "Release"
+		optimize "on"
+
+	filter "configurations:Dist"
+		defines "CANDY_DIST"
+		runtime "Release"
+		optimize "on"
+
+project "CandyEditor"
+	kind "ConsoleApp"
+	language "C++"
+	cppdialect "C++17"
+	staticruntime "off"
+	buildoptions { "/utf-8" }
+	defines { "YAML_CPP_STATIC_DEFINE" }
+
+    targetdir ("%{wks.location}/bin/" .. outputdir .. "/%{prj.name}")
+	objdir ("%{wks.location}/bin-int/" .. outputdir .. "/%{prj.name}")
+
+	files{
+		"Source/Editor/**.h",
+		"Source/Editor/**.cpp"
+	}
+	
+	includedirs{
+		"%{wks.location}/Candy/ThirdParty/spdlog/include",
+		"%{wks.location}/Candy/Source",
+		"%{wks.location}/Candy/Source/Editor",
+		"%{wks.location}/Candy/ThirdParty",
+
+		"%{IncludeDir.glm}",
+		"%{IncludeDir.entt}",
+		"%{IncludeDir.ImGuizmo}",
+		"%{IncludeDir.yaml_cpp}",
+		"%{IncludeDir.GLFW}"
+	}
+	
+	links{
+		"Candy"
+	}
+
+	if PythonLibDir and PythonLibDir ~= "" then
+		links { PythonLibDir .. "/" .. PythonLibName }
+
+		postbuildcommands {
+			'{COPY} "%{wks.location}/Candy/ThirdParty/Python3/python314.dll" "%{cfg.targetdir}"',
+			'{COPY} "%{wks.location}/Candy/ThirdParty/Python3/python314.zip" "%{cfg.targetdir}"',
+			'{COPY} "%{wks.location}/Candy/ThirdParty/Python3/python314._pth" "%{cfg.targetdir}"',
+		}
+	end
+
+	filter "system:windows"
+		systemversion "latest"
 
 	filter "configurations:Debug"
 		defines "CANDY_DEBUG"

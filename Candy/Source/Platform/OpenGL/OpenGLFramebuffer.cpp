@@ -106,6 +106,8 @@ namespace Candy {
 
 	OpenGLFramebuffer::~OpenGLFramebuffer()
 	{
+		if (m_Specification.SwapChainTarget)
+			return;
 		glDeleteFramebuffers(1, &m_RendererID);
 		glDeleteTextures(m_ColorAttachments.size(), m_ColorAttachments.data());
 		glDeleteTextures(1, &m_DepthAttachment);
@@ -113,6 +115,15 @@ namespace Candy {
 
 	void OpenGLFramebuffer::Invalidate()
 	{
+		if (m_Specification.SwapChainTarget)
+		{
+			m_RendererID = 0;
+			m_ColorAttachments.clear();
+			m_ColorAttachment = 0;
+			m_DepthAttachment = 0;
+			return;
+		}
+
 		if (m_RendererID)
 		{
 			glDeleteFramebuffers(1, &m_RendererID);
@@ -178,13 +189,23 @@ namespace Candy {
 
 	void OpenGLFramebuffer::Bind()
 	{
-		glBindFramebuffer(GL_FRAMEBUFFER, m_RendererID);
+		if (m_Specification.SwapChainTarget)
+		{
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		}
+		else
+		{
+			glBindFramebuffer(GL_FRAMEBUFFER, m_RendererID);
+		}
 		glViewport(0, 0, m_Specification.Width, m_Specification.Height);
 	}
 
 	void OpenGLFramebuffer::Unbind()
 	{
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		if (!m_Specification.SwapChainTarget)
+		{
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		}
 	}
 	void OpenGLFramebuffer::Resize(uint32_t width, uint32_t height)
 	{
@@ -196,11 +217,15 @@ namespace Candy {
 		m_Specification.Width = width;
 		m_Specification.Height = height;
 
+		if (m_Specification.SwapChainTarget)
+			return;
+
 		Invalidate();
 	}
 
 	int OpenGLFramebuffer::ReadPixel(uint32_t attachmentIndex, int x, int y)
 	{
+		CANDY_CORE_ASSERT(!m_Specification.SwapChainTarget);
 		CANDY_CORE_ASSERT(attachmentIndex < m_ColorAttachments.size());
 
 		glReadBuffer(GL_COLOR_ATTACHMENT0 + attachmentIndex);
@@ -210,6 +235,7 @@ namespace Candy {
 	}
 	void OpenGLFramebuffer::ClearAttachment(uint32_t attachmentIndex, int value)
 	{
+		CANDY_CORE_ASSERT(!m_Specification.SwapChainTarget);
 		CANDY_CORE_ASSERT(attachmentIndex < m_ColorAttachments.size());
 
 		auto& spec = m_ColorAttachmentSpecifications[attachmentIndex];

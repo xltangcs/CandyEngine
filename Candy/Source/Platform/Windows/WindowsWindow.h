@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Candy/Core/Window.h"
-#include "Candy/Renderer/GraphicsContext.h"
+#include "Runtime/Core/Window.h"
+#include "Runtime/Renderer/GraphicsContext.h"
 
 #include <GLFW/glfw3.h>
 
@@ -24,6 +24,7 @@ namespace Candy {
 		bool IsVSync() const override;
 
 		void SetTitle(const std::string& title) override { glfwSetWindowTitle(m_Window, title.c_str()); }
+		void SetSize(uint32_t w, uint32_t h) override;
 
 		inline virtual void* GetNativeWindow() const { return m_Window; }
 	private:
