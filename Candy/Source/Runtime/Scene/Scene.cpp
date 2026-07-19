@@ -78,14 +78,12 @@ namespace Candy {
 		auto& dstSceneRegistry = newScene->m_Registry;
 		std::unordered_map<UUID, entt::entity> enttMap;
 
-		// Create entities in new scene
-		auto idView = srcSceneRegistry.view<IDComponent>();
-		for (auto e : idView)
+		// Create entities in new scene (same order as hierarchy panel: reverse creation order)
+		for (auto [enttID] : srcSceneRegistry.storage<entt::entity>().reach())
 		{
-			UUID uuid = srcSceneRegistry.get<IDComponent>(e).ID;
-			const auto& name = srcSceneRegistry.get<TagComponent>(e).Tag;
-			Entity newEntity = newScene->CreateEntityWithUUID(uuid, name);
-			enttMap[uuid] = (entt::entity)newEntity;
+			Entity entity = { enttID, other.get() };
+			Entity newEntity = newScene->CreateEntityWithUUID(entity.GetUUID(), entity.GetName());
+			enttMap[entity.GetUUID()] = (entt::entity)newEntity;
 		}
 
 		// Copy components (except IDComponent and TagComponent)
