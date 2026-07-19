@@ -13,6 +13,8 @@
 
 #include "Runtime/Core/Application.h"
 #include "Runtime/Project/ProjectUtils.h"
+#include "Runtime/Core/VfsPath.h"
+#include "Runtime/Core/FileSystem.h"
 
 /* The Microsoft C++ compiler is non-compliant with the C++ standard and needs
  * the following definition to disable a security warning on std::strncpy().
@@ -24,6 +26,16 @@
 
 namespace Candy {
 	
+	static std::string ParsePythonClassNameFromContent(const std::string& content)
+	{
+		std::regex pattern(R"(class\s+(\w+)\s*\([^)]*\bcandy\b\s*\.\s*ScriptObject\b[^)]*\))");
+		std::smatch match;
+		if (std::regex_search(content, match, pattern))
+			return match[1];
+
+		return {};
+	}
+
 	static std::string ParsePythonClassName(const std::filesystem::path& filePath)
 	{
 		std::filesystem::path absPath = std::filesystem::absolute(filePath);
@@ -33,12 +45,7 @@ namespace Candy {
 
 		std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
-		std::regex pattern(R"(class\s+(\w+)\s*\([^)]*\bcandy\b\s*\.\s*ScriptObject\b[^)]*\))");
-		std::smatch match;
-		if (std::regex_search(content, match, pattern))
-			return match[1];
-
-		return {};
+		return ParsePythonClassNameFromContent(content);
 	}
 
 	SceneHierarchyPanel::SceneHierarchyPanel(const Ref<Scene>& context)
@@ -93,18 +100,22 @@ namespace Candy {
 		{
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 			{
-				const wchar_t* path = (const wchar_t*)payload->Data;
-				std::filesystem::path relPath(path);
-				if (relPath.extension() == ".py" && m_SelectionContext)
+				const char* path = (const char*)payload->Data;
+				VfsPath vp = VfsPath::Parse(path);
+				std::filesystem::path relPath(vp.relativePath);
+				if (vp.IsValid() && relPath.extension() == ".py" && m_SelectionContext)
 				{
 					auto& sc = m_SelectionContext.HasComponent<ScriptComponent>()
 						? m_SelectionContext.GetComponent<ScriptComponent>()
 						: m_SelectionContext.AddComponent<ScriptComponent>();
-					sc.ScriptPath = relPath.generic_string();
-					std::filesystem::path fullPath = std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / relPath);
-					std::string parsedName = ParsePythonClassName(fullPath);
-					if (!parsedName.empty())
-						sc.ClassName = parsedName;
+					sc.ScriptPath = vp.ToString();
+					auto content = FileSystem::Get().ReadText(vp.ToString());
+					if (content)
+					{
+						std::string parsedName = ParsePythonClassNameFromContent(*content);
+						if (!parsedName.empty())
+							sc.ClassName = parsedName;
+					}
 				}
 			}
 			ImGui::EndDragDropTarget();
@@ -146,18 +157,22 @@ namespace Candy {
 		{
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 			{
-				const wchar_t* path = (const wchar_t*)payload->Data;
-				std::filesystem::path relPath(path);
-				if (relPath.extension() == ".py")
+				const char* path = (const char*)payload->Data;
+				VfsPath vp = VfsPath::Parse(path);
+				std::filesystem::path relPath(vp.relativePath);
+				if (vp.IsValid() && relPath.extension() == ".py")
 				{
 					auto& sc = entity.HasComponent<ScriptComponent>()
 						? entity.GetComponent<ScriptComponent>()
 						: entity.AddComponent<ScriptComponent>();
-					sc.ScriptPath = relPath.generic_string();
-					std::filesystem::path fullPath = std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / relPath);
-					std::string parsedName = ParsePythonClassName(fullPath);
-					if (!parsedName.empty())
-						sc.ClassName = parsedName;
+					sc.ScriptPath = vp.ToString();
+					auto content = FileSystem::Get().ReadText(vp.ToString());
+					if (content)
+					{
+						std::string parsedName = ParsePythonClassNameFromContent(*content);
+						if (!parsedName.empty())
+							sc.ClassName = parsedName;
+					}
 				}
 			}
 			ImGui::EndDragDropTarget();
@@ -472,21 +487,29 @@ namespace Candy {
 			{
 				ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
 
-				ImGui::Button("Texture", ImVec2(100.0f, 0.0f));
-				if (ImGui::BeginDragDropTarget())
+			ImGui::Button("Texture", ImVec2(100.0f, 0.0f));
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 				{
-					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
+					const char* path = (const char*)payload->Data;
+					VfsPath vp = VfsPath::Parse(path);
+					if (vp.IsValid())
 					{
-						const wchar_t* path = (const wchar_t*)payload->Data;
-						std::filesystem::path texturePath = std::filesystem::path(ProjectUtils::GetProjectContentPath()) / path;
-						Ref<Texture2D> texture = Texture2D::Create(texturePath.string());
-						if (texture->IsLoaded())
+						Ref<Texture2D> texture = Texture2D::Create(vp.ToString());
+						if (texture && texture->IsLoaded())
+						{
 							component.Texture = texture;
+							component.TexturePath = vp.ToString();
+						}
 						else
-							CANDY_WARN("Could not load texture {0}", texturePath.filename().string());
+							CANDY_WARN("Could not load texture {0}", vp.ToString());
 					}
-					ImGui::EndDragDropTarget();
 				}
+				ImGui::EndDragDropTarget();
+			}
+			if (!component.TexturePath.empty())
+				ImGui::TextWrapped("%s", component.TexturePath.c_str());
 
 				ImGui::DragFloat("Tiling Factor", &component.TilingFactor, 0.1f, 0.0f, 100.0f);
 			});
@@ -561,18 +584,22 @@ namespace Candy {
 			{
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 				{
-					const wchar_t* path = (const wchar_t*)payload->Data;
-					std::filesystem::path relPath(path);
-					if (relPath.extension() == ".py")
+					const char* path = (const char*)payload->Data;
+					VfsPath vp = VfsPath::Parse(path);
+					std::filesystem::path relPath(vp.relativePath);
+					if (vp.IsValid() && relPath.extension() == ".py")
 					{
-						component.ScriptPath = relPath.generic_string();
+						component.ScriptPath = vp.ToString();
 						std::strncpy(buffer, component.ScriptPath.c_str(), sizeof(buffer) - 1);
 						buffer[sizeof(buffer) - 1] = '\0';
 
-						std::filesystem::path fullPath = std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / relPath);
-						std::string parsedName = ParsePythonClassName(fullPath);
-						if (!parsedName.empty())
-							component.ClassName = parsedName;
+						auto content = FileSystem::Get().ReadText(vp.ToString());
+						if (content)
+						{
+							std::string parsedName = ParsePythonClassNameFromContent(*content);
+							if (!parsedName.empty())
+								component.ClassName = parsedName;
+						}
 					}
 				}
 				ImGui::EndDragDropTarget();
@@ -585,7 +612,7 @@ namespace Candy {
 				if (!filepath.empty())
 				{
 					std::filesystem::path relPath = std::filesystem::relative(std::filesystem::path(filepath), ProjectUtils::GetProjectContentPath());
-					component.ScriptPath = relPath.generic_string();
+					component.ScriptPath = VfsPath::FromGame(relPath.generic_string()).ToString();
 					std::strncpy(buffer, component.ScriptPath.c_str(), sizeof(buffer) - 1);
 					buffer[sizeof(buffer) - 1] = '\0';
 
@@ -620,11 +647,14 @@ namespace Candy {
 			{
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 				{
-					const wchar_t* path = (const wchar_t*)payload->Data;
-					std::filesystem::path relPath(path);
-					component.SoundPath = relPath.generic_string();
-					std::strncpy(buffer, component.SoundPath.c_str(), sizeof(buffer) - 1);
-					buffer[sizeof(buffer) - 1] = '\0';
+					const char* path = (const char*)payload->Data;
+					VfsPath vp = VfsPath::Parse(path);
+					if (vp.IsValid())
+					{
+						component.SoundPath = vp.ToString();
+						std::strncpy(buffer, component.SoundPath.c_str(), sizeof(buffer) - 1);
+						buffer[sizeof(buffer) - 1] = '\0';
+					}
 				}
 				ImGui::EndDragDropTarget();
 			}

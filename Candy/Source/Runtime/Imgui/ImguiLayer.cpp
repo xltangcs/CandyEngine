@@ -178,7 +178,7 @@ namespace Candy {
 
 	void ImGuiLayer::LoadFontsFromVfs(ImGuiIO& targetIO)
 	{
-		auto boldData = FileSystem::Get().Read("/engine/Fonts/opensans/OpenSans-Bold.ttf");
+		auto boldData = FileSystem::Get().Read("VFS://Engine/Fonts/opensans/OpenSans-Bold.ttf");
 		if (boldData && !boldData->empty())
 		{
 			void* fontMem = ImGui::MemAlloc(boldData->size());
@@ -186,7 +186,7 @@ namespace Candy {
 			targetIO.Fonts->AddFontFromMemoryTTF(fontMem, (int)boldData->size(), 18.0f);
 		}
 
-		auto regularData = FileSystem::Get().Read("/engine/Fonts/opensans/OpenSans-Regular.ttf");
+		auto regularData = FileSystem::Get().Read("VFS://Engine/Fonts/opensans/OpenSans-Regular.ttf");
 		if (regularData && !regularData->empty())
 		{
 			void* fontMem = ImGui::MemAlloc(regularData->size());
@@ -235,7 +235,7 @@ namespace Candy {
 		ImGuiIO& io = ImGui::GetIO();
 		io.Fonts->ClearFonts();
 
-		if (!fontPath.empty() && fontPath[0] == '/')
+		if (!fontPath.empty() && fontPath.rfind("VFS://", 0) == 0)
 		{
 			auto data = FileSystem::Get().Read(fontPath);
 			if (data && !data->empty())

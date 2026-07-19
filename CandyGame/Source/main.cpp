@@ -47,10 +47,11 @@ namespace Candy {
 					return;
 				}
 
-				CANDY_CORE_INFO("Found pak: {0}", pakPath.string());
-				FileSystem::Get().Mount("/", pakPath);
+			CANDY_CORE_INFO("Found pak: {0}", pakPath.string());
+			FileSystem::Get().Mount("Engine", pakPath, "engine/");
+			FileSystem::Get().Mount("Game",   pakPath, "game/");
 
-				LoadProjectFromVfs("/project.candyproj");
+			LoadProjectFromVfs("VFS://Game/project.candyproj");
 			}
 
 			// Apply window size from ProjectSettings (window is non-resizable in game mode)

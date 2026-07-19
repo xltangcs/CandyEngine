@@ -30,7 +30,7 @@ namespace Candy {
 			if (!std::filesystem::exists(engineDir))
 				engineDir = "Content";
 			if (std::filesystem::exists(engineDir))
-				FileSystem::Get().Mount("/engine", engineDir);
+				FileSystem::Get().Mount("Engine", engineDir);
 			else
 				CANDY_CORE_WARN("Engine content not found: {0}", engineDir.string());
 		}
@@ -38,7 +38,7 @@ namespace Candy {
 		{
 			auto pakPath = std::filesystem::path("Content.pak");
 			if (std::filesystem::exists(pakPath))
-				FileSystem::Get().Mount("/engine", pakPath);
+				FileSystem::Get().Mount("Engine", pakPath);
 		}
 
 		Renderer::Init();
@@ -150,10 +150,20 @@ namespace Candy {
 			// Mount project content: prefer a packed .pak, fall back to the directory
 			auto contentDir = project->GetProjectDirectory() / "Content";
 			auto contentPak = project->GetProjectDirectory() / "Content.pak";
-			if (std::filesystem::exists(contentPak))
-				FileSystem::Get().Mount("/project", contentPak);
-			else if (std::filesystem::exists(contentDir))
-				FileSystem::Get().Mount("/project", contentDir);
+			if (m_IsEditor)
+			{
+				if (std::filesystem::exists(contentDir))
+					FileSystem::Get().Mount("Game", contentDir);
+				else if (std::filesystem::exists(contentPak))
+					FileSystem::Get().Mount("Game", contentPak);
+			}
+			else
+			{
+				if (std::filesystem::exists(contentPak))
+					FileSystem::Get().Mount("Game", contentPak);
+				else if (std::filesystem::exists(contentDir))
+					FileSystem::Get().Mount("Game", contentDir);
+			}
 		}
 	}
 
@@ -171,11 +181,11 @@ namespace Candy {
 		{
 			m_ActiveProject = project;
 			UpdateWindowTitle();
-			// Content is already mounted via the single pak at /
+			// Content is mounted separately (Engine/Game domains)
 		}
 
-		// Load ProjectSettings from VFS (Config/ProjectSetting.candy inside the pak)
-		auto configYaml = FileSystem::Get().ReadText("/project/Config/ProjectSetting.candy");
+		// Load ProjectSettings from VFS (Config/ProjectSetting.candy inside the Game domain)
+		auto configYaml = FileSystem::Get().ReadText("VFS://Game/Config/ProjectSetting.candy");
 		if (configYaml)
 			ProjectSettings::Get().LoadFromString(*configYaml);
 	}

@@ -7,6 +7,7 @@
 #include "Runtime/Core/Timestep.h"
 #include "Runtime/Core/UUID.h"
 #include "Runtime/Core/FileSystem.h"
+#include "Runtime/Core/VfsPath.h"
 #include "Runtime/Project/ProjectUtils.h"
 
 #include <pybind11/embed.h>
@@ -85,10 +86,22 @@ void ScriptSystem::ShutdownPython()
 
 static std::filesystem::path ResolveScriptPath(const std::string& scriptPath)
 {
+    if (scriptPath.empty())
+        return {};
+
+    // VFS:// scheme — resolve via FileSystem (returns disk path for dir mounts, empty for pak-only)
+    if (scriptPath.rfind("VFS://", 0) == 0)
+    {
+        auto disk = FileSystem::Get().ToDiskPath(scriptPath);
+        if (disk)
+            return *disk;
+        return {};
+    }
+
+    // Legacy: bare relative path or absolute disk path
     std::filesystem::path p(scriptPath);
     if (p.is_absolute())
         return p;
-
     return std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / p);
 }
 
@@ -112,12 +125,12 @@ void ScriptSystem::InstantiateScript(Entity& entity)
         // extract it from the VFS to a temp directory before handing it to Python.
         if (!std::filesystem::exists(scriptFullPath))
         {
-            auto vfsPath = "/project/" + sc.ScriptPath;
-            auto data = FileSystem::Get().Read(vfsPath);
+            VfsPath vp = MigrateLegacyPath(sc.ScriptPath);
+            auto data = FileSystem::Get().Read(vp.ToString());
             if (data)
             {
                 auto tempDir = std::filesystem::temp_directory_path() / "CandyGame";
-                scriptFullPath = tempDir / sc.ScriptPath;
+                scriptFullPath = tempDir / vp.relativePath;
                 std::filesystem::create_directories(scriptFullPath.parent_path());
                 {
                     std::ofstream out(scriptFullPath, std::ios::binary);
@@ -135,7 +148,7 @@ void ScriptSystem::InstantiateScript(Entity& entity)
             }
             else
             {
-                CANDY_CORE_ERROR("Script file not found: {0} (also tried VFS {1})", ResolveScriptPath(sc.ScriptPath).string(), vfsPath);
+                CANDY_CORE_ERROR("Script file not found: {0} (also tried VFS {1})", ResolveScriptPath(sc.ScriptPath).string(), vp.ToString());
                 return;
             }
         }

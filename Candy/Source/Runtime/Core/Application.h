@@ -70,7 +70,7 @@ namespace Candy {
 		bool m_IsEditor = true;
 
 		float m_FontSize = 18.0f;
-		std::string m_FontPath = "/engine/Fonts/opensans/OpenSans-Regular.ttf";
+		std::string m_FontPath = "VFS://Engine/Fonts/opensans/OpenSans-Regular.ttf";
 
 		Scope<Window> m_Window;
 		ImGuiLayer* m_ImGuiLayer;

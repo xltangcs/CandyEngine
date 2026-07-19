@@ -1,5 +1,5 @@
 ProjectSettings:
-  DefaultScene: Scenes/TestScene.candy
+  DefaultScene: VFS://Game/Scenes/TestScene.candy
   DefaultWidth: 1280
   DefaultHeight: 720
   GameProjectName: CandyGame

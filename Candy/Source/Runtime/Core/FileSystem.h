@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Runtime/Core/Base.h"
+#include "Runtime/Core/VfsPath.h"
 
 #include <filesystem>
 #include <string>
@@ -17,15 +18,33 @@ namespace Candy {
 	public:
 		static FileSystem& Get();
 
-		// Mount a physical path (directory or .pak file) at a virtual mount point
-		// e.g. Mount("/engine", "Candy/Content/")
-		//      Mount("/project", "MyGame.pak")
-		void Mount(const std::string& mountPoint, const std::filesystem::path& physicalPath);
+		// A mount point maps a VFS domain ("Engine" or "Game") to a physical
+		// directory or .pak file on disk.
+		struct MountPoint
+		{
+			std::string prefix;              // "Engine" or "Game"
+			std::filesystem::path path;      // physical path (directory or .pak)
+			bool isPak = false;
+			Ref<PakFile> pak;                // valid if isPak
+			std::string pakSubDir;           // subdirectory within the pak, e.g. "engine/" (standalone mode only)
+		};
 
-		// Unmount a mount point
-		void Unmount(const std::string& mountPoint);
+		// Mount a physical path at a VFS domain. When mounting a single .pak that
+		// contains both engine/ and game/ subdirectories (standalone mode), use
+		// pakSubDir to specify the subdirectory within the pak.
+		// Examples:
+		//   Mount("Engine", "Candy/Content/")              — editor: directory
+		//   Mount("Game",   "MyGame.pak")                  — game: pak w/o subdir
+		//   Mount("Engine", "Standalone.pak", "engine/")   — standalone: subdir
+		//   Mount("Game",   "Standalone.pak", "game/")     — standalone: subdir
+		void Mount(const std::string& domain, const std::filesystem::path& physicalPath,
+		           const std::string& pakSubDir = "");
+
+		// Unmount a domain
+		void Unmount(const std::string& domain);
 
 		// Read entire file as bytes. Returns empty optional if not found.
+		// Only accepts VFS:// scheme paths.
 		std::optional<std::vector<uint8_t>> Read(const std::string& virtualPath);
 
 		// Read entire file as string. Returns empty optional if not found.
@@ -38,21 +57,24 @@ namespace Candy {
 		bool Write(const std::string& virtualPath, const std::vector<uint8_t>& data);
 		bool WriteText(const std::string& virtualPath, const std::string& text);
 
+		// Resolve a VFS:// path to an absolute disk path. Returns nullopt for
+		// pak-only mounts or unresolvable paths.
+		std::optional<std::filesystem::path> ToDiskPath(const std::string& virtualPath);
+		std::optional<std::filesystem::path> ToDiskPath(const VfsPath& p) { return ToDiskPath(p.ToString()); }
+
+		// Enumerate entries directly under virtualDir (or recursively if recursive=true).
+		// Returns paths in VFS:// format. For pak mounts, lists entries whose path
+		// starts with the directory prefix (taking pakSubDir into account).
+		std::vector<std::string> EnumerateDirectory(const std::string& virtualDir, bool recursive = false);
+
+		// Resolve a VFS:// path to a mount point + relative path (relative to the
+		// mount point root, with pakSubDir prepended for pak mounts).
+		const MountPoint* Resolve(const std::string& virtualPath, std::string& outRelativePath);
+
 	private:
 		FileSystem() = default;
 
-		struct MountPoint
-		{
-			std::string prefix;           // e.g. "/engine", "/project"
-			std::filesystem::path path;   // physical path
-			bool isPak = false;
-			Ref<PakFile> pak;             // valid if isPak
-		};
-
 		std::vector<MountPoint> m_Mounts;
-
-		// Resolve a virtual path to a mount point + relative path
-		const MountPoint* Resolve(const std::string& virtualPath, std::string& outRelativePath);
 	};
 
 }

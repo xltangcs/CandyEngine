@@ -32,6 +32,9 @@ namespace Candy {
 
 		const std::filesystem::path& GetPath() const { return m_PakPath; }
 
+		// Access to all entries for directory enumeration (used by FileSystem::EnumerateDirectory).
+		const std::unordered_map<std::string, Entry>& GetEntries() const { return m_Entries; }
+
 	private:
 		std::filesystem::path m_PakPath;
 		std::unordered_map<std::string, Entry> m_Entries;

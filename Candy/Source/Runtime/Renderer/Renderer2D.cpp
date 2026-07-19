@@ -174,9 +174,9 @@ namespace Candy {
 			CANDY_CORE_ERROR("Failed to load shader: {0}", vfsPath);
 			return nullptr;
 		};
-		s_Data.QuadShader = loadShader("Renderer2D_Quad", "/engine/Shaders/Renderer2D_Quad.glsl");
-		s_Data.CircleShader = loadShader("Renderer2D_Circle", "/engine/Shaders/Renderer2D_Circle.glsl");
-		s_Data.LineShader = loadShader("Renderer2D_Line", "/engine/Shaders/Renderer2D_Line.glsl");
+		s_Data.QuadShader = loadShader("Renderer2D_Quad", "VFS://Engine/Shaders/Renderer2D_Quad.glsl");
+		s_Data.CircleShader = loadShader("Renderer2D_Circle", "VFS://Engine/Shaders/Renderer2D_Circle.glsl");
+		s_Data.LineShader = loadShader("Renderer2D_Line", "VFS://Engine/Shaders/Renderer2D_Line.glsl");
 
 		s_Data.TextureSlots[0] = s_Data.WhiteTexture;
 

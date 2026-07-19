@@ -1,6 +1,7 @@
 #include "CandyPCH.h"
 #include "Runtime/Project/ProjectSettings.h"
 #include "Runtime/Project/ProjectUtils.h"
+#include "Runtime/Core/VfsPath.h"
 
 #include <yaml-cpp/yaml.h>
 #include <fstream>
@@ -23,7 +24,7 @@ namespace Candy {
 		YAML::Emitter out;
 		out << YAML::BeginMap;
 		out << YAML::Key << "ProjectSettings" << YAML::Value << YAML::BeginMap;
-		out << YAML::Key << "DefaultScene" << YAML::Value << std::filesystem::path(DefaultScene).generic_string();
+		out << YAML::Key << "DefaultScene" << YAML::Value << DefaultScene;
 		out << YAML::Key << "DefaultWidth" << YAML::Value << DefaultWidth;
 		out << YAML::Key << "DefaultHeight" << YAML::Value << DefaultHeight;
 		out << YAML::Key << "GameProjectName" << YAML::Value << GameProjectName;
@@ -44,8 +45,8 @@ namespace Candy {
 
 		if (s["DefaultScene"])
 		{
-			DefaultScene = s["DefaultScene"].as<std::string>();
-			std::replace(DefaultScene.begin(), DefaultScene.end(), '\\', '/');
+			std::string raw = s["DefaultScene"].as<std::string>();
+			DefaultScene = raw.empty() ? raw : MigrateLegacyPath(raw).ToString();
 		}
 		if (s["DefaultWidth"]) DefaultWidth = s["DefaultWidth"].as<uint32_t>();
 		if (s["DefaultHeight"]) DefaultHeight = s["DefaultHeight"].as<uint32_t>();
@@ -60,8 +61,8 @@ namespace Candy {
 
 		if (s["DefaultScene"])
 		{
-			DefaultScene = s["DefaultScene"].as<std::string>();
-			std::replace(DefaultScene.begin(), DefaultScene.end(), '\\', '/');
+			std::string raw = s["DefaultScene"].as<std::string>();
+			DefaultScene = raw.empty() ? raw : MigrateLegacyPath(raw).ToString();
 		}
 		if (s["DefaultWidth"]) DefaultWidth = s["DefaultWidth"].as<uint32_t>();
 		if (s["DefaultHeight"]) DefaultHeight = s["DefaultHeight"].as<uint32_t>();

@@ -26,6 +26,8 @@
 
 #include <cstdlib>
 
+#include "Runtime/Core/FileSystem.h"
+
 namespace Candy {
 
 	EditorLayer::EditorLayer()
@@ -41,10 +43,10 @@ namespace Candy {
 	{
 		CANDY_PROFILE_FUNCTION();
 
-		m_CheckerboardTexture = Texture2D::Create("/engine/Textures/Checkerboard.png");
-		m_IconPlay = Texture2D::Create("/engine/Icons/PlayButton.png");
-		m_IconStop = Texture2D::Create("/engine/Icons/StopButton.png");
-		m_IconSimulate = Texture2D::Create("/engine/Icons/SimulateButton.png");
+		m_CheckerboardTexture = Texture2D::Create("VFS://Engine/Textures/Checkerboard.png");
+		m_IconPlay = Texture2D::Create("VFS://Engine/Icons/PlayButton.png");
+		m_IconStop = Texture2D::Create("VFS://Engine/Icons/StopButton.png");
+		m_IconSimulate = Texture2D::Create("VFS://Engine/Icons/SimulateButton.png");
 
 		FramebufferSpecification fbSpec;
 		fbSpec.Attachments = { FramebufferTextureFormat::RGBA8, FramebufferTextureFormat::RED_INTEGER, FramebufferTextureFormat::Depth };
@@ -70,9 +72,9 @@ namespace Candy {
 		if (project)
 		{
 			ProjectSettings::Get().Load();
-			auto scenePath = ProjectUtils::GetProjectContentPath() / ProjectSettings::Get().DefaultScene;
-			if (std::filesystem::exists(scenePath))
-				OpenScene(scenePath);
+			auto scenePathOpt = FileSystem::Get().ToDiskPath(ProjectSettings::Get().DefaultScene);
+			if (scenePathOpt && std::filesystem::exists(*scenePathOpt))
+				OpenScene(*scenePathOpt);
 		}
 		else if (!editorState.LastScenePath.empty() && std::filesystem::exists(editorState.LastScenePath))
 		{
@@ -395,8 +397,18 @@ namespace Candy {
 		{
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 			{
-				const wchar_t* path = (const wchar_t*)payload->Data;
-				OpenScene(ProjectUtils::GetProjectContentPath() / path);
+				const char* path = (const char*)payload->Data;
+				VfsPath vp = VfsPath::Parse(path);
+				if (vp.IsValid())
+				{
+					std::filesystem::path relPath(vp.relativePath);
+					if (relPath.extension() == ".candy")
+					{
+						auto disk = FileSystem::Get().ToDiskPath(vp);
+						if (disk)
+							OpenScene(*disk);
+					}
+				}
 			}
 			ImGui::EndDragDropTarget();
 		}
@@ -751,9 +763,9 @@ namespace Candy {
 			RecentProjects::Add(project->GetName(), project->GetProjectFileName().string());
 			m_RecentProjects = RecentProjects::Load();
 
-			auto scenePath = ProjectUtils::GetProjectContentPath() / ProjectSettings::Get().DefaultScene;
-			if (std::filesystem::exists(scenePath))
-				OpenScene(scenePath);
+			auto scenePathOpt = FileSystem::Get().ToDiskPath(ProjectSettings::Get().DefaultScene);
+			if (scenePathOpt && std::filesystem::exists(*scenePathOpt))
+				OpenScene(*scenePathOpt);
 		}
 	}
 
@@ -1085,10 +1097,8 @@ namespace Candy {
 
 		// ---------- Step 4: Create a single .pak with all content ----------
 		// Structure inside the pak:
-		//   engine/        �?engine Content/ files
-		//   project/       �?project Content/ files
-		//   project/Config/  �?project Config/ files (ProjectSetting.candy)
-		//   project.candyproj  �?project descriptor (Name only)
+		//   engine/        <- engine Content/ files
+		//   game/          <- game Content/ files (Config/, project.candyproj)
 		auto engineContent = ProjectUtils::GetEngineContentPath();
 		auto projectContent = project->GetProjectDirectory() / "Content";
 		auto projFile = project->GetProjectFileName();
@@ -1097,7 +1107,7 @@ namespace Candy {
 		auto stagingDir = buildDir / ".staging";
 		std::filesystem::remove_all(stagingDir);
 		std::filesystem::create_directories(stagingDir / "engine");
-		std::filesystem::create_directories(stagingDir / "project");
+		std::filesystem::create_directories(stagingDir / "game");
 
 		// Copy engine content into staging/engine/
 		if (std::filesystem::exists(engineContent))
@@ -1106,25 +1116,25 @@ namespace Candy {
 				std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing);
 		}
 
-		// Copy project content into staging/project/
+		// Copy project content into staging/game/
 		if (std::filesystem::exists(projectContent))
 		{
-			std::filesystem::copy(projectContent, stagingDir / "project",
+			std::filesystem::copy(projectContent, stagingDir / "game",
 				std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing);
 		}
 
-		// Copy project Config/ into staging/project/Config/
+		// Copy project Config/ into staging/game/Config/
 		auto projectConfig = project->GetProjectDirectory() / "Config";
 		if (std::filesystem::exists(projectConfig))
 		{
-			std::filesystem::copy(projectConfig, stagingDir / "project" / "Config",
+			std::filesystem::copy(projectConfig, stagingDir / "game" / "Config",
 				std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing);
 		}
 
-		// Copy the .candyproj file to staging root
+		// Copy the .candyproj file into staging/game/ (so it's accessible as VFS://Game/project.candyproj)
 		if (std::filesystem::exists(projFile))
 		{
-			std::filesystem::copy_file(projFile, stagingDir / "project.candyproj",
+			std::filesystem::copy_file(projFile, stagingDir / "game" / "project.candyproj",
 				std::filesystem::copy_options::overwrite_existing);
 		}
 

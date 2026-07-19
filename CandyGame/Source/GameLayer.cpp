@@ -10,6 +10,7 @@
 #include "Runtime/Project/ProjectSettings.h"
 #include "Runtime/Project/ProjectUtils.h"
 #include "Runtime/Core/FileSystem.h"
+#include "Runtime/Core/VfsPath.h"
 
 #include <GLFW/glfw3.h>
 #include <imgui/imgui.h>
@@ -39,10 +40,10 @@ namespace Candy {
 			return;
 		}
 
-		// Normalize to forward slashes for VFS path matching
-		std::replace(sceneName.begin(), sceneName.end(), '\\', '/');
-
-		auto vfsScenePath = "/project/" + sceneName;
+		// DefaultScene is stored in VFS:// format (migrated by ProjectSettings::Load).
+		// MigrateLegacyPath normalizes any legacy bare paths to VFS://Game/...
+		VfsPath sceneVp = MigrateLegacyPath(sceneName);
+		auto vfsScenePath = sceneVp.ToString();
 		if (FileSystem::Get().Exists(vfsScenePath))
 		{
 			auto yamlContent = FileSystem::Get().ReadText(vfsScenePath);

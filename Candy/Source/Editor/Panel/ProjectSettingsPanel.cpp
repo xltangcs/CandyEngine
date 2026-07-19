@@ -6,6 +6,7 @@
 
 #include "Runtime/Project/ProjectSettings.h"
 #include "Setting/EditorState.h"
+#include "Runtime/Core/VfsPath.h"
 
 namespace Candy {
 
@@ -32,9 +33,17 @@ namespace Candy {
 			{
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 				{
-					const wchar_t* path = (const wchar_t*)payload->Data;
-					settings.DefaultScene = std::filesystem::path(path).string();
-					settings.Save();
+					const char* path = (const char*)payload->Data;
+					VfsPath vp = VfsPath::Parse(path);
+					if (vp.IsValid())
+					{
+						std::filesystem::path relPath(vp.relativePath);
+						if (relPath.extension() == ".candy")
+						{
+							settings.DefaultScene = vp.ToString();
+							settings.Save();
+						}
+					}
 				}
 				ImGui::EndDragDropTarget();
 			}

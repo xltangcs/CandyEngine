@@ -7,6 +7,7 @@
 #include "Runtime/Scene/Components.h"
 #include "Runtime/Project/ProjectUtils.h"
 #include "Runtime/Core/FileSystem.h"
+#include "Runtime/Core/VfsPath.h"
 
 #include "miniaudio.h"
 #include <fstream>
@@ -23,20 +24,29 @@ namespace Candy {
 
 			if (!asc.SoundPath.empty() && asc.PlayOnStart)
 				{
-					auto soundPath = std::filesystem::path(asc.SoundPath);
-					if (soundPath.is_relative())
-						soundPath = std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / soundPath);
+					std::filesystem::path soundPath;
+					if (asc.SoundPath.rfind("VFS://", 0) == 0)
+					{
+						auto disk = FileSystem::Get().ToDiskPath(asc.SoundPath);
+						if (disk) soundPath = *disk;
+					}
+					else
+					{
+						soundPath = std::filesystem::path(asc.SoundPath);
+						if (soundPath.is_relative())
+							soundPath = std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / soundPath);
+					}
 
 					// VFS fallback: if the file is not on disk (standalone / pak mode),
 					// extract it from the VFS to a temp directory.
 					if (!std::filesystem::exists(soundPath))
 					{
-						auto vfsPath = "/project/" + asc.SoundPath;
-						auto data = FileSystem::Get().Read(vfsPath);
+						VfsPath vp = MigrateLegacyPath(asc.SoundPath);
+						auto data = FileSystem::Get().Read(vp.ToString());
 						if (data)
 						{
 							auto tempDir = std::filesystem::temp_directory_path() / "CandyGame";
-							auto tempPath = tempDir / asc.SoundPath;
+							auto tempPath = tempDir / vp.relativePath;
 							std::filesystem::create_directories(tempPath.parent_path());
 							{
 								std::ofstream out(tempPath, std::ios::binary);

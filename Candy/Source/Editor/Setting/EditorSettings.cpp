@@ -25,6 +25,7 @@ namespace Candy {
 		out << YAML::Key << "FontPath" << YAML::Value << Application::Get().GetFontPath();
 		out << YAML::Key << "ThumbnailSize" << YAML::Value << m_ThumbnailSize;
 		out << YAML::Key << "ThumbnailPadding" << YAML::Value << m_ThumbnailPadding;
+		out << YAML::Key << "ContentBrowserTreeWidth" << YAML::Value << m_ContentBrowserTreeWidth;
 		out << YAML::Key << "AutoOpenLastProject" << YAML::Value << m_AutoOpenLastProject;
 		out << YAML::EndMap << YAML::EndMap;
 		std::ofstream("Config/EditorSettings.candy") << out.c_str();
@@ -52,6 +53,7 @@ namespace Candy {
 		}
 		if (s["ThumbnailSize"]) m_ThumbnailSize = s["ThumbnailSize"].as<float>();
 		if (s["ThumbnailPadding"]) m_ThumbnailPadding = s["ThumbnailPadding"].as<float>();
+		if (s["ContentBrowserTreeWidth"]) m_ContentBrowserTreeWidth = s["ContentBrowserTreeWidth"].as<float>();
 		if (s["AutoOpenLastProject"]) m_AutoOpenLastProject = s["AutoOpenLastProject"].as<bool>();
 	}
 

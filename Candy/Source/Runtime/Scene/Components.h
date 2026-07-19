@@ -57,6 +57,7 @@ namespace Candy {
 	{
 		glm::vec4 Color{ 1.0f, 1.0f, 1.0f, 1.0f };
 		Ref<Texture2D> Texture;
+		std::string TexturePath;     // VFS:// format, empty = no texture (serialized for save/load)
 		float TilingFactor = 1.0f;
 		SpriteRendererComponent() = default;
 		SpriteRendererComponent(const SpriteRendererComponent&) = default;

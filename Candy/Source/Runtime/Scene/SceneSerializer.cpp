@@ -3,6 +3,8 @@
 #include "Runtime/Scene/Entity.h"
 #include "Runtime/Scene/Components.h"
 #include "Runtime/Scene/SceneSerializer.h"
+#include "Runtime/Core/VfsPath.h"
+#include "Runtime/Renderer/Texture.h"
 
 #include <fstream>
 #include <yaml-cpp/yaml.h>
@@ -198,6 +200,8 @@ namespace Candy {
 
 			auto& spriteRendererComponent = entity.GetComponent<SpriteRendererComponent>();
 			out << YAML::Key << "Color" << YAML::Value << spriteRendererComponent.Color;
+			if (!spriteRendererComponent.TexturePath.empty())
+				out << YAML::Key << "TexturePath" << YAML::Value << spriteRendererComponent.TexturePath;
 
 			out << YAML::EndMap; // SpriteRendererComponent
 		}
@@ -459,6 +463,19 @@ namespace Candy {
 				{
 					auto& src = deserializedEntity.AddComponent<SpriteRendererComponent>();
 					src.Color = spriteRendererComponent["Color"].as<glm::vec4>();
+					if (auto tp = spriteRendererComponent["TexturePath"])
+					{
+						std::string raw = tp.as<std::string>();
+						if (!raw.empty())
+						{
+							src.TexturePath = MigrateLegacyPath(raw).ToString();
+							auto tex = Texture2D::Create(src.TexturePath);
+							if (tex && tex->IsLoaded())
+								src.Texture = tex;
+							else
+								CANDY_CORE_WARN("SceneSerializer: failed to load texture {0}", src.TexturePath);
+						}
+					}
 				}
 
 				auto circleRendererComponent = entity["CircleRendererComponent"];
@@ -506,7 +523,8 @@ namespace Candy {
 				if (scriptComponent)
 				{
 					auto& sc = deserializedEntity.AddComponent<ScriptComponent>();
-					sc.ScriptPath = scriptComponent["ScriptPath"].as<std::string>();
+					std::string rawScript = scriptComponent["ScriptPath"].as<std::string>();
+					sc.ScriptPath = rawScript.empty() ? rawScript : MigrateLegacyPath(rawScript).ToString();
 					sc.ClassName = scriptComponent["ClassName"].as<std::string>();
 				}
 
@@ -514,7 +532,8 @@ namespace Candy {
 				if (audioSourceComponent)
 				{
 					auto& asc = deserializedEntity.AddComponent<AudioSourceComponent>();
-					asc.SoundPath = audioSourceComponent["SoundPath"].as<std::string>();
+					std::string rawSound = audioSourceComponent["SoundPath"].as<std::string>();
+					asc.SoundPath = rawSound.empty() ? rawSound : MigrateLegacyPath(rawSound).ToString();
 					asc.Volume = audioSourceComponent["Volume"].as<float>();
 					asc.Looping = audioSourceComponent["Looping"].as<bool>();
 					asc.PlayOnStart = audioSourceComponent["PlayOnStart"].as<bool>();
