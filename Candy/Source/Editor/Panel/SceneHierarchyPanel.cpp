@@ -1,8 +1,11 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
+#include <imgui/misc/cpp/imgui_stdlib.h>
 #include <glm/gtc/type_ptr.hpp>
 
 #include "SceneHierarchyPanel.h"
+
+#include "ImGuiUtils.h"
 
 #include "Runtime/Scene/Components.h"
 #include "Runtime/Utils/PlatformUtils.h"
@@ -196,66 +199,6 @@ namespace Candy {
 
 	}
 
-	static void DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue = 0.0f, float columnWidth = 100.0f)
-	{
-		ImGuiIO& io = ImGui::GetIO();
-		auto boldFont = io.Fonts->Fonts[0];
-
-		ImGui::PushID(label.c_str());
-
-		ImGui::Columns(2);
-		ImGui::SetColumnWidth(0, columnWidth);
-		ImGui::Text(label.c_str());
-		ImGui::NextColumn();
-
-		ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{ 0, 0 });
-
-		float lineHeight = ImGui::GetFrameHeight();
-		ImVec2 buttonSize = { lineHeight + 3.0f, lineHeight };
-
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.9f, 0.2f, 0.2f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f });
-		if (ImGui::Button("X", buttonSize))
-			values.x = resetValue;
-		ImGui::PopStyleColor(3);
-
-		ImGui::SameLine();
-		ImGui::DragFloat("##X", &values.x, 0.1f, 0.0f, 0.0f, "%.2f");
-		ImGui::PopItemWidth();
-		ImGui::SameLine();
-
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.2f, 0.7f, 0.2f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.3f, 0.8f, 0.3f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.2f, 0.7f, 0.2f, 1.0f });
-		if (ImGui::Button("Y", buttonSize))
-			values.y = resetValue;
-		ImGui::PopStyleColor(3);
-
-		ImGui::SameLine();
-		ImGui::DragFloat("##Y", &values.y, 0.1f, 0.0f, 0.0f, "%.2f");
-		ImGui::PopItemWidth();
-		ImGui::SameLine();
-
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.2f, 0.35f, 0.9f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f });
-		if (ImGui::Button("Z", buttonSize))
-			values.z = resetValue;
-		ImGui::PopStyleColor(3);
-
-		ImGui::SameLine();
-		ImGui::DragFloat("##Z", &values.z, 0.1f, 0.0f, 0.0f, "%.2f");
-		ImGui::PopItemWidth();
-
-		ImGui::PopStyleVar();
-
-		ImGui::Columns(1);
-
-		ImGui::PopID();
-	}
-
 	template<typename T, typename UIFunction>
 
 	static void DrawComponent(const std::string& name, Entity entity, UIFunction uiFunction)
@@ -419,11 +362,11 @@ namespace Candy {
 
 		DrawComponent<TransformComponent>("Transform", entity, [](auto& component)
 			{
-				DrawVec3Control("Translation", component.Translation);
+				ImGuiUtils::DrawVec3Control("Translation", component.Translation);
 				glm::vec3 rotation = glm::degrees(component.Rotation);
-				DrawVec3Control("Rotation", rotation);
+				ImGuiUtils::DrawVec3Control("Rotation", rotation);
 				component.Rotation = glm::radians(rotation);
-				DrawVec3Control("Scale", component.Scale, 1.0f);
+				ImGuiUtils::DrawVec3Control("Scale", component.Scale, 1.0f);
 			});
 
 		DrawComponent<CameraComponent>("Camera", entity, [](auto& component)
@@ -431,237 +374,120 @@ namespace Candy {
 				auto& camera = component.Camera;
 
 				const char* projectionTypeStrings[] = { "Perspective", "Orthographic" };
-				const char* currentProjectionTypeString = projectionTypeStrings[(int)camera.GetProjectionType()];
-				if (ImGui::BeginCombo("Projection", currentProjectionTypeString))
-				{
-					for (int i = 0; i < 2; i++)
-					{
-						bool isSelected = currentProjectionTypeString == projectionTypeStrings[i];
-						if (ImGui::Selectable(projectionTypeStrings[i], isSelected))
-						{
-							currentProjectionTypeString = projectionTypeStrings[i];
-							camera.SetProjectionType((SceneCamera::ProjectionType)i);
-						}
-
-						if (isSelected)
-							ImGui::SetItemDefaultFocus();
-					}
-
-					ImGui::EndCombo();
-				}
+				int projType = (int)camera.GetProjectionType();
+				if (ImGuiUtils::DrawCombo("Projection", projectionTypeStrings, 2, projType))
+					camera.SetProjectionType((SceneCamera::ProjectionType)projType);
 
 				if (camera.GetProjectionType() == SceneCamera::ProjectionType::Perspective)
 				{
-					float perspectiveVerticalFov = glm::degrees(camera.GetPerspectiveVerticalFOV());
-					if (ImGui::DragFloat("Vertical FOV", &perspectiveVerticalFov))
-						camera.SetPerspectiveVerticalFOV(glm::radians(perspectiveVerticalFov));
+					float fov = glm::degrees(camera.GetPerspectiveVerticalFOV());
+					if (ImGuiUtils::DrawDragFloat("Vertical FOV", fov))
+						camera.SetPerspectiveVerticalFOV(glm::radians(fov));
 
-					float perspectiveNear = camera.GetPerspectiveNearClip();
-					if (ImGui::DragFloat("Near", &perspectiveNear))
-						camera.SetPerspectiveNearClip(perspectiveNear);
+					float clipNear = camera.GetPerspectiveNearClip();
+					if (ImGuiUtils::DrawDragFloat("Near", clipNear))
+						camera.SetPerspectiveNearClip(clipNear);
 
-					float perspectiveFar = camera.GetPerspectiveFarClip();
-					if (ImGui::DragFloat("Far", &perspectiveFar))
-						camera.SetPerspectiveFarClip(perspectiveFar);
+					float clipFar = camera.GetPerspectiveFarClip();
+					if (ImGuiUtils::DrawDragFloat("Far", clipFar))
+						camera.SetPerspectiveFarClip(clipFar);
 				}
 
 				if (camera.GetProjectionType() == SceneCamera::ProjectionType::Orthographic)
 				{
-					float orthoSize = camera.GetOrthographicSize();
-					if (ImGui::DragFloat("Size", &orthoSize))
-						camera.SetOrthographicSize(orthoSize);
+					float size = camera.GetOrthographicSize();
+					if (ImGuiUtils::DrawDragFloat("Size", size))
+						camera.SetOrthographicSize(size);
 
 					float orthoNear = camera.GetOrthographicNearClip();
-					if (ImGui::DragFloat("Near", &orthoNear))
+					if (ImGuiUtils::DrawDragFloat("Near", orthoNear))
 						camera.SetOrthographicNearClip(orthoNear);
 
 					float orthoFar = camera.GetOrthographicFarClip();
-					if (ImGui::DragFloat("Far", &orthoFar))
+					if (ImGuiUtils::DrawDragFloat("Far", orthoFar))
 						camera.SetOrthographicFarClip(orthoFar);
 
-					ImGui::Checkbox("Fixed Aspect Ratio", &component.FixedAspectRatio);
+					ImGuiUtils::DrawCheckbox("Fixed Aspect Ratio", component.FixedAspectRatio);
 				}
 			});
 
 		DrawComponent<SpriteRendererComponent>("Sprite Renderer", entity, [](auto& component)
 			{
-				ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
+				ImGuiUtils::DrawColorEdit4("Color", component.Color);
 
-			ImGui::Button("Texture", ImVec2(100.0f, 0.0f));
-			if (ImGui::BeginDragDropTarget())
-			{
-				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
+				if (ImGuiUtils::DrawContentPathControl("Texture", component.TexturePath))
 				{
-					const char* path = (const char*)payload->Data;
-					VfsPath vp = VfsPath::Parse(path);
-					if (vp.IsValid())
+					Ref<Texture2D> tex = Texture2D::Create(component.TexturePath);
+					if (tex && tex->IsLoaded())
 					{
-						Ref<Texture2D> texture = Texture2D::Create(vp.ToString());
-						if (texture && texture->IsLoaded())
-						{
-							component.Texture = texture;
-							component.TexturePath = vp.ToString();
-						}
-						else
-							CANDY_WARN("Could not load texture {0}", vp.ToString());
+						component.Texture = tex;
 					}
+					else
+						CANDY_WARN("Could not load texture {0}", component.TexturePath);
 				}
-				ImGui::EndDragDropTarget();
-			}
-			if (!component.TexturePath.empty())
-				ImGui::TextWrapped("%s", component.TexturePath.c_str());
 
-				ImGui::DragFloat("Tiling Factor", &component.TilingFactor, 0.1f, 0.0f, 100.0f);
+				ImGuiUtils::DrawDragFloat("Tiling Factor", component.TilingFactor, 0.1f, 0.0f, 100.0f);
 			});
 
 		DrawComponent<CircleRendererComponent>("Circle Renderer", entity, [](auto& component)
 			{
-				ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
-				ImGui::DragFloat("Thickness", &component.Thickness, 0.025f, 0.0f, 1.0f);
-				ImGui::DragFloat("Fade", &component.Fade, 0.00025f, 0.0f, 1.0f);
+				ImGuiUtils::DrawColorEdit4("Color", component.Color);
+				ImGuiUtils::DrawDragFloat("Thickness", component.Thickness, 0.025f, 0.0f, 1.0f);
+				ImGuiUtils::DrawDragFloat("Fade", component.Fade, 0.00025f, 0.0f, 1.0f);
 			});
 
 		DrawComponent<Rigidbody2DComponent>("Rigidbody 2D", entity, [](auto& component)
 			{
 				const char* bodyTypeStrings[] = { "Static", "Dynamic", "Kinematic" };
-				const char* currentBodyTypeString = bodyTypeStrings[(int)component.Type];
-				if (ImGui::BeginCombo("Body Type", currentBodyTypeString))
-				{
-					for (int i = 0; i < 2; i++)
-					{
-						bool isSelected = currentBodyTypeString == bodyTypeStrings[i];
-						if (ImGui::Selectable(bodyTypeStrings[i], isSelected))
-						{
-							currentBodyTypeString = bodyTypeStrings[i];
-							component.Type = (Rigidbody2DComponent::BodyType)i;
-						}
+				int bodyType = (int)component.Type;
+				if (ImGuiUtils::DrawCombo("Body Type", bodyTypeStrings, 3, bodyType))
+					component.Type = (Rigidbody2DComponent::BodyType)bodyType;
 
-						if (isSelected)
-							ImGui::SetItemDefaultFocus();
-					}
-
-					ImGui::EndCombo();
-				}
-
-				ImGui::Checkbox("Fixed Rotation", &component.FixedRotation);
+				ImGuiUtils::DrawCheckbox("Fixed Rotation", component.FixedRotation);
 			});
 
 		DrawComponent<BoxCollider2DComponent>("Box Collider 2D", entity, [](auto& component)
 			{
-				ImGui::DragFloat2("Offset", glm::value_ptr(component.Offset));
-				ImGui::DragFloat2("Size", glm::value_ptr(component.Size));
-				ImGui::DragFloat("Density", &component.Density, 0.01f, 0.0f, 1.0f);
-				ImGui::DragFloat("Friction", &component.Friction, 0.01f, 0.0f, 1.0f);
-				ImGui::DragFloat("Restitution", &component.Restitution, 0.01f, 0.0f, 1.0f);
-				ImGui::DragFloat("Restitution Threshold", &component.RestitutionThreshold, 0.01f, 0.0f);
+				ImGuiUtils::DrawDragFloat2("Offset", component.Offset);
+				ImGuiUtils::DrawDragFloat2("Size", component.Size);
+				ImGuiUtils::DrawDragFloat("Density", component.Density, 0.01f, 0.0f, 1.0f);
+				ImGuiUtils::DrawDragFloat("Friction", component.Friction, 0.01f, 0.0f, 1.0f);
+				ImGuiUtils::DrawDragFloat("Restitution", component.Restitution, 0.01f, 0.0f, 1.0f);
+				ImGuiUtils::DrawDragFloat("Restitution Threshold", component.RestitutionThreshold, 0.01f, 0.0f);
 			});
 
 		DrawComponent<CircleCollider2DComponent>("Circle Collider 2D", entity, [](auto& component)
 			{
-				ImGui::DragFloat2("Offset", glm::value_ptr(component.Offset));
-				ImGui::DragFloat("Radius", &component.Radius);
-				ImGui::DragFloat("Density", &component.Density, 0.01f, 0.0f, 1.0f);
-				ImGui::DragFloat("Friction", &component.Friction, 0.01f, 0.0f, 1.0f);
-				ImGui::DragFloat("Restitution", &component.Restitution, 0.01f, 0.0f, 1.0f);
-				ImGui::DragFloat("Restitution Threshold", &component.RestitutionThreshold, 0.01f, 0.0f);
+				ImGuiUtils::DrawDragFloat2("Offset", component.Offset);
+				ImGuiUtils::DrawDragFloat("Radius", component.Radius);
+				ImGuiUtils::DrawDragFloat("Density", component.Density, 0.01f, 0.0f, 1.0f);
+				ImGuiUtils::DrawDragFloat("Friction", component.Friction, 0.01f, 0.0f, 1.0f);
+				ImGuiUtils::DrawDragFloat("Restitution", component.Restitution, 0.01f, 0.0f, 1.0f);
+				ImGuiUtils::DrawDragFloat("Restitution Threshold", component.RestitutionThreshold, 0.01f, 0.0f);
 			});
 
 		DrawComponent<ScriptComponent>("Script", entity, [](auto& component)
 		{
-			char buffer[256];
-
-			// ScriptPath
-			memset(buffer, 0, sizeof(buffer));
-			std::strncpy(buffer, component.ScriptPath.c_str(), sizeof(buffer));
-			ImGui::Text("ScriptPath");
-			ImGui::SameLine();
-			ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 80.0f);
-			if (ImGui::InputText("##ScriptPath", buffer, sizeof(buffer)))
-				component.ScriptPath = buffer;
-			ImGui::PopItemWidth();
-
-			if (ImGui::BeginDragDropTarget())
+			if (ImGuiUtils::DrawContentPathControl("Script Path", component.ScriptPath))
 			{
-				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
+				auto content = FileSystem::Get().ReadText(component.ScriptPath);
+				if (content)
 				{
-					const char* path = (const char*)payload->Data;
-					VfsPath vp = VfsPath::Parse(path);
-					std::filesystem::path relPath(vp.relativePath);
-					if (vp.IsValid() && relPath.extension() == ".py")
-					{
-						component.ScriptPath = vp.ToString();
-						std::strncpy(buffer, component.ScriptPath.c_str(), sizeof(buffer) - 1);
-						buffer[sizeof(buffer) - 1] = '\0';
-
-						auto content = FileSystem::Get().ReadText(vp.ToString());
-						if (content)
-						{
-							std::string parsedName = ParsePythonClassNameFromContent(*content);
-							if (!parsedName.empty())
-								component.ClassName = parsedName;
-						}
-					}
-				}
-				ImGui::EndDragDropTarget();
-			}
-			
-			ImGui::SameLine();
-			if (ImGui::Button("..."))
-			{
-				std::string filepath = FileDialogs::OpenFile("Python Script (*.py)\0*.py\0");
-				if (!filepath.empty())
-				{
-					std::filesystem::path relPath = std::filesystem::relative(std::filesystem::path(filepath), ProjectUtils::GetProjectContentPath());
-					component.ScriptPath = VfsPath::FromGame(relPath.generic_string()).ToString();
-					std::strncpy(buffer, component.ScriptPath.c_str(), sizeof(buffer) - 1);
-					buffer[sizeof(buffer) - 1] = '\0';
-
-					std::string parsedName = ParsePythonClassName(filepath);
+					std::string parsedName = ParsePythonClassNameFromContent(*content);
 					if (!parsedName.empty())
 						component.ClassName = parsedName;
 				}
 			}
-			
-			// ClassName
-			memset(buffer, 0, sizeof(buffer));
-			std::strncpy(buffer, component.ClassName.c_str(), sizeof(buffer));
-			ImGui::Text("ClassName");
-			ImGui::SameLine();
-			if (ImGui::InputText("##ClassName", buffer, sizeof(buffer)))
-				component.ClassName = buffer;
+
+			ImGuiUtils::DrawInputText("Class Name", component.ClassName);
 		});
 
 		DrawComponent<AudioSourceComponent>("Audio Source", entity, [](auto& component)
 		{
-			char buffer[256];
-			memset(buffer, 0, sizeof(buffer));
-			std::strncpy(buffer, component.SoundPath.c_str(), sizeof(buffer));
-			ImGui::Text("Sound Path");
-			ImGui::SameLine();
-			if (ImGui::InputText("##SoundPath", buffer, sizeof(buffer)))
-			{
-				component.SoundPath = buffer;
-			}
-
-			if (ImGui::BeginDragDropTarget())
-			{
-				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
-				{
-					const char* path = (const char*)payload->Data;
-					VfsPath vp = VfsPath::Parse(path);
-					if (vp.IsValid())
-					{
-						component.SoundPath = vp.ToString();
-						std::strncpy(buffer, component.SoundPath.c_str(), sizeof(buffer) - 1);
-						buffer[sizeof(buffer) - 1] = '\0';
-					}
-				}
-				ImGui::EndDragDropTarget();
-			}
-
-			ImGui::DragFloat("Volume", &component.Volume, 0.01f, 0.0f, 1.0f);
-			ImGui::Checkbox("Looping", &component.Looping);
-			ImGui::Checkbox("Play On Start", &component.PlayOnStart);
+			ImGuiUtils::DrawContentPathControl("Sound Path", component.SoundPath);
+			ImGuiUtils::DrawDragFloat("Volume", component.Volume, 0.01f, 0.0f, 1.0f);
+			ImGuiUtils::DrawCheckbox("Looping", component.Looping);
+			ImGuiUtils::DrawCheckbox("Play On Start", component.PlayOnStart);
 		});
 
 		DrawComponent<UITextBlockComponent>("Text Blocks", entity, [](auto& component)
@@ -680,16 +506,11 @@ namespace Candy {
 				{
 					ImGui::Indent();
 
-					char buf[256];
-					memset(buf, 0, sizeof(buf));
-					std::strncpy(buf, tb.Text.c_str(), sizeof(buf));
-					if (ImGui::InputText("Text", buf, sizeof(buf)))
-						tb.Text = buf;
-
-					ImGui::ColorEdit4("Color", glm::value_ptr(tb.Color));
-					ImGui::DragFloat2("Position", glm::value_ptr(tb.Position));
-					ImGui::DragFloat("Font Size", &tb.FontSize, 1.0f, 1.0f, 200.0f);
-					ImGui::Checkbox("Visible", &tb.Visible);
+					ImGuiUtils::DrawInputText("Text", tb.Text);
+					ImGuiUtils::DrawColorEdit4("Color", tb.Color);
+					ImGuiUtils::DrawDragFloat2("Position", tb.Position);
+					ImGuiUtils::DrawDragFloat("Font Size", tb.FontSize, 1.0f, 1.0f, 200.0f);
+					ImGuiUtils::DrawCheckbox("Visible", tb.Visible);
 
 					ImGui::Unindent();
 				}
@@ -724,22 +545,11 @@ namespace Candy {
 				{
 					ImGui::Indent();
 
-					char buf[256];
-					memset(buf, 0, sizeof(buf));
-					std::strncpy(buf, btn.Text.c_str(), sizeof(buf));
-					if (ImGui::InputText("Text", buf, sizeof(buf)))
-						btn.Text = buf;
-
-					ImGui::DragFloat2("Size", glm::value_ptr(btn.Size));
-					ImGui::DragFloat2("Position", glm::value_ptr(btn.Position));
-
-					char funcBuf[256];
-					memset(funcBuf, 0, sizeof(funcBuf));
-					std::strncpy(funcBuf, btn.OnClick.c_str(), sizeof(funcBuf));
-					if (ImGui::InputText("OnClick", funcBuf, sizeof(funcBuf)))
-						btn.OnClick = funcBuf;
-
-					ImGui::Checkbox("Visible", &btn.Visible);
+					ImGuiUtils::DrawInputText("Text", btn.Text);
+					ImGuiUtils::DrawDragFloat2("Size", btn.Size);
+					ImGuiUtils::DrawDragFloat2("Position", btn.Position);
+					ImGuiUtils::DrawInputText("OnClick", btn.OnClick);
+					ImGuiUtils::DrawCheckbox("Visible", btn.Visible);
 
 					ImGui::Unindent();
 				}
