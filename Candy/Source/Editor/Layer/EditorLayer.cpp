@@ -54,6 +54,12 @@ namespace Candy {
 		fbSpec.Height = 720;
 		m_Framebuffer = Framebuffer::Create(fbSpec);
 
+		FramebufferSpecification previewFbSpec;
+		previewFbSpec.Attachments = { FramebufferTextureFormat::RGBA8, FramebufferTextureFormat::Depth };
+		previewFbSpec.Width = 480;
+		previewFbSpec.Height = 270;
+		m_CameraPreviewFramebuffer = Framebuffer::Create(previewFbSpec);
+
 		m_EditorScene = CreateRef<Scene>();
 		m_ActiveScene = m_EditorScene;
 
@@ -176,6 +182,31 @@ namespace Candy {
 		}
 
 		OnOverlayRender();
+
+		// Camera Preview PIP
+		{
+			Entity selectedEntity = m_SceneHierarchyPanel.GetSelectedEntity();
+			if (!m_CameraPreviewPinned)
+			{
+				if (selectedEntity && selectedEntity.HasComponent<CameraComponent>())
+				{
+					m_CameraPreviewEntity = selectedEntity;
+				}
+				else
+				{
+					m_CameraPreviewEntity = {};
+				}
+			}
+			else if (!m_CameraPreviewEntity || !m_CameraPreviewEntity.HasComponent<CameraComponent>())
+			{
+				m_CameraPreviewEntity = {};
+				m_CameraPreviewPinned = false;
+			}
+			if (m_CameraPreviewEntity)
+			{
+				RenderPreviewScene();
+			}
+		}
 
 		// Render game UI into FBO
 		{
@@ -421,13 +452,7 @@ namespace Candy {
 			ImGuizmo::SetDrawlist();
 
 			ImGuizmo::SetRect(m_ViewportBounds[0].x, m_ViewportBounds[0].y, m_ViewportBounds[1].x - m_ViewportBounds[0].x, m_ViewportBounds[1].y - m_ViewportBounds[0].y);
-
-			// Camera
-			/*auto cameraEntity = m_ActiveScene->GetPrimaryCameraEntity();
-			const auto& camera = cameraEntity.GetComponent<CameraComponent>().Camera;
-			const glm::mat4& cameraProjection = camera.GetProjection();
-			glm::mat4 cameraView = glm::inverse(cameraEntity.GetComponent<TransformComponent>().GetTransform());*/
-
+			
 			// Editor camera
 			const glm::mat4& cameraProjection = m_EditorCamera.GetProjection();
 			glm::mat4 cameraView = m_EditorCamera.GetViewMatrix();
@@ -461,8 +486,44 @@ namespace Candy {
 			}
 		}
 
-		// Game UI is now rendered into the FBO via GameFrameRenderer::RenderUITo (in OnUpdate)
-		
+		// Camera Preview PIP overlay
+		if (m_CameraPreviewEntity)
+		{
+			float previewWidth = m_ViewportSize.x * m_CameraPreviewSize;
+			float aspectRatio = 16.0f / 9.0f;
+			float previewHeight = previewWidth / aspectRatio;
+			float padding = 10.0f;
+
+			ImVec2 previewPos(
+				viewportPanelSize.x - previewWidth - padding,
+				viewportPanelSize.y - previewHeight - padding
+			);
+
+			// Pin button + camera name
+			ImGui::SetCursorPos(ImVec2(previewPos.x, previewPos.y - 22.0f));
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 0.7f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.4f, 0.4f, 0.8f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.3f, 0.3f, 0.3f, 0.8f));
+			if (ImGui::SmallButton(m_CameraPreviewPinned ? "Unpin" : "Pin"))
+			{
+				m_CameraPreviewPinned = !m_CameraPreviewPinned;
+			}
+			ImGui::PopStyleColor(3);
+
+			ImGui::SameLine();
+			auto& tag = m_CameraPreviewEntity.GetComponent<TagComponent>();
+			ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 0.8f), tag.Tag.c_str());
+
+			// Preview image
+			ImGui::SetCursorPos(previewPos);
+			uint64_t previewTextureID = m_CameraPreviewFramebuffer->GetColorAttachmentRendererID();
+			ImGui::Image(
+				reinterpret_cast<void*>(previewTextureID),
+				ImVec2(previewWidth, previewHeight),
+				ImVec2(0, 1), ImVec2(1, 0)
+			);
+		}
+
 		ImGui::End();
 		ImGui::PopStyleVar();
 
@@ -566,8 +627,14 @@ namespace Candy {
 	{
 		if (e.GetMouseButton() == Mouse::ButtonLeft)
 		{
+			if (!m_HoveredEntity)
+			{
+				return false;
+			}
 			if (m_ViewportHovered && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftAlt))
+			{
 				m_SceneHierarchyPanel.SetSelectedEntity(m_HoveredEntity);
+			}
 		}
 		return false;
 	}
@@ -634,6 +701,8 @@ namespace Candy {
 		m_EditorScenePath = std::filesystem::path();
 		EditorState::Get().LastScenePath.clear();
 		m_HoveredEntity = {};
+		m_CameraPreviewEntity = {};
+		m_CameraPreviewPinned = false;
 	}
 
 	void EditorLayer::OpenScene()
@@ -667,6 +736,8 @@ namespace Candy {
 			m_ActiveScene = m_EditorScene;
 			m_EditorScenePath = path;
 			m_HoveredEntity = {};
+			m_CameraPreviewEntity = {};
+			m_CameraPreviewPinned = false;
 			EditorState::Get().LastScenePath = path.string();
 		}
 	}
@@ -705,6 +776,8 @@ namespace Candy {
 
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 		m_HoveredEntity = {};
+		m_CameraPreviewEntity = {};
+		m_CameraPreviewPinned = false;
 	}
 
 	void EditorLayer::OnSceneSimulate()
@@ -719,6 +792,8 @@ namespace Candy {
 
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 		m_HoveredEntity = {};
+		m_CameraPreviewEntity = {};
+		m_CameraPreviewPinned = false;
 	}
 
 	void EditorLayer::OnSceneStop()
@@ -735,6 +810,8 @@ namespace Candy {
 
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 		m_HoveredEntity = {};
+		m_CameraPreviewEntity = {};
+		m_CameraPreviewPinned = false;
 	}
 
 	void EditorLayer::OnDuplicateEntity()
@@ -745,6 +822,34 @@ namespace Candy {
 		Entity selectedEntity = m_SceneHierarchyPanel.GetSelectedEntity();
 		if (selectedEntity)
 			m_EditorScene->DuplicateEntity(selectedEntity);
+	}
+
+	void EditorLayer::RenderPreviewScene()
+	{
+		auto& cameraComp = m_CameraPreviewEntity.GetComponent<CameraComponent>();
+		auto& cameraTransform = m_CameraPreviewEntity.GetComponent<TransformComponent>();
+
+		// Set camera viewport to match preview framebuffer size
+		auto& previewSpec = m_CameraPreviewFramebuffer->GetSpecification();
+		uint32_t prevWidth = previewSpec.Width;
+		uint32_t prevHeight = previewSpec.Height;
+
+		// Save and restore camera viewport size
+		auto& sceneCamera = cameraComp.Camera;
+		sceneCamera.SetViewportSize(prevWidth, prevHeight);
+
+		m_CameraPreviewFramebuffer->Bind();
+		RenderCommand::SetClearColor({ 0.0f, 0.0f, 0.0f, 1.0f });
+		RenderCommand::Clear();
+
+		m_ActiveScene->RenderSceneFromCamera(cameraComp, cameraTransform.GetTransform());
+
+		m_CameraPreviewFramebuffer->Unbind();
+		m_Framebuffer->Bind(); // Re-bind main FBO for subsequent UI rendering
+
+		// Restore camera viewport to main viewport size
+		sceneCamera.SetViewportSize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
+		
 	}
 
 	void EditorLayer::OpenRecent(const std::filesystem::path& path)

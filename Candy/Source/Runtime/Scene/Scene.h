@@ -40,6 +40,7 @@ namespace Candy {
 		void OnUpdateSimulationLogic(Timestep ts);
 		void OnUpdateEditor(Timestep ts, EditorCamera& camera);
 		void RenderScene(EditorCamera& camera);
+		void RenderSceneFromCamera(const class CameraComponent& cameraComp, const glm::mat4& cameraTransform);
 
 		void OnViewportResize(uint32_t width, uint32_t height);
 		void DuplicateEntity(Entity entity);

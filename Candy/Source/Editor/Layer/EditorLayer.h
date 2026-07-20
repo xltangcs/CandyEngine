@@ -44,14 +44,12 @@ namespace Candy {
 
 		void OnDuplicateEntity();
 
+		void RenderPreviewScene();
+
 		// Project
 		void OpenRecent(const std::filesystem::path& path);
-		void BuildGame();
 		void UI_BuildDialog();
-
-		// UI Panels
-		void UI_Toolbar();
-
+	
 	private:
 		Candy::OrthographicCameraController m_CameraController;
 
@@ -59,6 +57,12 @@ namespace Candy {
 		Ref<VertexArray> m_SquareVA;
 		Ref<Shader> m_FlatColorShader;
 		Ref<Framebuffer> m_Framebuffer;
+
+		// Camera Preview (PIP)
+		Entity m_CameraPreviewEntity;
+		bool m_CameraPreviewPinned = false;
+		Ref<Framebuffer> m_CameraPreviewFramebuffer;
+		float m_CameraPreviewSize = 0.3f;
 
 		Ref<Scene> m_ActiveScene;
 		Ref<Scene> m_EditorScene;
