@@ -299,6 +299,10 @@ PYBIND11_EMBEDDED_MODULE(candy, m)
              "Check if this entity has a component by type name")
         .def("add_component", &AddComponentToEntity, py::arg("type"),
              "Add a component by type name (e.g. \"Rigidbody2DComponent\")")
+        .def("queue_free", &Candy::Entity::QueueFree,
+             "Deferred deletion (Godot-style): destroyed on the next safe frame. Safe to call from on_tick / collision callbacks.")
+        .def("is_queued_for_deletion", &Candy::Entity::IsQueuedForDeletion,
+             "Returns true if this entity has been marked for deferred deletion via queue_free().")
         .def_property("tag",
             [](Candy::Entity& self) -> std::string {
                 return self.GetComponent<Candy::TagComponent>().Tag;
@@ -342,6 +346,13 @@ PYBIND11_EMBEDDED_MODULE(candy, m)
         .def("destroy_entity", [](Candy::Scene& self, Candy::Entity& entity) {
             self.DestroyEntity(entity);
         })
+        .def("queue_free", [](Candy::Scene& self, Candy::Entity& entity) {
+            self.QueueFree(entity);
+        }, py::arg("entity"),
+             "Deferred deletion (Godot-style): the entity is destroyed on the next safe frame.")
+        .def("is_queued_for_deletion", [](Candy::Scene& self, Candy::Entity& entity) -> bool {
+            return self.IsQueuedForDeletion(entity);
+        }, py::arg("entity"))
         .def("create_physics_body", [](Candy::Scene& self, Candy::Entity& entity) {
             self.CreatePhysicsBody(entity);
         })

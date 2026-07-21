@@ -44,7 +44,7 @@ class Cube(candy.ScriptObject):
         transform = entity.get_component("TransformComponent")
         if transform.Translation.y < -3.0:
             self.game_over = True
-            scene.destroy_entity(self._entity)
+            self._entity.queue_free()
 
     def on_collision_enter(self, other):
         if other is None:

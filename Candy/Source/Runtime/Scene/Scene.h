@@ -1,5 +1,7 @@
 #pragma once
 
+#include <set>
+
 #include "entt.hpp"
 
 #include "Runtime/Core/Timestep.h"
@@ -27,6 +29,10 @@ namespace Candy {
 		Entity CreateEntity(const std::string& name = std::string());
 		Entity CreateEntityWithUUID(UUID uuid, const std::string& name = std::string());
 		void DestroyEntity(Entity entity);
+
+		void QueueFree(Entity entity);
+		bool IsQueuedForDeletion(Entity entity) const;
+		void ProcessDeletions();
 
 		void OnRuntimeStart();
 		void OnRuntimeStop();
@@ -68,6 +74,8 @@ namespace Candy {
 		b2World* m_PhysicsWorld = nullptr;
 		Scope<PhysicsContactListener> m_ContactListener;
 		SceneCamera m_FallbackCamera;
+
+		std::set<entt::entity> m_PendingDeletions;
 
 		friend class Entity;
 		friend class SceneSerializer;

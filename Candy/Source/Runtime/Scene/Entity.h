@@ -62,6 +62,9 @@ namespace Candy {
 		const std::string& GetName() { return GetComponent<TagComponent>().Tag; }
 		Scene* GetScene() const { return m_Scene; }
 
+		void QueueFree() { m_Scene->QueueFree(*this); }
+		bool IsQueuedForDeletion() const { return m_Scene->IsQueuedForDeletion(*this); }
+
 		bool operator==(const Entity& other) const
 		{
 			return m_EntityHandle == other.m_EntityHandle && m_Scene == other.m_Scene;

@@ -29,9 +29,9 @@ class GameManager(candy.ScriptObject):
         if scene is None:
             return
 
-        # Check if Cube is still alive
+        # Check if Cube is still alive (queue_free'd → no longer in scene → game over)
         cube = scene.find_entity_by_tag("Cube")
-        if cube is not None:
+        if cube is None:
             self.game_over = True
             self._update_hud()
             return
@@ -54,7 +54,6 @@ class GameManager(candy.ScriptObject):
     def _cleanup_obstacles(self, scene):
         """Destroy obstacles that have passed the left boundary."""
         boundary_x = -12.0
-        to_destroy = []
         # Collect dead obstacles by scanning entity tags
         for i in range(1, self.obstacle_index + 1):
             name = f"Obstacle_{i}"
@@ -62,10 +61,7 @@ class GameManager(candy.ScriptObject):
             if obs is not None:
                 transform = obs.get_component("TransformComponent")
                 if transform.Translation.x < boundary_x:
-                    to_destroy.append(obs)
-
-        for obs in to_destroy:
-            scene.destroy_entity(obs)
+                    obs.queue_free()
 
     def _spawn_obstacle(self, scene):
         self.obstacle_index += 1

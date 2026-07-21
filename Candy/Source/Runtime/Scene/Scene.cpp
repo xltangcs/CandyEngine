@@ -123,7 +123,46 @@ namespace Candy {
 	{
 		if (entity.HasComponent<ScriptComponent>())
 			ScriptSystem::Get().DestroyScript(entity.GetUUID());
+
+		if (m_PhysicsWorld && entity.HasComponent<Rigidbody2DComponent>())
+		{
+			auto& rb2d = entity.GetComponent<Rigidbody2DComponent>();
+			if (rb2d.RuntimeBody)
+			{
+				m_PhysicsWorld->DestroyBody((b2Body*)rb2d.RuntimeBody);
+				rb2d.RuntimeBody = nullptr;
+			}
+		}
+
 		m_Registry.destroy(entity);
+	}
+
+	void Scene::QueueFree(Entity entity)
+	{
+		if (!entity || !m_Registry.valid(entity))
+			return;
+		m_PendingDeletions.insert(entity);
+	}
+
+	bool Scene::IsQueuedForDeletion(Entity entity) const
+	{
+		return m_PendingDeletions.count(entity) > 0;
+	}
+
+	void Scene::ProcessDeletions()
+	{
+		if (m_PendingDeletions.empty())
+			return;
+
+		// Iterate over the set without modifying it (only clear() at the end),
+		// so traversal is never invalidated.
+		for (entt::entity e : m_PendingDeletions)
+		{
+			Entity entity{ e, this };
+			if (entity)
+				DestroyEntity(entity);
+		}
+		m_PendingDeletions.clear();
 	}
 
 	void Scene::OnRuntimeStart()
@@ -166,6 +205,8 @@ namespace Candy {
 
 	void Scene::OnUpdateRuntimeLogic(Timestep ts)
 	{
+		ProcessDeletions();
+
 		// Update Python scripts
 		ScriptSystem::Get().OnUpdateRuntime(ts);
 
@@ -267,6 +308,8 @@ namespace Candy {
 
 	void Scene::OnUpdateSimulationLogic(Timestep ts)
 	{
+		ProcessDeletions();
+
 		// Physics
 		{
 			const int32_t velocityIterations = 6;
