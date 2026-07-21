@@ -1,7 +1,7 @@
 project "Candy"		
 	kind "StaticLib"
 	language "C++"
-	cppdialect "C++17"
+	cppdialect "C++20"
 	staticruntime "off"
 
     targetdir ("%{wks.location}/bin/" .. outputdir .. "/%{prj.name}")
@@ -105,7 +105,7 @@ project "Candy"
 project "CandyEditor"
 	kind "ConsoleApp"
 	language "C++"
-	cppdialect "C++17"
+	cppdialect "C++20"
 	staticruntime "off"
 	buildoptions { "/utf-8" }
 	defines { "YAML_CPP_STATIC_DEFINE" }

@@ -1,6 +1,10 @@
 workspace "CandyEngine"		-- sln文件名
 	architecture "x64"	
 	startproject "CandyEditor"
+	
+	language "C++"
+	cppdialect "C++20"
+        
 	configurations{
 		"Debug",
 		"Release",
