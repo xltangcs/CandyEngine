@@ -10,6 +10,7 @@ class Cube(candy.ScriptObject):
         self.ground_contact_count = 0
         self.game_over = False
         self.space_was_pressed = False
+        self.is_shrunk = False
 
     def on_tick(self, dt):
         if self.game_over:
@@ -23,6 +24,29 @@ class Cube(candy.ScriptObject):
         #     return 
 
         rb = entity.get_component("Rigidbody2DComponent")
+        transform = entity.get_component("TransformComponent")
+
+        # --- Crouch: hold S to shrink to half size, anchored at the bottom-center ---
+        # The physics body's position is its center and the engine resyncs the transform
+        # from it every frame, so to keep the cube grounded we shift the body down by the
+        # difference in half-heights and rebuild the collider at the new size.
+        want_shrink = candy.is_key_pressed("S")
+        if want_shrink != self.is_shrunk:
+            old_scale = transform.Scale
+            factor = 0.5 if want_shrink else 2.0
+            new_scale = candy.Vec3(old_scale.x * factor, old_scale.y * factor, 1.0)
+            old_half = old_scale.y * 0.5
+            new_half = new_scale.y * 0.5
+            transform.Scale = new_scale
+            # keep the bottom edge fixed: move the center by (old half - new half)
+            transform.Translation = candy.Vec3(
+                transform.Translation.x,
+                transform.Translation.y - old_half + new_half,
+                transform.Translation.z
+            )
+            # rebuild the physics body so the collider matches the new size
+            entity.scene.recreate_physics_body(entity)
+            self.is_shrunk = want_shrink
 
         # Horizontal movement (preserve vertical velocity, physics drives position)
         vel = rb.get_linear_velocity()
@@ -41,7 +65,6 @@ class Cube(candy.ScriptObject):
         self.space_was_pressed = space_down
 
         # Fell off the ground → game over
-        transform = entity.get_component("TransformComponent")
         if transform.Translation.y < -3.0:
             self.game_over = True
             self._entity.queue_free()
@@ -55,6 +78,7 @@ class Cube(candy.ScriptObject):
             self.ground_contact_count += 1
         elif tag.startswith("Obstacle"):
             self.ground_contact_count += 1
+
     def on_collision_exit(self, other):
         if other is None:
             return

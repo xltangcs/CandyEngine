@@ -6,16 +6,32 @@ class GameManager(candy.ScriptObject):
     """Manages game state: spawns obstacles, tracks score, updates HUD."""
 
     def on_construct(self):
-        self.spawn_interval = 1.5       # seconds between spawns
+        self.base_spawn_interval = 1.5    # 初始生成间隔（秒）
+        self.min_spawn_interval = 0.3     # 最小生成间隔
+        self.interval_decrease_rate = 0.02 # 每秒间隔减少量
         self.spawn_timer = 0.0
         self.obstacle_speed = 3.0
         self.game_over = False
         self.score = 0.0
         self.obstacle_count = 0
-        self.min_spawn_y = -0.5
-        self.max_spawn_y = 1.5
         self.spawn_x = 8.0
         self.obstacle_index = 0
+
+        # --- 障碍物 X 轴宽度：0.4 ~ 0.8 独立随机 ---
+        self.obs_x_scale_min = 0.4
+        self.obs_x_scale_max = 0.8
+
+        # --- 障碍物 Y 轴高度：独立随机 ---
+        self.obs_y_scale_min = 0.3
+        self.obs_y_scale_max = 0.7
+
+        # --- 可通过性相关（基于物理：g=19.8, jump=7.0）---
+        self.ground_top = -0.995         # 地面顶面 Y（中心 -1 + 半高 0.005）
+        self.cube_crouch_half = 0.1      # 蹲下后 cube 半高（0.2 * 0.5）
+        self.jump_peak_bottom = 0.242    # cube 跳跃峰值底部 Y（用于判断能否跳上去）
+        self.crouch_margin = 0.05        # 蹲下通过的安全余量
+        self.jump_type_ratio = 0.6       # “跳过去”类型占比，其余为“蹲过去”
+        self.max_spawn_y = 1.5           # 浮空障碍最高 Y 位置
 
     def on_tick(self, dt):
         if self.game_over:
@@ -40,10 +56,15 @@ class GameManager(candy.ScriptObject):
         # Increment score
         self.score += dt
 
-        # Spawn timer
+        # Spawn timer — 间隔随时间递减
         self.spawn_timer -= dt
         if self.spawn_timer <= 0.0:
-            self.spawn_timer = self.spawn_interval
+            # 计算当前间隔 = max(最小间隔, 基础间隔 - 递减量 * 存活时间)
+            current_interval = max(
+                self.min_spawn_interval,
+                self.base_spawn_interval - self.interval_decrease_rate * self.score
+            )
+            self.spawn_timer = current_interval
             self._spawn_obstacle(scene)
 
         # Clean up dead obstacles
@@ -55,7 +76,6 @@ class GameManager(candy.ScriptObject):
     def _cleanup_obstacles(self, scene):
         """Destroy obstacles that have passed the left boundary."""
         boundary_x = -12.0
-        # Collect dead obstacles by scanning entity tags
         for i in range(1, self.obstacle_index + 1):
             name = f"Obstacle_{i}"
             obs = scene.find_entity_by_tag(name)
@@ -74,24 +94,38 @@ class GameManager(candy.ScriptObject):
         # Tag
         obs.tag = name
 
-        # Transform - random Y position, spawn at right edge
+        # X Scale: 独立随机 0.4 ~ 0.8
+        x_scale = random.uniform(self.obs_x_scale_min, self.obs_x_scale_max)
+
+        # Y Scale: 独立随机
+        y_scale = random.uniform(self.obs_y_scale_min, self.obs_y_scale_max)
+
+        # Y 位置: 保证至少一条路径可通过（跳过去 或 蹲过去）
+        if random.random() < self.jump_type_ratio:
+            # 跳过去型：坐在地面上，cube 可跳上顶部翻越
+            y_pos = self.ground_top + y_scale * 0.5
+        else:
+            # 蹲过去型：浮空，底部留出足够间隙让蹲下的 cube 通过
+            min_y = (self.ground_top + self.cube_crouch_half * 2 + self.crouch_margin) + y_scale * 0.5
+            y_pos = random.uniform(min_y, self.max_spawn_y)
+
         transform = obs.get_component("TransformComponent")
-        y_pos = random.uniform(self.min_spawn_y, self.max_spawn_y)
         transform.Translation = candy.Vec3(self.spawn_x, y_pos, 0.0)
-        transform.Scale = candy.Vec3(0.5, 0.5, 1.0)
+        transform.Scale = candy.Vec3(x_scale, y_scale, 1.0)
 
         # Sprite renderer
         obs.add_component("SpriteRendererComponent")
         sprite = obs.get_component("SpriteRendererComponent")
         sprite.Color = candy.Vec4(1.0, 0.2, 0.2, 1.0)
 
-        # Rigidbody (Dynamic)
+        # Rigidbody (Kinematic)
         obs.add_component("Rigidbody2DComponent")
         rb = obs.get_component("Rigidbody2DComponent")
         rb.Type = 2        # Kinematic
         rb.FixedRotation = True
 
-        # Box collider
+        # Box collider — 保持默认 Size(0.5,0.5)，物理半尺寸 = Size * Scale，
+        # 全尺寸 = Scale，与视觉大小完全一致（不再用 random_scale 覆盖）
         obs.add_component("BoxCollider2DComponent")
         collider = obs.get_component("BoxCollider2DComponent")
         collider.Size = candy.Vec2(0.5, 0.5)
