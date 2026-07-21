@@ -9,11 +9,20 @@ Entities:
       Scale: [1, 1, 1]
     UITextBlockComponent:
       TextBlocks:
-        TextBlock_1:
+        Game:
           Text: Cube
           Color: [1, 1, 1, 1]
           Position: [555, 136]
           FontSize: 72
+          Visible: true
+    UIButtonComponent:
+      Buttons:
+        Restart:
+          Text: Restart
+          FontSize: 45
+          Size: [200, 50]
+          Position: [555, 232.899994]
+          OnClick: ""
           Visible: true
   - Entity: 10453616027141309842
     TagComponent:

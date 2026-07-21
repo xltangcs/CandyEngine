@@ -172,7 +172,8 @@ namespace Candy {
 		auto scriptView = m_Registry.view<ScriptComponent>();
 		for (auto e : scriptView)
 		{
-			scriptSystem.InstantiateScript(Entity{ e, this });
+			Entity entity{ e, this };
+			scriptSystem.InstantiateScript(entity);
 		}
 
 		scriptSystem.OnRuntimeStart();

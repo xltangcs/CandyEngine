@@ -231,7 +231,7 @@ PYBIND11_EMBEDDED_MODULE(candy, m)
     // --- UITextBlockComponent ---
     py::class_<Candy::UITextBlockComponent>(m, "UITextBlockComponent")
         .def(py::init<>())
-        .def_readwrite("TextBlocks", &Candy::UITextBlockComponent::TextBlocks);
+        .def_readwrite("TextBlockDatas", &Candy::UITextBlockComponent::TextBlockDatas);
 
     // --- Rigidbody2DComponent ---
     py::class_<Candy::Rigidbody2DComponent>(m, "Rigidbody2DComponent")

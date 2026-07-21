@@ -107,8 +107,8 @@ static std::filesystem::path ResolveScriptPath(const std::string& scriptPath)
 
 void ScriptSystem::InstantiateScript(Entity& entity)
 {
-    UUID uuid = entity.GetUUID();
-    auto& sc = entity.GetComponent<ScriptComponent>();
+    const UUID uuid = entity.GetUUID();
+    const auto& sc = entity.GetComponent<ScriptComponent>();
 
     if (m_Instances.find(uuid) != m_Instances.end())
     {

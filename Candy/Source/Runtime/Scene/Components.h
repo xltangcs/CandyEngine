@@ -21,6 +21,7 @@ namespace Candy {
 
 		IDComponent() = default;
 		IDComponent(const IDComponent&) = default;
+		IDComponent(const UUID& id) : ID(id) {} 
 	};
 
 	struct TagComponent
@@ -188,7 +189,8 @@ namespace Candy {
 
 	struct UITextBlockComponent
 	{
-		std::unordered_map<std::string, TextBlockUIData> TextBlocks;
+		std::unordered_map<std::string, TextBlockUIData> TextBlockDatas;
+		std::vector<std::string> TextBlockOrder;
 
 		UITextBlockComponent() = default;
 		UITextBlockComponent(const UITextBlockComponent&) = default;
@@ -197,6 +199,7 @@ namespace Candy {
 	struct ButtonUIData
 	{
 		std::string Text;
+		float FontSize = 24.0f;
 		glm::vec2 Size = { 200.0f, 50.0f };
 		glm::vec2 Position = { 0.0f, 0.0f };
 		std::string OnClick;
@@ -205,7 +208,8 @@ namespace Candy {
 
 	struct UIButtonComponent
 	{
-		std::unordered_map<std::string, ButtonUIData> Buttons;
+		std::unordered_map<std::string, ButtonUIData> ButtonDatas;
+		std::vector<std::string> ButtonOrder;
 
 		UIButtonComponent() = default;
 		UIButtonComponent(const UIButtonComponent&) = default;

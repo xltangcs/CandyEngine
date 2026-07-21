@@ -125,8 +125,8 @@ class GameManager(candy.ScriptObject):
             return
 
         ui = hud_entity.get_component("UITextBlockComponent")
-        if "TextBlock_1" in ui.TextBlocks:
-            block = ui.TextBlocks["TextBlock_1"]
+        if "TextBlock_1" in ui.TextBlockDatas:
+            block = ui.TextBlockDatas["TextBlock_1"]
             if self.game_over:
                 block.Text = f"Game Over! Score: {self.score:.1f}"
             else:

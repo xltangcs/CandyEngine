@@ -40,8 +40,9 @@ namespace Candy {
 			{
 				Entity entity{ e, &scene };
 				auto& comp = entity.GetComponent<UITextBlockComponent>();
-				for (auto& [key, tb] : comp.TextBlocks)
+				for (auto& key : comp.TextBlockOrder)
 				{
+					auto& tb = comp.TextBlockDatas[key];
 					if (!tb.Visible) continue;
 
 					ImVec2 pos(tb.Position.x, tb.Position.y);
@@ -63,8 +64,9 @@ namespace Candy {
 			{
 				Entity entity{ e, &scene };
 				auto& comp = entity.GetComponent<UIButtonComponent>();
-				for (auto& [key, btn] : comp.Buttons)
+				for (auto& key : comp.ButtonOrder)
 				{
+					auto& btn = comp.ButtonDatas[key];
 					if (!btn.Visible) continue;
 
 					ImVec2 pos(btn.Position.x, btn.Position.y);
@@ -75,9 +77,10 @@ namespace Candy {
 						IM_COL32(60, 60, 60, 200), 4.0f);
 
 					// Draw centered text
-					ImVec2 textSize = ImGui::CalcTextSize(btn.Text.c_str());
+					ImFont* font = ImGui::GetFont();
+					ImVec2 textSize = font->CalcTextSizeA(btn.FontSize, FLT_MAX, -1.0f, btn.Text.c_str());
 					drawList->AddText(
-						ImVec2(pos.x + (size.x - textSize.x) * 0.5f,
+					nullptr, btn.FontSize, ImVec2(pos.x + (size.x - textSize.x) * 0.5f,
 						       pos.y + (size.y - textSize.y) * 0.5f),
 						IM_COL32(255, 255, 255, 255), btn.Text.c_str());
 

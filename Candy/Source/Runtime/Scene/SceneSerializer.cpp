@@ -297,8 +297,9 @@ namespace Candy {
 			auto& ui = entity.GetComponent<UITextBlockComponent>();
 			out << YAML::Key << "TextBlocks";
 			out << YAML::BeginMap; // TextBlocks
-			for (auto& [key, tb] : ui.TextBlocks)
+			for (auto& key : ui.TextBlockOrder)
 			{
+				auto& tb = ui.TextBlockDatas[key];
 				out << YAML::Key << key;
 				out << YAML::BeginMap; // TextBlock
 				out << YAML::Key << "Text" << YAML::Value << tb.Text;
@@ -321,11 +322,13 @@ namespace Candy {
 			auto& ui = entity.GetComponent<UIButtonComponent>();
 			out << YAML::Key << "Buttons";
 			out << YAML::BeginMap; // Buttons
-			for (auto& [key, btn] : ui.Buttons)
+			for (auto& key : ui.ButtonOrder)
 			{
+				auto& btn = ui.ButtonDatas[key];
 				out << YAML::Key << key;
 				out << YAML::BeginMap; // Button
 				out << YAML::Key << "Text" << YAML::Value << btn.Text;
+				out << YAML::Key << "FontSize" << YAML::Value << btn.FontSize;
 				out << YAML::Key << "Size" << YAML::Value << btn.Size;
 				out << YAML::Key << "Position" << YAML::Value << btn.Position;
 				out << YAML::Key << "OnClick" << YAML::Value << btn.OnClick;
@@ -444,7 +447,7 @@ namespace Candy {
 				{
 					auto& cc = deserializedEntity.AddComponent<CameraComponent>();
 
-					auto& cameraProps = cameraComponent["Camera"];
+					auto cameraProps = cameraComponent["Camera"];
 					cc.Camera.SetProjectionType((SceneCamera::ProjectionType)cameraProps["ProjectionType"].as<int>());
 
 					cc.Camera.SetPerspectiveVerticalFOV(cameraProps["PerspectiveFOV"].as<float>());
@@ -556,7 +559,8 @@ namespace Candy {
 							tb.Position = tbData["Position"].as<glm::vec2>();
 							tb.FontSize = tbData["FontSize"].as<float>();
 							tb.Visible = tbData["Visible"].as<bool>();
-							ui.TextBlocks[key] = tb;
+							ui.TextBlockDatas[key] = tb;
+						ui.TextBlockOrder.push_back(key);
 						}
 					}
 				}
@@ -574,11 +578,13 @@ namespace Candy {
 							auto& btnData = btnNode.second;
 							ButtonUIData btn;
 							btn.Text = btnData["Text"].as<std::string>();
+							btn.FontSize = btnData["FontSize"].as<float>();
 							btn.Size = btnData["Size"].as<glm::vec2>();
 							btn.Position = btnData["Position"].as<glm::vec2>();
 							btn.OnClick = btnData["OnClick"].as<std::string>();
 							btn.Visible = btnData["Visible"].as<bool>();
-							ui.Buttons[key] = btn;
+							ui.ButtonDatas[key] = btn;
+						ui.ButtonOrder.push_back(key);
 						}
 					}
 				}

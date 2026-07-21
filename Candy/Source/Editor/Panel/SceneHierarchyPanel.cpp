@@ -13,6 +13,7 @@
 #include <cstring>
 #include <regex>
 #include <fstream>
+#include <algorithm>
 
 #include "Runtime/Core/Application.h"
 #include "Runtime/Project/ProjectUtils.h"
@@ -493,11 +494,14 @@ namespace Candy {
 		DrawComponent<UITextBlockComponent>("Text Blocks", entity, [](auto& component)
 		{
 			std::string toRemove;
+			std::vector<std::pair<std::string, std::string>> toRename;
 			float lineHeight = ImGui::GetFrameHeight();
 
-			for (auto& [key, tb] : component.TextBlocks)
+			for (size_t i = 0; i < component.TextBlockOrder.size(); i++)
 			{
-				ImGui::PushID(key.c_str());
+				const auto& key = component.TextBlockOrder[i];
+				auto& tb = component.TextBlockDatas[key];
+				ImGui::PushID(static_cast<int>(i));
 				bool open = ImGui::CollapsingHeader(key.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap);
 				ImGui::SameLine(ImGui::GetContentRegionAvail().x - lineHeight);
 				if (ImGui::Button("X", ImVec2{ lineHeight, lineHeight }))
@@ -505,6 +509,14 @@ namespace Candy {
 				if (open)
 				{
 					ImGui::Indent();
+					std::string editKey = key;
+					if (ImGuiUtils::DrawInputText("Name", editKey))
+					{
+						if (!editKey.empty() && editKey != key)
+						{
+							toRename.push_back({ key, editKey });
+						}
+					}
 
 					ImGuiUtils::DrawInputText("Text", tb.Text);
 					ImGuiUtils::DrawColorEdit4("Color", tb.Color);
@@ -517,7 +529,26 @@ namespace Candy {
 				ImGui::PopID();
 			}
 			if (!toRemove.empty())
-				component.TextBlocks.erase(toRemove);
+			{
+				component.TextBlockDatas.erase(toRemove);
+				auto it = std::find(component.TextBlockOrder.begin(), component.TextBlockOrder.end(), toRemove);
+				if (it != component.TextBlockOrder.end())
+					component.TextBlockOrder.erase(it);
+			}
+			for (auto& [oldKey, newKey] : toRename)
+			{
+				if (component.TextBlockDatas.contains(newKey))
+					continue;
+				auto nh = component.TextBlockDatas.extract(oldKey);
+				if (!nh.empty())
+				{
+					nh.key() = newKey;
+					component.TextBlockDatas.insert(std::move(nh));
+				}
+				auto it = std::find(component.TextBlockOrder.begin(), component.TextBlockOrder.end(), oldKey);
+				if (it != component.TextBlockOrder.end())
+					*it = newKey;
+			}
 
 			ImGui::Separator();
 			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x * 0.5f - 60.0f);
@@ -525,18 +556,22 @@ namespace Candy {
 			{
 				static uint32_t s_TextBlockCounter = 0;
 				std::string key = "TextBlock_" + std::to_string(++s_TextBlockCounter);
-				component.TextBlocks[key] = TextBlockUIData();
+				component.TextBlockDatas[key] = TextBlockUIData();
+				component.TextBlockOrder.push_back(key);
 			}
 		});
 
 		DrawComponent<UIButtonComponent>("Buttons", entity, [](auto& component)
 		{
 			std::string toRemove;
+			std::vector<std::pair<std::string, std::string>> toRename;
 			float lineHeight = ImGui::GetFrameHeight();
 
-			for (auto& [key, btn] : component.Buttons)
+			for (size_t i = 0; i < component.ButtonOrder.size(); i++)
 			{
-				ImGui::PushID(key.c_str());
+				const auto& key = component.ButtonOrder[i];
+				auto& btn = component.ButtonDatas[key];
+				ImGui::PushID(static_cast<int>(i));
 				bool open = ImGui::CollapsingHeader(key.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap);
 				ImGui::SameLine(ImGui::GetContentRegionAvail().x - lineHeight);
 				if (ImGui::Button("X", ImVec2{ lineHeight, lineHeight }))
@@ -545,7 +580,16 @@ namespace Candy {
 				{
 					ImGui::Indent();
 
+					std::string editKey = key;
+					if (ImGuiUtils::DrawInputText("Name", editKey))
+					{
+						if (!editKey.empty() && editKey != key)
+						{
+							toRename.push_back({ key, editKey });
+						}
+					}
 					ImGuiUtils::DrawInputText("Text", btn.Text);
+					ImGuiUtils::DrawDragFloat("Font Size", btn.FontSize, 1.0f, 1.0f, 200.0f);
 					ImGuiUtils::DrawDragFloat2("Size", btn.Size);
 					ImGuiUtils::DrawDragFloat2("Position", btn.Position);
 					ImGuiUtils::DrawInputText("OnClick", btn.OnClick);
@@ -556,7 +600,26 @@ namespace Candy {
 				ImGui::PopID();
 			}
 			if (!toRemove.empty())
-				component.Buttons.erase(toRemove);
+			{
+				component.ButtonDatas.erase(toRemove);
+				auto it = std::find(component.ButtonOrder.begin(), component.ButtonOrder.end(), toRemove);
+				if (it != component.ButtonOrder.end())
+					component.ButtonOrder.erase(it);
+			}
+			for (auto& [oldKey, newKey] : toRename)
+			{
+				if (component.ButtonDatas.contains(newKey))
+					continue;
+				auto nh = component.ButtonDatas.extract(oldKey);
+				if (!nh.empty())
+				{
+					nh.key() = newKey;
+					component.ButtonDatas.insert(std::move(nh));
+				}
+				auto it = std::find(component.ButtonOrder.begin(), component.ButtonOrder.end(), oldKey);
+				if (it != component.ButtonOrder.end())
+					*it = newKey;
+			}
 
 			ImGui::Separator();
 			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x * 0.5f - 60.0f);
@@ -564,7 +627,8 @@ namespace Candy {
 			{
 				static uint32_t s_ButtonCounter = 0;
 				std::string key = "Button_" + std::to_string(++s_ButtonCounter);
-				component.Buttons[key] = ButtonUIData();
+				component.ButtonDatas[key] = ButtonUIData();
+				component.ButtonOrder.push_back(key);
 			}
 		});
 	}
