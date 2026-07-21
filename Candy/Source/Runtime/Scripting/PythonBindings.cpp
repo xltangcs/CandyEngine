@@ -64,6 +64,9 @@ py::object GetComponentFromEntity(Candy::Entity& entity, const std::string& type
 	if (type == "UITextBlockComponent")
 		return py::cast(&entity.GetComponent<Candy::UITextBlockComponent>(), py::return_value_policy::reference);
 
+	if (type == "UIButtonComponent")
+		return py::cast(&entity.GetComponent<Candy::UIButtonComponent>(), py::return_value_policy::reference);
+
 	if (type == "Rigidbody2DComponent")
 		return py::cast(&entity.GetComponent<Candy::Rigidbody2DComponent>(), py::return_value_policy::reference);
 
@@ -89,6 +92,9 @@ bool EntityHasComponent(Candy::Entity& entity, const std::string& type)
 
 	if (type == "UITextBlockComponent")
 		return entity.HasComponent<Candy::UITextBlockComponent>();
+
+	if (type == "UIButtonComponent")
+		return entity.HasComponent<Candy::UIButtonComponent>();
 
 	if (type == "Rigidbody2DComponent")
 		return entity.HasComponent<Candy::Rigidbody2DComponent>();
@@ -231,7 +237,49 @@ PYBIND11_EMBEDDED_MODULE(candy, m)
     // --- UITextBlockComponent ---
     py::class_<Candy::UITextBlockComponent>(m, "UITextBlockComponent")
         .def(py::init<>())
-        .def_readwrite("TextBlockDatas", &Candy::UITextBlockComponent::TextBlockDatas);
+        .def_readwrite("TextBlockDatas", &Candy::UITextBlockComponent::TextBlockDatas)
+        .def("set_text_visible", [](Candy::UITextBlockComponent& self, const std::string& key, bool visible) {
+            auto it = self.TextBlockDatas.find(key);
+            if (it != self.TextBlockDatas.end()) it->second.Visible = visible;
+        }, py::arg("key"), py::arg("visible"))
+        .def("set_text", [](Candy::UITextBlockComponent& self, const std::string& key, const std::string& text) {
+            auto it = self.TextBlockDatas.find(key);
+            if (it != self.TextBlockDatas.end()) it->second.Text = text;
+        }, py::arg("key"), py::arg("text"));
+
+    // --- ButtonUIData ---
+    py::class_<Candy::ButtonUIData>(m, "ButtonUIData")
+        .def(py::init<>())
+        .def_readwrite("Text",     &Candy::ButtonUIData::Text)
+        .def_readwrite("FontSize", &Candy::ButtonUIData::FontSize)
+        .def_readwrite("Size",     &Candy::ButtonUIData::Size)
+        .def_readwrite("Position", &Candy::ButtonUIData::Position)
+        .def_readwrite("OnClick",  &Candy::ButtonUIData::OnClick)
+        .def_readwrite("Visible",  &Candy::ButtonUIData::Visible);
+
+    // --- UIButtonComponent ---
+    // NOTE: reading a std::unordered_map member returns a COPY in pybind11, so
+    // mutating ButtonDatas[key] from Python would not persist. Use the helper
+    // methods below, which mutate the C++ data in place.
+    py::class_<Candy::UIButtonComponent>(m, "UIButtonComponent")
+        .def(py::init<>())
+        .def("set_button_visible", [](Candy::UIButtonComponent& self, const std::string& key, bool visible) {
+            auto it = self.ButtonDatas.find(key);
+            if (it != self.ButtonDatas.end()) it->second.Visible = visible;
+        }, py::arg("key"), py::arg("visible"),
+             "Show/hide a button by its key.")
+        .def("get_button_visible", [](Candy::UIButtonComponent& self, const std::string& key) -> bool {
+            auto it = self.ButtonDatas.find(key);
+            return it != self.ButtonDatas.end() ? it->second.Visible : false;
+        }, py::arg("key"))
+        .def("set_button_text", [](Candy::UIButtonComponent& self, const std::string& key, const std::string& text) {
+            auto it = self.ButtonDatas.find(key);
+            if (it != self.ButtonDatas.end()) it->second.Text = text;
+        }, py::arg("key"), py::arg("text"))
+        .def("set_button_onclick", [](Candy::UIButtonComponent& self, const std::string& key, const std::string& onclick) {
+            auto it = self.ButtonDatas.find(key);
+            if (it != self.ButtonDatas.end()) it->second.OnClick = onclick;
+        }, py::arg("key"), py::arg("onclick"));
 
     // --- Rigidbody2DComponent ---
     py::class_<Candy::Rigidbody2DComponent>(m, "Rigidbody2DComponent")
@@ -303,6 +351,10 @@ PYBIND11_EMBEDDED_MODULE(candy, m)
              "Deferred deletion (Godot-style): destroyed on the next safe frame. Safe to call from on_tick / collision callbacks.")
         .def("is_queued_for_deletion", &Candy::Entity::IsQueuedForDeletion,
              "Returns true if this entity has been marked for deferred deletion via queue_free().")
+        .def("call_function", [](Candy::Entity& self, const std::string& funcName) {
+            Candy::ScriptSystem::Get().CallFunction(self, funcName);
+        }, py::arg("func_name"),
+             "Call a Python method by name on this entity's script instance (cross-entity messaging).")
         .def_property("tag",
             [](Candy::Entity& self) -> std::string {
                 return self.GetComponent<Candy::TagComponent>().Tag;

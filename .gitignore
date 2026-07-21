@@ -35,4 +35,7 @@ __pycache__/
 Saved/
 Doc/
 
+.codebuddy/
+.workbuddy/
+
 **.user

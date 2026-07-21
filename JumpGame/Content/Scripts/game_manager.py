@@ -33,6 +33,7 @@ class GameManager(candy.ScriptObject):
         cube = scene.find_entity_by_tag("Cube")
         if cube is None:
             self.game_over = True
+            self._show_restart_button(scene)
             self._update_hud()
             return
 
@@ -112,6 +113,89 @@ class GameManager(candy.ScriptObject):
 
         print(f"Spawned {name}")
 
+    def _show_restart_button(self, scene):
+        hud = scene.find_entity_by_tag("HUD")
+        if hud is not None:
+            if hud.has_component("UIButtonComponent"):
+                hud.get_component("UIButtonComponent").set_button_visible("Restart", True)
+            if hud.has_component("UITextBlockComponent"):
+                hud.get_component("UITextBlockComponent").set_text_visible("Ending", True)
+
+    def _hide_restart_button(self, scene):
+        hud = scene.find_entity_by_tag("HUD")
+        if hud is not None:
+            if hud.has_component("UIButtonComponent"):
+                hud.get_component("UIButtonComponent").set_button_visible("Restart", False)
+            if hud.has_component("UITextBlockComponent"):
+                hud.get_component("UITextBlockComponent").set_text_visible("Ending", False)
+
+    def restart_game(self):
+        """Called (via HUD.on_restart_btn_clicked) when the Restart button is clicked."""
+        entity = self._entity
+        if entity is None:
+            return
+
+        scene = entity.scene
+        if scene is None:
+            return
+
+        # Remove every remaining obstacle.
+        for i in range(1, self.obstacle_index + 1):
+            obs = scene.find_entity_by_tag(f"Obstacle_{i}")
+            if obs is not None:
+                obs.queue_free()
+
+        # Reset game state.
+        self.spawn_timer = 0.0
+        self.score = 0.0
+        self.obstacle_index = 0
+        self.game_over = False
+
+        # Respawn the player Cube if it is gone.
+        if scene.find_entity_by_tag("Cube") is None:
+            self._spawn_cube(scene)
+
+        # Hide the button again and refresh the HUD.
+        self._hide_restart_button(scene)
+        self._update_hud()
+
+    def _spawn_cube(self, scene):
+        cube = scene.create_entity("Cube")
+        if cube is None:
+            return
+
+        cube.tag = "Cube"
+
+        transform = cube.get_component("TransformComponent")
+        transform.Translation = candy.Vec3(0.0, 0.0, 0.0)
+        transform.Scale = candy.Vec3(0.4, 0.4, 1.0)
+
+        cube.add_component("SpriteRendererComponent")
+        sprite = cube.get_component("SpriteRendererComponent")
+        sprite.Color = candy.Vec4(1.0, 0.5, 0.0, 1.0)
+
+        cube.add_component("Rigidbody2DComponent")
+        rb = cube.get_component("Rigidbody2DComponent")
+        rb.Type = 1        # Dynamic
+        rb.FixedRotation = True
+
+        cube.add_component("BoxCollider2DComponent")
+        collider = cube.get_component("BoxCollider2DComponent")
+        collider.Size = candy.Vec2(0.5, 0.5)
+        collider.Density = 1.0
+        collider.Friction = 0
+        collider.Restitution = 0.0
+
+        cube.add_component("ScriptComponent")
+        sc = cube.get_component("ScriptComponent")
+        sc.ScriptPath = "VFS://Game/Scripts/cube.py"
+        sc.ClassName = "Cube"
+
+        scene.create_physics_body(cube)
+        scene.instantiate_script(cube)
+
+        print("Respawned Cube")
+
     def _update_hud(self):
         scene = self._entity.scene
         if scene is None:
@@ -125,9 +209,5 @@ class GameManager(candy.ScriptObject):
             return
 
         ui = hud_entity.get_component("UITextBlockComponent")
-        if "TextBlock_1" in ui.TextBlockDatas:
-            block = ui.TextBlockDatas["TextBlock_1"]
-            if self.game_over:
-                block.Text = f"Game Over! Score: {self.score:.1f}"
-            else:
-                block.Text = f"Score: {self.score:.1f}"
+        # 使用 set_text 方法（避免 pybind11 map 返回副本导致修改不生效）
+        ui.set_text("LifeTime", f"You have survived {int(self.score)}s")

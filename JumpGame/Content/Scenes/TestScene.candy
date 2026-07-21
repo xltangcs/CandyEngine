@@ -7,22 +7,31 @@ Entities:
       Translation: [0, 0, 0]
       Rotation: [0, 0, 0]
       Scale: [1, 1, 1]
+    ScriptComponent:
+      ScriptPath: VFS://Game/Scripts/hud.py
+      ClassName: HUD
     UITextBlockComponent:
       TextBlocks:
-        Game:
-          Text: Cube
+        LifeTime:
+          Text: You Have Lifes 2s
           Color: [1, 1, 1, 1]
-          Position: [555, 136]
+          Position: [534.400024, 51.7000008]
           FontSize: 72
+          Visible: true
+        Ending:
+          Text: Game Over
+          Color: [1, 1, 1, 1]
+          Position: [555.799988, 133.800003]
+          FontSize: 95
           Visible: true
     UIButtonComponent:
       Buttons:
         Restart:
           Text: Restart
-          FontSize: 45
-          Size: [200, 50]
-          Position: [555, 232.899994]
-          OnClick: ""
+          FontSize: 80
+          Size: [250, 80]
+          Position: [611.200012, 245.600006]
+          OnClick: on_restart_btn_clicked
           Visible: true
   - Entity: 10453616027141309842
     TagComponent:
