@@ -105,7 +105,6 @@ namespace Candy {
 
 		// Build / package dialog state
 		bool m_ShowBuildDialog = false;
-		std::string m_BuildOutputPath;
 		int m_BuildMode = 0; // 0 = Content Only, 1 = Full Build (MSBuild)
 		int m_BuildConfig = 0; // 0 = Debug, 1 = Release, 2 = Dist
 	};

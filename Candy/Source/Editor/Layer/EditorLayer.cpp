@@ -978,21 +978,7 @@ namespace Candy {
 				ImGui::Text("Content Only: uses existing CandyGame.exe, no C++ rebuild needed.");
 			}
 
-			// Output directory (where the distributable folder is written)
-			ImGui::Text("Output Dir");
-			ImGui::SameLine();
-			ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 40);
-			ImGui::InputText("##BuildOutput", &m_BuildOutputPath, ImGuiInputTextFlags_EnterReturnsTrue);
-			ImGui::PopItemWidth();
-			ImGui::SameLine();
-			if (ImGui::Button("..."))
-			{
-				std::string dir = FileDialogs::OpenFolder();
-				if (!dir.empty())
-					m_BuildOutputPath = dir;
-			}
-
-			ImGui::Spacing();
+		ImGui::Spacing();
 			ImGui::Separator();
 			ImGui::Spacing();
 
@@ -1069,9 +1055,7 @@ namespace Candy {
 		}
 
 		// ---------- Step 2: Assemble distribution folder ----------
-		auto buildDir = m_BuildOutputPath.empty()
-			? (project->GetProjectDirectory() / "Build")
-			: std::filesystem::path(m_BuildOutputPath);
+		auto buildDir = project->GetProjectDirectory() / "Build" / configNames[m_BuildConfig];
 		std::filesystem::create_directories(buildDir);
 
 		// Copy game executable
@@ -1172,9 +1156,7 @@ namespace Candy {
 		}
 
 		// ---------- Step 1: Create output directory ----------
-		auto buildDir = m_BuildOutputPath.empty()
-			? (project->GetProjectDirectory() / "Build")
-			: std::filesystem::path(m_BuildOutputPath);
+		auto buildDir = project->GetProjectDirectory() / "Build" / configNames[m_BuildConfig];
 		std::filesystem::create_directories(buildDir);
 
 		// ---------- Step 2: Copy game executable (renamed to project name) ----------
