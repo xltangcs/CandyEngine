@@ -29,7 +29,7 @@ msbuild CandyEngine.sln /p:Configuration=Debug
 > .\Scripts\GenerateProjects.bat
 > ```
 
-构建配置对应宏：`Debug` → `CANDY_DEBUG`，`Release` → `CANDY_RELEASE`，`Dist` → `CANDY_DIST`。Sandbox 测试 demo 默认在根 `premake5.lua` 中被注释，不构建。
+构建配置对应宏：`Debug` → `CANDY_DEBUG`，`Release` → `CANDY_RELEASE`，`Dist` → `CANDY_DIST`。
 
 ### 已实现的功能
 
@@ -52,7 +52,6 @@ msbuild CandyEngine.sln /p:Configuration=Debug
 
 **示例项目**
 - **JumpGame**：纯 Python 脚本实现的跳跃躲避类游戏 Demo，位于 `JumpGame/`。
-- **Sandbox**：C++ 测试 demo（默认不构建）。
 
 ### 简单的未来计划
 
@@ -70,7 +69,6 @@ msbuild CandyEngine.sln /p:Configuration=Debug
 |------|------|------|------|
 | `Candy/Source/` | `Candy` | 静态库 | 引擎核心 |
 | `CandyEditor/Source/` | `CandyEditor` | ConsoleApp | 编辑器（链接 `Candy`） |
-| `Sandbox/Source/` | `Sandbox` | ConsoleApp | 测试 demo（默认不构建） |
 | `JumpGame/` | — | 示例 | Python 脚本游戏 Demo |
 | `ThirdParty/` | — | 依赖 | 第三方库（含 premake5、pybind11 等子模块） |
 
