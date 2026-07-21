@@ -1,42 +1,63 @@
 import candy
 
+
 class Cube(candy.ScriptObject):
+    """Player cube — fully physics-driven. Landing on obstacles is ok, side-hit is death."""
+
     def on_construct(self):
         self.speed = 5.0
-        self.velocity_y = 0.0
-        self.gravity = -20.0
-        self.jump_velocity = 9.0
-        self.max_jumps = 2
-        self.jump_count = 0
-        self.ground_y = 0.0
+        self.jump_velocity = 7.0
+        self.ground_contact_count = 0
+        self.game_over = False
         self.space_was_pressed = False
 
     def on_tick(self, dt):
-        t = self._entity.get_component("TransformComponent")
+        if self.game_over:
+            return
+        entity = self._entity
+        if entity is None:
+            return
 
+        # bgm = scene.find_entity_by_tag("BGM")
+        # if not bgm:
+        #     return 
+
+        rb = entity.get_component("Rigidbody2DComponent")
+
+        # Horizontal movement (preserve vertical velocity, physics drives position)
+        vel = rb.get_linear_velocity()
+        vx = 0.0
         if candy.is_key_pressed("A"):
-            t.Translation.x -= self.speed * dt
-        if candy.is_key_pressed("D"):
-            t.Translation.x += self.speed * dt
+            vx = -self.speed
+        elif candy.is_key_pressed("D"):
+            vx = self.speed
+        rb.set_linear_velocity(vx, vel.y)
 
+        # Single jump: only when grounded (edge detection)
+        grounded = self.ground_contact_count > 0
         space_down = candy.is_key_pressed("SPACE")
-        if space_down and not self.space_was_pressed and self.jump_count < self.max_jumps:
-            self.velocity_y = self.jump_velocity
-            self.jump_count += 1
+        if space_down and not self.space_was_pressed and grounded:
+            rb.set_linear_velocity(vx, self.jump_velocity)
         self.space_was_pressed = space_down
 
-        self.velocity_y += self.gravity * dt
-        t.Translation.y += self.velocity_y * dt
+        # Fell off the ground → game over
+        transform = entity.get_component("TransformComponent")
+        if transform.Translation.y < -3.0:
+            self.game_over = True
+            scene.destroy_entity(self._entity)
 
-        half_h = t.Scale.y * 0.5
-        if t.Translation.y - half_h <= self.ground_y:
-            t.Translation.y = self.ground_y + half_h
-            self.velocity_y = 0.0
-            self.jump_count = 0
+    def on_collision_enter(self, other):
+        if other is None:
+            return
 
-        # HUD
-        hud = self._entity.scene.find_entity_by_tag("HUD")
-        if hud is not None and hud.has_component("UITextBlockComponent"):
-            tb = hud.get_component("UITextBlockComponent").TextBlocks["TextBlock_1"]
-            tb.Text = (f"Cube  Pos:({t.Translation.x:.1f},{t.Translation.y:.1f})  "
-                       f"VelY:{self.velocity_y:.1f}")
+        tag = other.tag
+        if tag.startswith("Ground"):
+            self.ground_contact_count += 1
+        elif tag.startswith("Obstacle"):
+            self.ground_contact_count += 1
+    def on_collision_exit(self, other):
+        if other is None:
+            return
+        tag = other.tag
+        if tag.startswith("Ground") or tag.startswith("Obstacle"):
+            self.ground_contact_count -= 1

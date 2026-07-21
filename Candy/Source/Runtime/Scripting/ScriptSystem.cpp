@@ -232,6 +232,48 @@ void ScriptSystem::CallFunction(Entity entity, const std::string& funcName)
 		pyObj.attr(funcName.c_str())();
 }
 
+void ScriptSystem::DispatchCollisionEnter(UUID entityID, UUID otherID)
+{
+	auto it = m_Instances.find(entityID);
+	if (it == m_Instances.end() || !it->second->Script)
+		return;
+
+	Scene* scene = it->second->StoredEntity.GetScene();
+	auto& registry = scene->GetRegistry();
+
+	// Find other entity by UUID
+	for (auto [enttID] : registry.storage<entt::entity>().reach())
+	{
+		if (registry.get<IDComponent>(enttID).ID == otherID)
+		{
+			Entity other = { enttID, scene };
+			it->second->Script->OnCollisionEnter(other);
+			break;
+		}
+	}
+}
+
+void ScriptSystem::DispatchCollisionExit(UUID entityID, UUID otherID)
+{
+	auto it = m_Instances.find(entityID);
+	if (it == m_Instances.end() || !it->second->Script)
+		return;
+
+	Scene* scene = it->second->StoredEntity.GetScene();
+	auto& registry = scene->GetRegistry();
+
+	// Find other entity by UUID
+	for (auto [enttID] : registry.storage<entt::entity>().reach())
+	{
+		if (registry.get<IDComponent>(enttID).ID == otherID)
+		{
+			Entity other = { enttID, scene };
+			it->second->Script->OnCollisionExit(other);
+			break;
+		}
+	}
+}
+
 void ScriptSystem::OnRuntimeStop()
 {
     for (auto& [id, instance] : m_Instances)

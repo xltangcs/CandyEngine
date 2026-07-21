@@ -4,6 +4,7 @@
 #include "Runtime/Scene/Entity.h"
 #include "Runtime/Scene/Components.h"
 #include "Runtime/Scene/ScriptableEntity.h"
+#include "Runtime/Scene/PhysicsContactListener.h"
 #include "Runtime/Scripting/ScriptSystem.h"
 
 #include "Runtime/Renderer/Renderer2D.h"
@@ -120,6 +121,8 @@ namespace Candy {
 
 	void Scene::DestroyEntity(Entity entity)
 	{
+		if (entity.HasComponent<ScriptComponent>())
+			ScriptSystem::Get().DestroyScript(entity.GetUUID());
 		m_Registry.destroy(entity);
 	}
 
@@ -189,6 +192,10 @@ namespace Candy {
 			const int32_t velocityIterations = 6;
 			const int32_t positionIterations = 2;
 			m_PhysicsWorld->Step(ts, velocityIterations, positionIterations);
+
+			// Process collision events
+			if (m_ContactListener)
+				m_ContactListener->Flush();
 
 			// Retrieve transform from Box2D
 			auto view = m_Registry.view<Rigidbody2DComponent>();
@@ -346,7 +353,10 @@ namespace Candy {
 
 	void Scene::OnPhysics2DStart()
 	{
-		m_PhysicsWorld = new b2World({ 0.0f, -9.8f });
+		m_PhysicsWorld = new b2World({ 0.0f, -19.8f });
+
+		m_ContactListener = CreateScope<PhysicsContactListener>(this);
+		m_PhysicsWorld->SetContactListener(m_ContactListener.get());
 
 		auto view = m_Registry.view<Rigidbody2DComponent>();
 		for (auto e : view)
@@ -362,6 +372,7 @@ namespace Candy {
 
 			b2Body* body = m_PhysicsWorld->CreateBody(&bodyDef);
 			body->SetFixedRotation(rb2d.FixedRotation);
+			body->GetUserData().pointer = static_cast<uintptr_t>(e);
 			rb2d.RuntimeBody = body;
 
 			if (entity.HasComponent<BoxCollider2DComponent>())
@@ -401,8 +412,67 @@ namespace Candy {
 
 	void Scene::OnPhysics2DStop()
 	{
+		m_ContactListener.reset();
 		delete m_PhysicsWorld;
 		m_PhysicsWorld = nullptr;
+	}
+
+	void Scene::CreatePhysicsBody(Entity entity)
+	{
+		if (!m_PhysicsWorld)
+			return;
+
+		if (!entity.HasComponent<Rigidbody2DComponent>())
+			return;
+
+		auto& transform = entity.GetComponent<TransformComponent>();
+		auto& rb2d = entity.GetComponent<Rigidbody2DComponent>();
+
+		if (rb2d.RuntimeBody)
+			return; // Already has a physics body
+
+		b2BodyDef bodyDef;
+		bodyDef.type = Rigidbody2DTypeToBox2DBody(rb2d.Type);
+		bodyDef.position.Set(transform.Translation.x, transform.Translation.y);
+		bodyDef.angle = transform.Rotation.z;
+
+		b2Body* body = m_PhysicsWorld->CreateBody(&bodyDef);
+		body->SetFixedRotation(rb2d.FixedRotation);
+		body->GetUserData().pointer = static_cast<uintptr_t>(static_cast<entt::entity>(entity));
+		rb2d.RuntimeBody = body;
+
+		if (entity.HasComponent<BoxCollider2DComponent>())
+		{
+			auto& bc2d = entity.GetComponent<BoxCollider2DComponent>();
+
+			b2PolygonShape boxShape;
+			boxShape.SetAsBox(bc2d.Size.x * transform.Scale.x, bc2d.Size.y * transform.Scale.y);
+
+			b2FixtureDef fixtureDef;
+			fixtureDef.shape = &boxShape;
+			fixtureDef.density = bc2d.Density;
+			fixtureDef.friction = bc2d.Friction;
+			fixtureDef.restitution = bc2d.Restitution;
+			fixtureDef.restitutionThreshold = bc2d.RestitutionThreshold;
+			body->CreateFixture(&fixtureDef);
+		}
+
+		if (entity.HasComponent<CircleCollider2DComponent>())
+		{
+			auto& cc2d = entity.GetComponent<CircleCollider2DComponent>();
+
+			b2CircleShape circleShape;
+			circleShape.m_p.Set(cc2d.Offset.x, cc2d.Offset.y);
+			circleShape.m_radius = transform.Scale.x * cc2d.Radius;
+
+			b2FixtureDef fixtureDef;
+			fixtureDef.shape = &circleShape;
+			fixtureDef.density = cc2d.Density;
+			fixtureDef.friction = cc2d.Friction;
+			fixtureDef.restitution = cc2d.Restitution;
+			fixtureDef.restitutionThreshold = cc2d.RestitutionThreshold;
+			body->CreateFixture(&fixtureDef);
+		}
 	}
 
 	void Scene::RenderScene(EditorCamera& camera)

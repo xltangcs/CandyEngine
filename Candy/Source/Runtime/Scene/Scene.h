@@ -14,6 +14,7 @@ class b2World;
 namespace Candy {
 
 	class Entity;
+	class PhysicsContactListener;
 
 	class Scene
 	{
@@ -40,11 +41,12 @@ namespace Candy {
 		void OnUpdateSimulationLogic(Timestep ts);
 		void OnUpdateEditor(Timestep ts, EditorCamera& camera);
 		void RenderScene(EditorCamera& camera);
-		void RenderSceneFromCamera(const class CameraComponent& cameraComp, const glm::mat4& cameraTransform);
+		void RenderSceneFromCamera(const struct CameraComponent& cameraComp, const glm::mat4& cameraTransform);
 
 		void OnViewportResize(uint32_t width, uint32_t height);
 		void DuplicateEntity(Entity entity);
 		Entity GetPrimaryCameraEntity();
+		void CreatePhysicsBody(Entity entity);
 		template<typename... Components>
 		auto GetAllEntitiesWith()
 		{
@@ -64,6 +66,7 @@ namespace Candy {
 		uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
 
 		b2World* m_PhysicsWorld = nullptr;
+		Scope<PhysicsContactListener> m_ContactListener;
 		SceneCamera m_FallbackCamera;
 
 		friend class Entity;

@@ -9,10 +9,13 @@
 #include <glm/glm.hpp>
 
 #include "Runtime/Scripting/ScriptObject.h"
+#include "Runtime/Scripting/ScriptSystem.h"
 #include "Runtime/Scene/Entity.h"
 #include "Runtime/Scene/Components.h"
 #include "Runtime/Core/Input.h"
 #include "Runtime/Core/KeyCodes.h"
+
+#include "box2d/b2_body.h"
 
 namespace py = pybind11;
 
@@ -35,34 +38,108 @@ public:
         PYBIND11_OVERRIDE_NAME(void, Candy::ScriptObject, "on_tick", OnTick, (float)ts);
     }
 
-    void OnDestroy() override
-    {
-        PYBIND11_OVERRIDE_NAME(void, Candy::ScriptObject, "on_destroy", OnDestroy);
-    }
+	void OnDestroy() override
+	{
+		PYBIND11_OVERRIDE_NAME(void, Candy::ScriptObject, "on_destroy", OnDestroy);
+	}
+
+	void OnCollisionEnter(const Candy::Entity& other) override
+	{
+		PYBIND11_OVERRIDE_NAME(void, Candy::ScriptObject, "on_collision_enter", OnCollisionEnter, other);
+	}
+
+	void OnCollisionExit(const Candy::Entity& other) override
+	{
+		PYBIND11_OVERRIDE_NAME(void, Candy::ScriptObject, "on_collision_exit", OnCollisionExit, other);
+	}
 };
 
 namespace {
 
 py::object GetComponentFromEntity(Candy::Entity& entity, const std::string& type)
 {
-    if (type == "TransformComponent")
-        return py::cast(&entity.GetComponent<Candy::TransformComponent>(), py::return_value_policy::reference);
+	if (type == "TransformComponent")
+		return py::cast(&entity.GetComponent<Candy::TransformComponent>(), py::return_value_policy::reference);
 
-    if (type == "UITextBlockComponent")
-        return py::cast(&entity.GetComponent<Candy::UITextBlockComponent>(), py::return_value_policy::reference);
+	if (type == "UITextBlockComponent")
+		return py::cast(&entity.GetComponent<Candy::UITextBlockComponent>(), py::return_value_policy::reference);
 
-    throw std::runtime_error("Unknown component type: " + type);
+	if (type == "Rigidbody2DComponent")
+		return py::cast(&entity.GetComponent<Candy::Rigidbody2DComponent>(), py::return_value_policy::reference);
+
+	if (type == "BoxCollider2DComponent")
+		return py::cast(&entity.GetComponent<Candy::BoxCollider2DComponent>(), py::return_value_policy::reference);
+
+	if (type == "SpriteRendererComponent")
+		return py::cast(&entity.GetComponent<Candy::SpriteRendererComponent>(), py::return_value_policy::reference);
+
+	if (type == "ScriptComponent")
+		return py::cast(&entity.GetComponent<Candy::ScriptComponent>(), py::return_value_policy::reference);
+
+	if (type == "TagComponent")
+		return py::cast(&entity.GetComponent<Candy::TagComponent>(), py::return_value_policy::reference);
+
+	throw std::runtime_error("Unknown component type: " + type);
 }
 
 bool EntityHasComponent(Candy::Entity& entity, const std::string& type)
 {
-    if (type == "TransformComponent")
-        return entity.HasComponent<Candy::TransformComponent>();
+	if (type == "TransformComponent")
+		return entity.HasComponent<Candy::TransformComponent>();
 
-    if (type == "UITextBlockComponent")
-        return entity.HasComponent<Candy::UITextBlockComponent>();
+	if (type == "UITextBlockComponent")
+		return entity.HasComponent<Candy::UITextBlockComponent>();
 
-    return false;
+	if (type == "Rigidbody2DComponent")
+		return entity.HasComponent<Candy::Rigidbody2DComponent>();
+
+	if (type == "BoxCollider2DComponent")
+		return entity.HasComponent<Candy::BoxCollider2DComponent>();
+
+	if (type == "SpriteRendererComponent")
+		return entity.HasComponent<Candy::SpriteRendererComponent>();
+
+	if (type == "ScriptComponent")
+		return entity.HasComponent<Candy::ScriptComponent>();
+
+	if (type == "TagComponent")
+		return entity.HasComponent<Candy::TagComponent>();
+
+	return false;
+}
+
+void AddComponentToEntity(Candy::Entity& entity, const std::string& type)
+{
+	if (type == "Rigidbody2DComponent")
+	{
+		Candy::Rigidbody2DComponent comp;
+		comp.Type = Candy::Rigidbody2DComponent::BodyType::Dynamic;
+		entity.AddComponent<Candy::Rigidbody2DComponent>(comp);
+	}
+	else if (type == "BoxCollider2DComponent")
+	{
+		entity.AddComponent<Candy::BoxCollider2DComponent>();
+	}
+	else if (type == "CircleCollider2DComponent")
+	{
+		entity.AddComponent<Candy::CircleCollider2DComponent>();
+	}
+	else if (type == "SpriteRendererComponent")
+	{
+		entity.AddComponent<Candy::SpriteRendererComponent>();
+	}
+	else if (type == "ScriptComponent")
+	{
+		entity.AddComponent<Candy::ScriptComponent>();
+	}
+	else if (type == "TagComponent")
+	{
+		entity.AddComponent<Candy::TagComponent>();
+	}
+	else
+	{
+		throw std::runtime_error("Cannot add component of type: " + type);
+	}
 }
 
 bool PyIsKeyPressed(const std::string& key)
@@ -156,12 +233,79 @@ PYBIND11_EMBEDDED_MODULE(candy, m)
         .def(py::init<>())
         .def_readwrite("TextBlocks", &Candy::UITextBlockComponent::TextBlocks);
 
+    // --- Rigidbody2DComponent ---
+    py::class_<Candy::Rigidbody2DComponent>(m, "Rigidbody2DComponent")
+        .def(py::init<>())
+        .def_property("Type",
+            [](Candy::Rigidbody2DComponent& self) -> int { return static_cast<int>(self.Type); },
+            [](Candy::Rigidbody2DComponent& self, int type) { self.Type = static_cast<Candy::Rigidbody2DComponent::BodyType>(type); })
+        .def_readwrite("FixedRotation", &Candy::Rigidbody2DComponent::FixedRotation)
+        .def("get_linear_velocity", [](Candy::Rigidbody2DComponent& self) -> glm::vec2 {
+            b2Body* body = static_cast<b2Body*>(self.RuntimeBody);
+            if (!body) return {0.0f, 0.0f};
+            auto v = body->GetLinearVelocity();
+            return {v.x, v.y};
+        })
+        .def("set_linear_velocity", [](Candy::Rigidbody2DComponent& self, float vx, float vy) {
+            b2Body* body = static_cast<b2Body*>(self.RuntimeBody);
+            if (body) body->SetLinearVelocity({vx, vy});
+        })
+        .def("apply_linear_impulse", [](Candy::Rigidbody2DComponent& self, float ix, float iy) {
+            b2Body* body = static_cast<b2Body*>(self.RuntimeBody);
+            if (body) body->ApplyLinearImpulse({ix, iy}, body->GetWorldCenter(), true);
+        });
+
+    // --- BoxCollider2DComponent ---
+    py::class_<Candy::BoxCollider2DComponent>(m, "BoxCollider2DComponent")
+        .def(py::init<>())
+        .def_readwrite("Offset", &Candy::BoxCollider2DComponent::Offset)
+        .def_readwrite("Size", &Candy::BoxCollider2DComponent::Size)
+        .def_readwrite("Density", &Candy::BoxCollider2DComponent::Density)
+        .def_readwrite("Friction", &Candy::BoxCollider2DComponent::Friction)
+        .def_readwrite("Restitution", &Candy::BoxCollider2DComponent::Restitution);
+
+    // --- CircleCollider2DComponent ---
+    py::class_<Candy::CircleCollider2DComponent>(m, "CircleCollider2DComponent")
+        .def(py::init<>())
+        .def_readwrite("Offset", &Candy::CircleCollider2DComponent::Offset)
+        .def_readwrite("Radius", &Candy::CircleCollider2DComponent::Radius)
+        .def_readwrite("Density", &Candy::CircleCollider2DComponent::Density)
+        .def_readwrite("Friction", &Candy::CircleCollider2DComponent::Friction)
+        .def_readwrite("Restitution", &Candy::CircleCollider2DComponent::Restitution);
+
+    // --- SpriteRendererComponent ---
+    py::class_<Candy::SpriteRendererComponent>(m, "SpriteRendererComponent")
+        .def(py::init<>())
+        .def_readwrite("Color", &Candy::SpriteRendererComponent::Color)
+        .def_readwrite("TexturePath", &Candy::SpriteRendererComponent::TexturePath)
+        .def_readwrite("TilingFactor", &Candy::SpriteRendererComponent::TilingFactor);
+
+    // --- ScriptComponent ---
+    py::class_<Candy::ScriptComponent>(m, "ScriptComponent")
+        .def(py::init<>())
+        .def_readwrite("ScriptPath", &Candy::ScriptComponent::ScriptPath)
+        .def_readwrite("ClassName", &Candy::ScriptComponent::ClassName);
+
+    // --- TagComponent ---
+    py::class_<Candy::TagComponent>(m, "TagComponent")
+        .def(py::init<>())
+        .def_readwrite("Tag", &Candy::TagComponent::Tag);
+
     // --- Entity ---
     py::class_<Candy::Entity>(m, "Entity")
         .def("get_component", &GetComponentFromEntity, py::arg("type"),
              "Get a component by type name (e.g. \"TransformComponent\")")
         .def("has_component", &EntityHasComponent, py::arg("type"),
              "Check if this entity has a component by type name")
+        .def("add_component", &AddComponentToEntity, py::arg("type"),
+             "Add a component by type name (e.g. \"Rigidbody2DComponent\")")
+        .def_property("tag",
+            [](Candy::Entity& self) -> std::string {
+                return self.GetComponent<Candy::TagComponent>().Tag;
+            },
+            [](Candy::Entity& self, const std::string& tag) {
+                self.GetComponent<Candy::TagComponent>().Tag = tag;
+            })
         .def_property_readonly("scene", [](Candy::Entity& self) -> py::object {
             return py::cast(self.GetScene(), py::return_value_policy::reference);
         });
@@ -169,9 +313,11 @@ PYBIND11_EMBEDDED_MODULE(candy, m)
     // --- ScriptObject ---
     py::class_<Candy::ScriptObject, PyScriptObject>(m, "ScriptObject")
         .def(py::init<>())
-        .def("on_construct", &Candy::ScriptObject::OnConstruct)
-        .def("on_start",     &Candy::ScriptObject::OnStart)
-        .def("on_destroy",   &Candy::ScriptObject::OnDestroy)
+        .def("on_construct",        &Candy::ScriptObject::OnConstruct)
+        .def("on_start",            &Candy::ScriptObject::OnStart)
+        .def("on_destroy",          &Candy::ScriptObject::OnDestroy)
+        .def("on_collision_enter",  &Candy::ScriptObject::OnCollisionEnter)
+        .def("on_collision_exit",   &Candy::ScriptObject::OnCollisionExit)
         .def_property_readonly("_entity", [](Candy::ScriptObject& self) -> py::object {
             Candy::Entity* entity = self.GetEntity();
             if (entity)
@@ -195,6 +341,12 @@ PYBIND11_EMBEDDED_MODULE(candy, m)
         })
         .def("destroy_entity", [](Candy::Scene& self, Candy::Entity& entity) {
             self.DestroyEntity(entity);
+        })
+        .def("create_physics_body", [](Candy::Scene& self, Candy::Entity& entity) {
+            self.CreatePhysicsBody(entity);
+        })
+        .def("instantiate_script", [](Candy::Scene& self, Candy::Entity& entity) {
+            Candy::ScriptSystem::Get().InstantiateScript(entity);
         });
 
     // --- Module-level functions ---

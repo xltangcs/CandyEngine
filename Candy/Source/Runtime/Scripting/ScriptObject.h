@@ -14,6 +14,8 @@ public:
     virtual void OnStart() {}
     virtual void OnTick(Timestep ts) {}
     virtual void OnDestroy() {}
+    virtual void OnCollisionEnter(const Entity& other) {}
+    virtual void OnCollisionExit(const Entity& other) {}
 
     Entity* GetEntity() const { return m_Entity; }
 

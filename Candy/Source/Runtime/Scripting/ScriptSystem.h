@@ -28,6 +28,9 @@ namespace Candy
 
 		void CallFunction(Entity entity, const std::string& funcName);
 
+		void DispatchCollisionEnter(UUID entityID, UUID otherID);
+		void DispatchCollisionExit(UUID entityID, UUID otherID);
+
 	private:
 		ScriptSystem() = default;
 		~ScriptSystem() = default;
