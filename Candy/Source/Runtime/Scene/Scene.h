@@ -53,6 +53,12 @@ namespace Candy {
 		void DuplicateEntity(Entity entity);
 		Entity GetPrimaryCameraEntity();
 		void CreatePhysicsBody(Entity entity);
+		/// <summary>
+		/// Destroys the entity's runtime physics body (if any) and recreates it using the
+		/// entity's current Transform/Collider components. Useful for resizing a collider
+		/// (e.g. a crouch/shrink) at runtime. Repositions the body at the current transform.
+		/// </summary>
+		void RecreatePhysicsBody(Entity entity);
 		template<typename... Components>
 		auto GetAllEntitiesWith()
 		{

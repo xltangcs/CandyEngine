@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <stdexcept>
+#include <filesystem>
 
 #include <glm/glm.hpp>
 
@@ -14,6 +15,10 @@
 #include "Runtime/Scene/Components.h"
 #include "Runtime/Core/Input.h"
 #include "Runtime/Core/KeyCodes.h"
+
+#include "Runtime/Audio/AudioEngine.h"
+#include "Runtime/Project/ProjectUtils.h"
+#include "Runtime/Core/FileSystem.h"
 
 #include "box2d/b2_body.h"
 
@@ -56,6 +61,27 @@ public:
 
 namespace {
 
+// Resolve a VFS:// or project-relative path to an absolute disk path suitable
+// for AudioEngine::PlayOneShot (which takes a file path, not a VFS path).
+std::filesystem::path ResolveSoundPath(const std::string& path)
+{
+	if (path.rfind("VFS://", 0) == 0)
+	{
+		auto disk = Candy::FileSystem::Get().ToDiskPath(path);
+		if (disk) return *disk;
+	}
+	else
+	{
+		std::filesystem::path p(path);
+		if (p.is_relative())
+			return std::filesystem::absolute(Candy::ProjectUtils::GetProjectContentPath() / p);
+		return p;
+	}
+	// VFS path that could not be resolved to disk (e.g. pak-only mount)
+	CANDY_CORE_WARN("Python play_one_shot: could not resolve audio path '{0}'", path);
+	return {};
+}
+
 py::object GetComponentFromEntity(Candy::Entity& entity, const std::string& type)
 {
 	if (type == "TransformComponent")
@@ -81,6 +107,9 @@ py::object GetComponentFromEntity(Candy::Entity& entity, const std::string& type
 
 	if (type == "TagComponent")
 		return py::cast(&entity.GetComponent<Candy::TagComponent>(), py::return_value_policy::reference);
+
+	if (type == "AudioSourceComponent")
+		return py::cast(&entity.GetComponent<Candy::AudioSourceComponent>(), py::return_value_policy::reference);
 
 	throw std::runtime_error("Unknown component type: " + type);
 }
@@ -110,6 +139,9 @@ bool EntityHasComponent(Candy::Entity& entity, const std::string& type)
 
 	if (type == "TagComponent")
 		return entity.HasComponent<Candy::TagComponent>();
+
+	if (type == "AudioSourceComponent")
+		return entity.HasComponent<Candy::AudioSourceComponent>();
 
 	return false;
 }
@@ -141,6 +173,10 @@ void AddComponentToEntity(Candy::Entity& entity, const std::string& type)
 	else if (type == "TagComponent")
 	{
 		entity.AddComponent<Candy::TagComponent>();
+	}
+	else if (type == "AudioSourceComponent")
+	{
+		entity.AddComponent<Candy::AudioSourceComponent>();
 	}
 	else
 	{
@@ -339,6 +375,14 @@ PYBIND11_EMBEDDED_MODULE(candy, m)
         .def(py::init<>())
         .def_readwrite("Tag", &Candy::TagComponent::Tag);
 
+    // --- AudioSourceComponent ---
+    py::class_<Candy::AudioSourceComponent>(m, "AudioSourceComponent")
+        .def(py::init<>())
+        .def_readwrite("SoundPath", &Candy::AudioSourceComponent::SoundPath)
+        .def_readwrite("Volume", &Candy::AudioSourceComponent::Volume)
+        .def_readwrite("Looping", &Candy::AudioSourceComponent::Looping)
+        .def_readwrite("PlayOnStart", &Candy::AudioSourceComponent::PlayOnStart);
+
     // --- Entity ---
     py::class_<Candy::Entity>(m, "Entity")
         .def("get_component", &GetComponentFromEntity, py::arg("type"),
@@ -405,9 +449,13 @@ PYBIND11_EMBEDDED_MODULE(candy, m)
         .def("is_queued_for_deletion", [](Candy::Scene& self, Candy::Entity& entity) -> bool {
             return self.IsQueuedForDeletion(entity);
         }, py::arg("entity"))
-        .def("create_physics_body", [](Candy::Scene& self, Candy::Entity& entity) {
-            self.CreatePhysicsBody(entity);
-        })
+		.def("create_physics_body", [](Candy::Scene& self, Candy::Entity& entity) {
+			self.CreatePhysicsBody(entity);
+		})
+		.def("recreate_physics_body", [](Candy::Scene& self, Candy::Entity& entity) {
+			self.RecreatePhysicsBody(entity);
+		}, py::arg("entity"),
+			"Destroy and recreate the entity's runtime physics body from its current Transform/Collider components (e.g. after resizing a collider).")
         .def("instantiate_script", [](Candy::Scene& self, Candy::Entity& entity) {
             Candy::ScriptSystem::Get().InstantiateScript(entity);
         });
@@ -415,4 +463,11 @@ PYBIND11_EMBEDDED_MODULE(candy, m)
     // --- Module-level functions ---
     m.def("is_key_pressed", &PyIsKeyPressed, py::arg("key"),
           "Check if a key is pressed. Key names: W, A, S, D, UP, DOWN, LEFT, RIGHT, SPACE, ESCAPE, etc.");
+
+    m.def("play_one_shot", [](const std::string& path, float volume) {
+        auto disk = ResolveSoundPath(path);
+        if (!disk.empty())
+            Candy::AudioEngine::PlayOneShot(disk.string(), volume);
+    }, py::arg("path"), py::arg("volume") = 1.0f,
+       "Play a one-shot (non-looping) sound effect from a VFS:// or project-relative path.");
 }

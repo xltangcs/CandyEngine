@@ -73,6 +73,7 @@ project "Candy"
 
 	filter "files:Source/Runtime/Scripting/**.cpp"
 	flags { "NoPCH" }
+	buildoptions { "/bigobj" }
 
 	filter "files:Source/Runtime/Audio/**.cpp"
 	flags { "NoPCH" }

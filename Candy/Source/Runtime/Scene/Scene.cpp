@@ -519,6 +519,24 @@ namespace Candy {
 		}
 	}
 
+	void Scene::RecreatePhysicsBody(Entity entity)
+	{
+		if (!m_PhysicsWorld)
+			return;
+
+		if (!entity.HasComponent<Rigidbody2DComponent>())
+			return;
+
+		auto& rb2d = entity.GetComponent<Rigidbody2DComponent>();
+		if (rb2d.RuntimeBody)
+		{
+			m_PhysicsWorld->DestroyBody((b2Body*)rb2d.RuntimeBody);
+			rb2d.RuntimeBody = nullptr;
+		}
+
+		CreatePhysicsBody(entity);
+	}
+
 	void Scene::RenderScene(EditorCamera& camera)
 	{
 		Renderer2D::BeginScene(camera);

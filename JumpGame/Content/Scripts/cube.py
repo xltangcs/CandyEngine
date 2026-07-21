@@ -61,6 +61,7 @@ class Cube(candy.ScriptObject):
         grounded = self.ground_contact_count > 0
         space_down = candy.is_key_pressed("SPACE")
         if space_down and not self.space_was_pressed and grounded:
+            candy.play_one_shot("VFS://Game/Audio/jump.mp3")
             rb.set_linear_velocity(vx, self.jump_velocity)
         self.space_was_pressed = space_down
 

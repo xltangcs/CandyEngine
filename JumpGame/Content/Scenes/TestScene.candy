@@ -15,13 +15,13 @@ Entities:
         LifeTime:
           Text: You Have Lifes 2s
           Color: [1, 1, 1, 1]
-          Position: [534.400024, 51.7000008]
+          Position: [530.299988, 0]
           FontSize: 72
           Visible: true
         Ending:
           Text: Game Over
           Color: [1, 1, 1, 1]
-          Position: [555.799988, 133.800003]
+          Position: [555.799988, 107.099998]
           FontSize: 95
           Visible: true
     UIButtonComponent:
@@ -33,18 +33,6 @@ Entities:
           Position: [611.200012, 245.600006]
           OnClick: on_restart_btn_clicked
           Visible: true
-  - Entity: 10453616027141309842
-    TagComponent:
-      Tag: BGM
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    AudioSourceComponent:
-      SoundPath: VFS://Game/Audio/jump.mp3
-      Volume: 1
-      Looping: true
-      PlayOnStart: true
   - Entity: 7028300387292532713
     TagComponent:
       Tag: Cube
@@ -67,6 +55,11 @@ Entities:
     ScriptComponent:
       ScriptPath: VFS://Game/Scripts/cube.py
       ClassName: Cube
+    AudioSourceComponent:
+      SoundPath: VFS://Game/Audio/jump.mp3
+      Volume: 1
+      Looping: false
+      PlayOnStart: false
   - Entity: 13208629452487242676
     TagComponent:
       Tag: Ground
