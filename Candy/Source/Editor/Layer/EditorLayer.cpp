@@ -426,19 +426,15 @@ namespace Candy {
 		{
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 			{
-				const char* path = (const char*)payload->Data;
-				VfsPath vp = VfsPath::Parse(path);
-				if (vp.IsValid())
+				const char* path = static_cast<const char*>(payload->Data);
+				if (std::filesystem::path(path).extension() == ".candy")
 				{
-					std::filesystem::path relPath(vp.relativePath);
-					if (relPath.extension() == ".candy")
-					{
-						auto disk = FileSystem::Get().ToDiskPath(vp);
-						if (disk)
-							OpenScene(*disk);
-					}
+					auto disk = FileSystem::Get().ToDiskPath(path);
+					if (disk)
+						OpenScene(*disk);
 				}
 			}
+
 			ImGui::EndDragDropTarget();
 		}
 
