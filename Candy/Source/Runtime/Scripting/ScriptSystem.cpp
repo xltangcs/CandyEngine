@@ -13,7 +13,6 @@
 #include <pybind11/embed.h>
 
 #include <filesystem>
-#include <fstream>
 #include <windows.h>
 
 namespace py = pybind11;
@@ -84,27 +83,6 @@ void ScriptSystem::ShutdownPython()
     // ("candy") still has live static type info causes an access violation.
 }
 
-static std::filesystem::path ResolveScriptPath(const std::string& scriptPath)
-{
-    if (scriptPath.empty())
-        return {};
-
-    // VFS:// scheme — resolve via FileSystem (returns disk path for dir mounts, empty for pak-only)
-    if (scriptPath.rfind("VFS://", 0) == 0)
-    {
-        auto disk = FileSystem::Get().ToDiskPath(scriptPath);
-        if (disk)
-            return *disk;
-        return {};
-    }
-
-    // Legacy: bare relative path or absolute disk path
-    std::filesystem::path p(scriptPath);
-    if (p.is_absolute())
-        return p;
-    return std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / p);
-}
-
 void ScriptSystem::InstantiateScript(Entity& entity)
 {
     const UUID uuid = entity.GetUUID();
@@ -116,45 +94,28 @@ void ScriptSystem::InstantiateScript(Entity& entity)
         return;
     }
 
-    try
-    {
-        // Resolve script file to absolute path
-        std::filesystem::path scriptFullPath = ResolveScriptPath(sc.ScriptPath);
+	try
+	{
+		auto diskOpt = FileSystem::Get().ResolveToDiskPath(sc.ScriptPath);
+		if (!diskOpt)
+		{
+			CANDY_CORE_ERROR("Script file not found: {0}", sc.ScriptPath);
+			return;
+		}
+		std::filesystem::path scriptFullPath = *diskOpt;
+		if (!std::filesystem::exists(scriptFullPath))
+		{
+			CANDY_CORE_ERROR("Script file not found on disk: {0} (resolved from {1})", scriptFullPath.string(), sc.ScriptPath);
+			return;
+		}
 
-        // VFS fallback: if the script is not on disk (standalone / pak mode),
-        // extract it from the VFS to a temp directory before handing it to Python.
-        if (!std::filesystem::exists(scriptFullPath))
-        {
-            VfsPath vp = MigrateLegacyPath(sc.ScriptPath);
-            auto data = FileSystem::Get().Read(vp.ToString());
-            if (data)
-            {
-                auto tempDir = std::filesystem::temp_directory_path() / "CandyGame";
-                scriptFullPath = tempDir / vp.relativePath;
-                std::filesystem::create_directories(scriptFullPath.parent_path());
-                {
-                    std::ofstream out(scriptFullPath, std::ios::binary);
-                    out.write(reinterpret_cast<const char*>(data->data()), data->size());
-                }
-                CANDY_CORE_INFO("Extracted script to temp: {0}", scriptFullPath.string());
+		// Make the script's own directory importable so sibling modules can be
+		// imported by name (e.g. `import cube`).
+		py::module_ sys = py::module_::import("sys");
+		sys.attr("path").attr("append")(scriptFullPath.parent_path().string());
 
-                // Add the temp scripts dir to Python's sys.path once (for import statements)
-                if (m_TempScriptsDir.empty())
-                {
-                    m_TempScriptsDir = tempDir;
-                    py::module_ sys = py::module_::import("sys");
-                    sys.attr("path").attr("append")(m_TempScriptsDir.string());
-                }
-            }
-            else
-            {
-                CANDY_CORE_ERROR("Script file not found: {0} (also tried VFS {1})", ResolveScriptPath(sc.ScriptPath).string(), vp.ToString());
-                return;
-            }
-        }
-
-        // Use importlib to load the script by file path (bypasses sys.path)
-        py::module_ util = py::module_::import("importlib.util");
+		// Use importlib to load the script by file path (bypasses sys.path)
+		py::module_ util = py::module_::import("importlib.util");
         py::object spec = util.attr("spec_from_file_location")(sc.ClassName, scriptFullPath.string());
         if (spec.is_none())
         {

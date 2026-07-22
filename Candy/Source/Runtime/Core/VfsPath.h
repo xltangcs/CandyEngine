@@ -24,8 +24,8 @@ namespace Candy {
 		static VfsPath Parse(const std::string& s)
 		{
 			const std::string scheme = "VFS://";
-			if (s.rfind(scheme, 0) != 0)
-				return VfsPath{};
+		if (!s.starts_with(scheme))
+			return VfsPath{};
 
 			std::string rest = s.substr(scheme.size());  // "Engine/Icons/x.png" or "Game/..."
 
@@ -34,9 +34,9 @@ namespace Candy {
 			const std::string engineOnly = "Engine";
 			const std::string gameOnly = "Game";
 
-			if (rest.rfind(enginePrefix, 0) == 0)
+			if (rest.starts_with(enginePrefix))
 				return VfsPath{ Domain::Engine, rest.substr(enginePrefix.size()) };
-			if (rest.rfind(gamePrefix, 0) == 0)
+			if (rest.starts_with(gamePrefix))
 				return VfsPath{ Domain::Game, rest.substr(gamePrefix.size()) };
 			if (rest == engineOnly)
 				return VfsPath{ Domain::Engine, "" };
@@ -84,20 +84,20 @@ namespace Candy {
 		if (raw.empty())
 			return VfsPath{};
 
-		if (raw.rfind("VFS://", 0) == 0)
+		if (raw.starts_with("VFS://"))
 			return VfsPath::Parse(raw);
 
 		std::string n = raw;
 		std::replace(n.begin(), n.end(), '\\', '/');
 
-		if (n.rfind("/engine/", 0) == 0)
+		if (n.starts_with("/engine/"))
 			return VfsPath::FromEngine(n.substr(8));
 		if (n == "/engine")
 			return VfsPath::FromEngine("");
 
-		if (n.rfind("/project/", 0) == 0)
+		if (n.starts_with("/project/"))
 			return VfsPath::FromGame(n.substr(9));
-		if (n.rfind("/game/", 0) == 0)
+		if (n.starts_with("/game/"))
 			return VfsPath::FromGame(n.substr(6));
 		if (n == "/project" || n == "/game")
 			return VfsPath::FromGame("");

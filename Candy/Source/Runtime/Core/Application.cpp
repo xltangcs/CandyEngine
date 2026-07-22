@@ -11,6 +11,7 @@
 #include <glfw/glfw3.h>
 
 #include "Runtime/Scripting/ScriptSystem.h"
+#include "Utils/PlatformUtils.h"
 
 namespace Candy {
 	Application* Application::s_Instance = nullptr;
@@ -23,23 +24,9 @@ namespace Candy {
 		m_Window = Window::Create(WindowProps(name, width, height, resizable));
 		m_Window->SetEventCallback(CANDY_BIND_EVENT_FN(Application::OnEvent));
 
-		// Mount engine content: Editor → source directory, Game → .pak
-		if (m_IsEditor)
-		{
-			auto engineDir = std::filesystem::path("..") / "Candy" / "Content";
-			if (!std::filesystem::exists(engineDir))
-				engineDir = "Content";
-			if (std::filesystem::exists(engineDir))
-				FileSystem::Get().Mount("Engine", engineDir);
-			else
-				CANDY_CORE_WARN("Engine content not found: {0}", engineDir.string());
-		}
-		else
-		{
-			auto pakPath = std::filesystem::path("Content.pak");
-			if (std::filesystem::exists(pakPath))
-				FileSystem::Get().Mount("Engine", pakPath);
-		}
+		// Mount Engine + Game content. The strategy (directory vs .pak) depends
+		// on whether we're running inside the editor or a packaged build.
+		MountContent();
 
 		Renderer::Init();
 		AudioEngine::Init();
@@ -49,6 +36,35 @@ namespace Candy {
 		PushOverlay(m_ImGuiLayer);
 
 		ImGuiLayer::RebuildFont(m_FontPath);
+	}
+
+	void Application::MountContent()
+	{
+		if (m_IsEditor)
+		{
+			// Editor: mount the real Engine Content directory (hot-reload friendly).
+			std::filesystem::path engineDir = std::filesystem::path("..") / "Candy" / "Content";
+			if (!std::filesystem::exists(engineDir))
+				engineDir = "Content";
+			if (std::filesystem::exists(engineDir))
+				FileSystem::Get().Mount("Engine", engineDir);
+			else
+				CANDY_CORE_WARN("Engine content not found: {0}", engineDir.string());
+		}
+		else
+		{
+			// Packaged: the single standalone .pak next to the executable holds
+			// both Engine/ and Game/ subdirectories.
+			auto pakPath = GetExecutablePath();
+			pakPath.replace_extension(".pak");
+			if (std::filesystem::exists(pakPath))
+			{
+				FileSystem::Get().Mount("Engine", pakPath, "engine/");
+				FileSystem::Get().Mount("Game",   pakPath, "game/");
+			}
+			else
+				CANDY_CORE_WARN("Game pak not found: {0}", pakPath.string());
+		}
 	}
 
 	Application::~Application()
@@ -147,22 +163,15 @@ namespace Candy {
 			m_ActiveProject = project;
 			UpdateWindowTitle();
 
-			// Mount project content: prefer a packed .pak, fall back to the directory
-			auto contentDir = project->GetProjectDirectory() / "Content";
-			auto contentPak = project->GetProjectDirectory() / "Content.pak";
+			// Editor: mount the game's real Content directory (supports hot reload).
+			// Packaged builds already mount Game content from the .pak in MountContent().
 			if (m_IsEditor)
 			{
+				auto contentDir = project->GetProjectDirectory() / "Content";
 				if (std::filesystem::exists(contentDir))
 					FileSystem::Get().Mount("Game", contentDir);
-				else if (std::filesystem::exists(contentPak))
-					FileSystem::Get().Mount("Game", contentPak);
-			}
-			else
-			{
-				if (std::filesystem::exists(contentPak))
-					FileSystem::Get().Mount("Game", contentPak);
-				else if (std::filesystem::exists(contentDir))
-					FileSystem::Get().Mount("Game", contentDir);
+				else
+					CANDY_CORE_WARN("Game content not found: {0}", contentDir.string());
 			}
 		}
 	}

@@ -2,10 +2,12 @@
 
 #include <string>
 #include <optional>
+#include <filesystem>
 
 namespace Candy {
 
 	std::string GetExecutableDirectory();
+	std::filesystem::path GetExecutablePath();
 
 	class FileDialogs
 	{

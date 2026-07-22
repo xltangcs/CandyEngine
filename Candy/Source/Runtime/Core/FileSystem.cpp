@@ -53,7 +53,7 @@ namespace Candy {
 		// "VFS://Engine/Icons/x.png" -> domain="Engine", relative="Icons/x.png"
 		// "VFS://Game"               -> domain="Game",   relative=""
 		const std::string scheme = "VFS://";
-		if (virtualPath.rfind(scheme, 0) != 0)
+		if (!virtualPath.starts_with(scheme))
 			return nullptr;
 
 		std::string rest = virtualPath.substr(scheme.size());  // "Engine/Icons/x.png" or "Game"
@@ -172,6 +172,43 @@ namespace Candy {
 		return fullPath;
 	}
 
+	std::optional<std::filesystem::path> FileSystem::ResolveToDiskPath(const std::string& virtualPath)
+	{
+		// Only VFS:// paths are resolved at runtime. Legacy / disk paths are the
+		// concern of the serialization layer (MigrateLegacyPath), not the caller.
+		if (!virtualPath.starts_with("VFS://"))
+			return std::nullopt;
+
+		// Fast path: directory mounts already expose the real file on disk.
+		auto disk = ToDiskPath(virtualPath);
+		if (disk)
+			return *disk;
+
+		// Pak mounts: extract the file to a temp directory once, then reuse it.
+		static std::unordered_map<std::string, std::filesystem::path> s_PakCache;
+		auto it = s_PakCache.find(virtualPath);
+		if (it != s_PakCache.end() && std::filesystem::exists(it->second))
+			return it->second;
+
+		auto data = Read(virtualPath);
+		if (!data)
+			return std::nullopt;
+
+		VfsPath vp = VfsPath::Parse(virtualPath);
+		if (!vp.IsValid())
+			return std::nullopt;
+
+		auto tempPath = std::filesystem::temp_directory_path() / "CandyGame" / vp.DomainLabel() / vp.relativePath;
+		std::filesystem::create_directories(tempPath.parent_path());
+		{
+			std::ofstream out(tempPath, std::ios::binary);
+			out.write(reinterpret_cast<const char*>(data->data()), static_cast<std::streamsize>(data->size()));
+		}
+		s_PakCache[virtualPath] = tempPath;
+		CANDY_CORE_INFO("FileSystem: extracted to temp: {0}", tempPath.string());
+		return tempPath;
+	}
+
 	std::vector<std::string> FileSystem::EnumerateDirectory(const std::string& virtualDir, bool recursive)
 	{
 		std::vector<std::string> result;
@@ -199,7 +236,7 @@ namespace Candy {
 
 			for (const auto& [entryPath, entry] : mp->pak->GetEntries())
 			{
-				if (entryPath.rfind(prefix, 0) != 0)
+				if (!entryPath.starts_with(prefix))
 					continue;
 				std::string rest = entryPath.substr(prefix.size());
 				if (!recursive && rest.find('/') != std::string::npos)
@@ -211,7 +248,7 @@ namespace Candy {
 				{
 					// entryPath = "engine/Shaders/x.glsl", pakSubDir = "engine/"
 					// We want "Shaders/x.glsl" as the relative path for VFS://Engine/Shaders/x.glsl
-					if (entryPath.rfind(mp->pakSubDir, 0) == 0)
+					if (entryPath.starts_with(mp->pakSubDir))
 						vfsRel = entryPath.substr(subDirLen);
 					else
 						vfsRel = entryPath;  // shouldn't happen, but be safe

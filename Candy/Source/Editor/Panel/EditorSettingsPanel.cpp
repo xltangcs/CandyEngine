@@ -3,6 +3,8 @@
 #include <imgui/imgui.h>
 #include <imgui/misc/cpp/imgui_stdlib.h>
 
+#include "ImGuiUtils.h"
+#include "Layer/EditorLayer.h"
 #include "Setting/EditorSettings.h"
 #include "Setting/EditorState.h"
 #include "Runtime/Utils/PlatformUtils.h"
@@ -91,6 +93,8 @@ namespace Candy {
 
 			ImGui::EndTable();
 		}
+
+		ImGuiUtils::DrawCheckbox("Show Physics Colliders", EditorLayer::GetShowPhysicsColliders());
 
 		ImGui::End();
 	}

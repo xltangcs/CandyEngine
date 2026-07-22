@@ -61,27 +61,6 @@ public:
 
 namespace {
 
-// Resolve a VFS:// or project-relative path to an absolute disk path suitable
-// for AudioEngine::PlayOneShot (which takes a file path, not a VFS path).
-std::filesystem::path ResolveSoundPath(const std::string& path)
-{
-	if (path.rfind("VFS://", 0) == 0)
-	{
-		auto disk = Candy::FileSystem::Get().ToDiskPath(path);
-		if (disk) return *disk;
-	}
-	else
-	{
-		std::filesystem::path p(path);
-		if (p.is_relative())
-			return std::filesystem::absolute(Candy::ProjectUtils::GetProjectContentPath() / p);
-		return p;
-	}
-	// VFS path that could not be resolved to disk (e.g. pak-only mount)
-	CANDY_CORE_WARN("Python play_one_shot: could not resolve audio path '{0}'", path);
-	return {};
-}
-
 py::object GetComponentFromEntity(Candy::Entity& entity, const std::string& type)
 {
 	if (type == "TransformComponent")
@@ -465,9 +444,11 @@ PYBIND11_EMBEDDED_MODULE(candy, m)
           "Check if a key is pressed. Key names: W, A, S, D, UP, DOWN, LEFT, RIGHT, SPACE, ESCAPE, etc.");
 
     m.def("play_one_shot", [](const std::string& path, float volume) {
-        auto disk = ResolveSoundPath(path);
-        if (!disk.empty())
-            Candy::AudioEngine::PlayOneShot(disk.string(), volume);
+        auto disk = Candy::FileSystem::Get().ResolveToDiskPath(path);
+        if (disk)
+            Candy::AudioEngine::PlayOneShot(disk->string(), volume);
+        else
+            CANDY_CORE_WARN("Python play_one_shot: could not resolve audio path '{0}'", path);
     }, py::arg("path"), py::arg("volume") = 1.0f,
-       "Play a one-shot (non-looping) sound effect from a VFS:// or project-relative path.");
+       "Play a one-shot (non-looping) sound effect from a VFS:// path.");
 }

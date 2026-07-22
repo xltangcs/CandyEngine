@@ -29,7 +29,7 @@ namespace Candy {
 		int width, height, channels;
 		stbi_uc* data = nullptr;
 
-		if (!path.empty() && (path.rfind("VFS://", 0) == 0))
+		if (!path.empty() && path.starts_with("VFS://"))
 		{
 			auto fileData = FileSystem::Get().Read(path);
 			if (fileData && !fileData->empty())

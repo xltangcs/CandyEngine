@@ -1,7 +1,5 @@
 #include <Candy.h>
 #include <Runtime/Core/EntryPoint.h>
-#include <Runtime/Core/FileSystem.h>
-#include <Runtime/Utils/PlatformUtils.h>
 #include <Runtime/Project/ProjectSettings.h>
 
 #include "GameLayer.h"
@@ -28,30 +26,9 @@ namespace Candy {
 			}
 			else
 			{
-				// Standalone mode: find .pak next to executable
-				std::string exeDir = GetExecutableDirectory();
-				std::filesystem::path pakPath;
-				for (auto& entry : std::filesystem::directory_iterator(exeDir))
-				{
-					if (entry.path().extension() == ".pak")
-					{
-						pakPath = entry.path();
-						break;
-					}
-				}
-
-				if (pakPath.empty())
-				{
-					CANDY_CORE_ERROR("No .pak file found next to executable: {0}", exeDir);
-					Close();
-					return;
-				}
-
-			CANDY_CORE_INFO("Found pak: {0}", pakPath.string());
-			FileSystem::Get().Mount("Engine", pakPath, "engine/");
-			FileSystem::Get().Mount("Game",   pakPath, "game/");
-
-			LoadProjectFromVfs("VFS://Game/project.candyproj");
+				// Standalone mode: Engine + Game are mounted from the executable's
+				// .pak by Application::MountContent(). Just load the project via VFS.
+				LoadProjectFromVfs("VFS://Game/project.candyproj");
 			}
 
 			// Apply window size from ProjectSettings (window is non-resizable in game mode)

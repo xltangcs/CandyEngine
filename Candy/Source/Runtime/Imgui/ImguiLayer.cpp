@@ -235,7 +235,7 @@ namespace Candy {
 		ImGuiIO& io = ImGui::GetIO();
 		io.Fonts->ClearFonts();
 
-		if (!fontPath.empty() && fontPath.rfind("VFS://", 0) == 0)
+		if (!fontPath.empty() && fontPath.starts_with("VFS://"))
 		{
 			auto data = FileSystem::Get().Read(fontPath);
 			if (data && !data->empty())

@@ -63,6 +63,9 @@ namespace Candy {
 		void Run();
 		bool OnWindowClose(WindowCloseEvent& e);
 		bool OnWindowResize(WindowResizeEvent& e);
+
+		// Mount Engine + Game content
+		void MountContent();
 	private:
 		bool m_Running = true;
 		bool m_Minimized = false;

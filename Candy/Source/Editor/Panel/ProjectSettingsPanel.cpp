@@ -4,6 +4,7 @@
 #include <imgui/misc/cpp/imgui_stdlib.h>
 #include <filesystem>
 
+#include "ImGuiUtils.h"
 #include "Runtime/Project/ProjectSettings.h"
 #include "Setting/EditorState.h"
 #include "Runtime/Core/VfsPath.h"

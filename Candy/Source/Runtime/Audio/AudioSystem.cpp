@@ -25,7 +25,7 @@ namespace Candy {
 			if (!asc.SoundPath.empty() && asc.PlayOnStart)
 				{
 					std::filesystem::path soundPath;
-					if (asc.SoundPath.rfind("VFS://", 0) == 0)
+					if (asc.SoundPath.starts_with("VFS://"))
 					{
 						auto disk = FileSystem::Get().ToDiskPath(asc.SoundPath);
 						if (disk) soundPath = *disk;

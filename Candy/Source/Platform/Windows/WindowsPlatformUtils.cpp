@@ -108,12 +108,16 @@ namespace Candy {
 		ShellExecuteA(nullptr, "explore", path.c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
 	}
 
-	std::string GetExecutableDirectory()
+	std::filesystem::path GetExecutablePath()
 	{
 		wchar_t buf[MAX_PATH];
 		GetModuleFileNameW(nullptr, buf, MAX_PATH);
-		std::filesystem::path exePath(buf);
-		return exePath.parent_path().string();
+		return std::filesystem::path(buf);
+	}
+
+	std::string GetExecutableDirectory()
+	{
+		return GetExecutablePath().parent_path().string();
 	}
 
 }

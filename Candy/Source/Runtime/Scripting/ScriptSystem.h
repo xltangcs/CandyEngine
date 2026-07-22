@@ -39,6 +39,5 @@ namespace Candy
 		
 		std::unordered_map<UUID, std::unique_ptr<ScriptInstance>> m_Instances;
 		bool m_PythonInitialized = false;
-		std::filesystem::path m_TempScriptsDir;
 	};
 }

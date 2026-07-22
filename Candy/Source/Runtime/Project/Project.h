@@ -31,7 +31,7 @@ namespace Candy {
 		Project() = default;
 
 		std::string m_Name;
-		std::string m_DefaultScene = "Scenes/Default.candy";
+		std::string m_DefaultScene;
 		std::filesystem::path m_ProjectFileName;
 	};
 

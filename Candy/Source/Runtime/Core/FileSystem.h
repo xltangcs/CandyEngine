@@ -62,6 +62,15 @@ namespace Candy {
 		std::optional<std::filesystem::path> ToDiskPath(const std::string& virtualPath);
 		std::optional<std::filesystem::path> ToDiskPath(const VfsPath& p) { return ToDiskPath(p.ToString()); }
 
+		// Resolve a VFS:// path to a real file on disk.
+		//   - Directory mounts return the actual on-disk path (fast path).
+		//   - Pak mounts extract the file to a temp directory once, then reuse it.
+		// Returns nullopt for non-VFS paths or if the file cannot be resolved.
+		// Legacy / disk paths are the concern of the serialization layer
+		// (MigrateLegacyPath), not of callers requesting a real file.
+		std::optional<std::filesystem::path> ResolveToDiskPath(const std::string& virtualPath);
+		std::optional<std::filesystem::path> ResolveToDiskPath(const VfsPath& p) { return ResolveToDiskPath(p.ToString()); }
+
 		// Enumerate entries directly under virtualDir (or recursively if recursive=true).
 		// Returns paths in VFS:// format. For pak mounts, lists entries whose path
 		// starts with the directory prefix (taking pakSubDir into account).

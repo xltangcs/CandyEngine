@@ -25,6 +25,8 @@ namespace Candy {
 		void OnUpdate(Timestep ts) override;
 		virtual void OnImGuiRender() override;
 		void OnEvent(Event& e) override;
+
+		static bool& GetShowPhysicsColliders() { return m_ShowPhysicsColliders; }
 	private:
 		bool OnKeyPressed(KeyPressedEvent& e);
 		bool OnMouseButtonPressed(MouseButtonPressedEvent& e);
@@ -82,7 +84,8 @@ namespace Candy {
 		glm::vec2 m_ViewportBounds[2];
 		glm::vec4 m_SquareColor = { 0.2f, 0.3f, 0.8f, 1.0f };
 		int m_GizmoType = -1;
-		bool m_ShowPhysicsColliders = false;
+		
+		static bool m_ShowPhysicsColliders;
 
 		enum class SceneState
 		{
