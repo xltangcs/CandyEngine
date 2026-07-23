@@ -17,11 +17,10 @@ namespace Candy {
 		out << YAML::BeginMap;
 		out << YAML::Key << "Project" << YAML::Value;
 		out << YAML::BeginMap;
-		out << YAML::Key << "Name" << YAML::Value << m_Project->GetName();
+		out << YAML::Key << "ProjectName" << YAML::Value << m_Project->GetProjectName();
 		out << YAML::Key << "DefaultScene" << YAML::Value << m_Project->GetDefaultScene();
 		out << YAML::Key << "DefaultWidth" << YAML::Value << m_Project->GetDefaultWidth();
 		out << YAML::Key << "DefaultHeight" << YAML::Value << m_Project->GetDefaultHeight();
-		out << YAML::Key << "GameProjectName" << YAML::Value << m_Project->GetGameProjectName();
 		out << YAML::EndMap;
 		out << YAML::EndMap;
 
@@ -55,11 +54,10 @@ namespace Candy {
 		}
 
 		auto projectNode = data["Project"];
-		m_Project->m_Name = projectNode["Name"].as<std::string>();
+		if (projectNode["ProjectName"]) m_Project->m_ProjectName = projectNode["ProjectName"].as<std::string>();
 		if (projectNode["DefaultScene"]) m_Project->m_DefaultScene = projectNode["DefaultScene"].as<std::string>();
 		if (projectNode["DefaultWidth"]) m_Project->m_DefaultWidth = projectNode["DefaultWidth"].as<uint32_t>();
 		if (projectNode["DefaultHeight"]) m_Project->m_DefaultHeight = projectNode["DefaultHeight"].as<uint32_t>();
-		if (projectNode["GameProjectName"]) m_Project->m_GameProjectName = projectNode["GameProjectName"].as<std::string>();
 		m_Project->m_ProjectFileName = std::filesystem::absolute(filepath);
 
 		return true;
@@ -85,11 +83,10 @@ namespace Candy {
 		}
 
 		auto projectNode = data["Project"];
-		m_Project->m_Name = projectNode["Name"].as<std::string>();
+		m_Project->m_ProjectName = projectNode["ProjectName"].as<std::string>();
 		if (projectNode["DefaultScene"]) m_Project->m_DefaultScene = projectNode["DefaultScene"].as<std::string>();
 		if (projectNode["DefaultWidth"]) m_Project->m_DefaultWidth = projectNode["DefaultWidth"].as<uint32_t>();
 		if (projectNode["DefaultHeight"]) m_Project->m_DefaultHeight = projectNode["DefaultHeight"].as<uint32_t>();
-		if (projectNode["GameProjectName"]) m_Project->m_GameProjectName = projectNode["GameProjectName"].as<std::string>();
 		m_Project->m_ProjectFileName = vfsPath;
 
 		return true;

@@ -213,7 +213,7 @@ namespace Candy {
 	{
 		if (m_ActiveProject)
 		{
-			std::string title = m_ActiveProject->GetName() + " - Candy Engine";
+			std::string title = m_ActiveProject->GetProjectName() + " - Candy Engine";
 			m_Window->SetTitle(title);
 		}
 		else

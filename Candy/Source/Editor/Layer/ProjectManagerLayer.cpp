@@ -174,7 +174,7 @@ namespace Candy {
 		if (Application::Get().GetProject())
 		{
 			auto project = Application::Get().GetProject();
-			RecentProjects::Add(project->GetName(), project->GetProjectFileName().string());
+			RecentProjects::Add(project->GetProjectName(), project->GetProjectFileName().string());
 			Application::Get().SchedulePopLayer(this);
 			Application::Get().SchedulePushLayer(new EditorLayer());
 		}
@@ -240,7 +240,7 @@ namespace Candy {
 			if (Application::Get().GetProject())
 			{
 				auto project = Application::Get().GetProject();
-				RecentProjects::Add(project->GetName(), project->GetProjectFileName().string());
+				RecentProjects::Add(project->GetProjectName(), project->GetProjectFileName().string());
 				m_ShowNewProjectDialog = false;
 				Application::Get().SchedulePopLayer(this);
 				Application::Get().SchedulePushLayer(new EditorLayer());

@@ -10,7 +10,7 @@ namespace Candy {
 		std::filesystem::create_directories(directory / "Content");
 
 		Ref<Project> project = Ref<Project>(new Project());
-		project->m_Name = name;
+		project->m_ProjectName = name;
 		project->m_ProjectFileName = directory / (name + ".candyproj");
 
 		project->Save();

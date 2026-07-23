@@ -16,8 +16,8 @@ namespace Candy {
 		static Ref<Project> LoadFromVfs(const std::string& yamlContent, const std::string& vfsProjectPath);
 		void Save();
 
-		const std::string& GetName() const { return m_Name; }
-		void SetName(const std::string& name) { m_Name = name; }
+		const std::string& GetProjectName() const { return m_ProjectName; }
+		void SetProjectName(const std::string& name) { m_ProjectName = name; }
 
 		const std::filesystem::path& GetProjectFileName() const { return m_ProjectFileName; }
 		std::filesystem::path GetProjectDirectory() const { return m_ProjectFileName.parent_path(); }
@@ -30,19 +30,16 @@ namespace Candy {
 		void SetDefaultWidth(uint32_t w) { m_DefaultWidth = w; }
 		uint32_t GetDefaultHeight() const { return m_DefaultHeight; }
 		void SetDefaultHeight(uint32_t h) { m_DefaultHeight = h; }
-		const std::string& GetGameProjectName() const { return m_GameProjectName; }
-		void SetGameProjectName(const std::string& name) { m_GameProjectName = name; }
 
 		friend class ProjectSerializer;
 
 	private:
 		Project() = default;
 
-		std::string m_Name;
+		std::string m_ProjectName;
 		std::string m_DefaultScene;
 		uint32_t m_DefaultWidth = 1280;
 		uint32_t m_DefaultHeight = 720;
-		std::string m_GameProjectName = "CandyGame";   // premake project name to build for standalone game distribution
 		std::filesystem::path m_ProjectFileName;
 	};
 

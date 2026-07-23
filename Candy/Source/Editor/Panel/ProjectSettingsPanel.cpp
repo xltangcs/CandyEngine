@@ -79,26 +79,13 @@ namespace Candy {
 			ImGui::TableSetColumnIndex(0);
 			ImGui::Text("Default Height");
 			ImGui::TableSetColumnIndex(1);
-			int defaultHeight = (int)project->GetDefaultHeight();
+			int defaultHeight = static_cast<int>(project->GetDefaultHeight());
 			if (ImGui::InputInt("##DefaultHeight", &defaultHeight))
 			{
-				project->SetDefaultHeight((uint32_t)defaultHeight);
+				project->SetDefaultHeight(static_cast<uint32_t>(defaultHeight));
 				project->Save();
 			}
-
-			// Game Project
-			ImGui::TableNextRow();
-			ImGui::TableSetColumnIndex(0);
-			ImGui::Text("Game Project");
-			ImGui::TableSetColumnIndex(1);
-			std::string gameProjectName = project->GetGameProjectName();
-			ImGui::InputText("##GameProjectName", &gameProjectName);
-			if (ImGui::IsItemDeactivatedAfterEdit())
-			{
-				project->SetGameProjectName(gameProjectName);
-				project->Save();
-			}
-
+			
 			ImGui::EndTable();
 		}
 

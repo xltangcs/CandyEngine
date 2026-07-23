@@ -859,7 +859,7 @@ namespace Candy {
 		auto project = Application::Get().GetProject();
 		if (project)
 		{
-			RecentProjects::Add(project->GetName(), project->GetProjectFileName().string());
+			RecentProjects::Add(project->GetProjectName(), project->GetProjectFileName().string());
 			m_RecentProjects = RecentProjects::Load();
 
 			auto scenePathOpt = FileSystem::Get().ToDiskPath(project->GetDefaultScene());
@@ -951,32 +951,8 @@ namespace Candy {
 			const char* configs[] = { "Debug", "Release", "Dist" };
 			ImGui::Combo("##BuildConfig", &m_BuildConfig, configs, IM_ARRAYSIZE(configs));
 			ImGui::PopItemWidth();
-
-			// Game project name (only relevant for Full Build)
-			if (m_BuildMode == 1 && project)
-			{
-				ImGui::Text("Game Project");
-				ImGui::SameLine();
-				ImGui::PushItemWidth(200);
-				std::string gameProjectName = project->GetGameProjectName();
-				if (ImGui::InputText("##GameProject", &gameProjectName))
-				{
-					if (gameProjectName.empty())
-						gameProjectName = "CandyGame";
-				}
-				if (ImGui::IsItemDeactivatedAfterEdit())
-				{
-					project->SetGameProjectName(gameProjectName);
-					project->Save();
-				}
-				ImGui::PopItemWidth();
-			}
-			else
-			{
-				ImGui::Text("Content Only: uses existing CandyGame.exe, no C++ rebuild needed.");
-			}
-
-		ImGui::Spacing();
+			
+			ImGui::Spacing();
 			ImGui::Separator();
 			ImGui::Spacing();
 
@@ -1008,7 +984,7 @@ namespace Candy {
 		}
 
 		// Default to CandyGame so the current project builds out of the box
-		std::string gameProjectName = project->GetGameProjectName();
+		std::string gameProjectName = project->GetProjectName();
 		if (gameProjectName.empty())
 			gameProjectName = "CandyGame";
 
@@ -1083,7 +1059,7 @@ namespace Candy {
 		// ---------- Step 4: Project content ----------
 		// Place the project file and content under Build/<ProjectName>/
 		// The launch script runs: CandyGame.exe "<ProjectName>/<ProjectName>.candyproj"
-		auto projectName = project->GetName();
+		auto projectName = project->GetProjectName();
 		auto projectDestDir = buildDir / projectName;
 		std::filesystem::create_directories(projectDestDir);
 
@@ -1157,7 +1133,7 @@ namespace Candy {
 		std::filesystem::create_directories(buildDir);
 
 		// ---------- Step 2: Copy game executable (renamed to project name) ----------
-		auto projectName = project->GetName();
+		auto projectName = project->GetProjectName();
 		auto gameExeName = projectName + ".exe";
 		std::filesystem::copy_file(binExe, buildDir / gameExeName,
 			std::filesystem::copy_options::overwrite_existing);

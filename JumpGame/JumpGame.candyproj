@@ -1,6 +1,5 @@
 Project:
-  Name: JumpGame
+  ProjectName: JumpGame
   DefaultScene: VFS://Game/Scenes/TestScene.candy
   DefaultWidth: 1280
   DefaultHeight: 720
-  GameProjectName: CandyGame
