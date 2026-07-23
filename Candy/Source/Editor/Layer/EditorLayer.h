@@ -4,7 +4,6 @@
 #include "Runtime/Project/RecentProjects.h"
 #include "Setting/EditorSettings.h"
 #include "Setting/EditorState.h"
-#include "Runtime/Project/ProjectSettings.h"
 #include "Panel/SceneHierarchyPanel.h"
 #include "Panel/ContentBrowserPanel.h"
 #include "Panel/EditorSettingsPanel.h"

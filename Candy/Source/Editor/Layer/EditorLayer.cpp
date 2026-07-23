@@ -20,7 +20,6 @@
 
 #include <GLFW/glfw3.h>
 
-#include "Runtime/Project/ProjectUtils.h"
 #include "Runtime/Core/PakFile.h"
 #include "Layer/ProjectManagerLayer.h"
 
@@ -77,8 +76,7 @@ namespace Candy {
 		auto project = Application::Get().GetProject();
 		if (project)
 		{
-			ProjectSettings::Get().Load();
-			auto scenePathOpt = FileSystem::Get().ToDiskPath(ProjectSettings::Get().DefaultScene);
+			auto scenePathOpt = FileSystem::Get().ToDiskPath(project->GetDefaultScene());
 			if (scenePathOpt && std::filesystem::exists(*scenePathOpt))
 				OpenScene(*scenePathOpt);
 		}
@@ -101,7 +99,8 @@ namespace Candy {
 	{
 		CANDY_PROFILE_FUNCTION();
 		EditorSettings::Get().Save();
-		ProjectSettings::Get().Save();
+		if (auto project = Application::Get().GetProject())
+			project->Save();
 		EditorState::Get().Save();
 	}
 
@@ -860,11 +859,10 @@ namespace Candy {
 		auto project = Application::Get().GetProject();
 		if (project)
 		{
-			ProjectSettings::Get().Load();
 			RecentProjects::Add(project->GetName(), project->GetProjectFileName().string());
 			m_RecentProjects = RecentProjects::Load();
 
-			auto scenePathOpt = FileSystem::Get().ToDiskPath(ProjectSettings::Get().DefaultScene);
+			auto scenePathOpt = FileSystem::Get().ToDiskPath(project->GetDefaultScene());
 			if (scenePathOpt && std::filesystem::exists(*scenePathOpt))
 				OpenScene(*scenePathOpt);
 		}
@@ -933,7 +931,7 @@ namespace Candy {
 
 		if (ImGui::BeginPopupModal("Build Game", &m_ShowBuildDialog, ImGuiWindowFlags_AlwaysAutoResize))
 		{
-			auto& settings = ProjectSettings::Get();
+			auto project = Application::Get().GetProject();
 
 			ImGui::Text("Package the current project into a standalone, playable game.");
 			ImGui::Spacing();
@@ -955,18 +953,22 @@ namespace Candy {
 			ImGui::PopItemWidth();
 
 			// Game project name (only relevant for Full Build)
-			if (m_BuildMode == 1)
+			if (m_BuildMode == 1 && project)
 			{
 				ImGui::Text("Game Project");
 				ImGui::SameLine();
 				ImGui::PushItemWidth(200);
-				if (ImGui::InputText("##GameProject", &settings.GameProjectName))
+				std::string gameProjectName = project->GetGameProjectName();
+				if (ImGui::InputText("##GameProject", &gameProjectName))
 				{
-					if (settings.GameProjectName.empty())
-						settings.GameProjectName = "CandyGame";
+					if (gameProjectName.empty())
+						gameProjectName = "CandyGame";
 				}
 				if (ImGui::IsItemDeactivatedAfterEdit())
-					settings.Save();
+				{
+					project->SetGameProjectName(gameProjectName);
+					project->Save();
+				}
 				ImGui::PopItemWidth();
 			}
 			else
@@ -998,11 +1000,6 @@ namespace Candy {
 
 	void EditorLayer::BuildGame_Full()
 	{
-		auto& settings = ProjectSettings::Get();
-		// Default to CandyGame so the current project builds out of the box
-		if (settings.GameProjectName.empty())
-			settings.GameProjectName = "CandyGame";
-
 		auto project = Application::Get().GetProject();
 		if (!project)
 		{
@@ -1010,12 +1007,17 @@ namespace Candy {
 			return;
 		}
 
-		// Resolve paths
-		auto engineRoot = ProjectUtils::GetEnginePath().parent_path(); // e.g. "../../" from editor cwd
+		// Default to CandyGame so the current project builds out of the box
+		std::string gameProjectName = project->GetGameProjectName();
+		if (gameProjectName.empty())
+			gameProjectName = "CandyGame";
+
+		// Engine root is the workspace (one level above ../Candy, relative to editor CWD)
+		auto engineRoot = std::filesystem::path("..");
 		const char* configNames[] = { "Debug", "Release", "Dist" };
 		auto outputDir = std::string(configNames[m_BuildConfig]) + "-windows-x86_64";
-		auto gameExeName = settings.GameProjectName + ".exe";
-		auto binDir = engineRoot / "bin" / outputDir / settings.GameProjectName;
+		auto gameExeName = gameProjectName + ".exe";
+		auto binDir = engineRoot / "bin" / outputDir / gameProjectName;
 		auto binExe = binDir / gameExeName;
 
 		// ---------- Step 1: Build the game project ----------
@@ -1031,7 +1033,7 @@ namespace Candy {
 			cmd += "\" && \"";
 			cmd += msbuild;
 			cmd += "\" CandyEngine.sln /t:";
-			cmd += settings.GameProjectName;
+			cmd += gameProjectName;
 			cmd += " /p:Configuration=";
 			cmd += configNames[m_BuildConfig];
 			cmd += " /nologo /v:minimal";
@@ -1068,7 +1070,7 @@ namespace Candy {
 
 		// ---------- Step 3: Engine content ----------
 		// Place engine content at Build/Content/ so the standalone game finds it via VFS /engine
-		auto engineContent = ProjectUtils::GetEngineContentPath();
+		auto engineContent = std::filesystem::path("..") / "Candy" / "Content";
 		if (std::filesystem::exists(engineContent))
 		{
 			auto targetContent = buildDir / "Content";
@@ -1138,8 +1140,7 @@ namespace Candy {
 		}
 
 		// Resolve paths
-		auto& settings = ProjectSettings::Get();
-		auto engineRoot = ProjectUtils::GetEnginePath().parent_path();
+		auto engineRoot = std::filesystem::path("..");
 		const char* configNames[] = { "Debug", "Release", "Dist" };
 		auto buildOutputDir = std::string(configNames[m_BuildConfig]) + "-windows-x86_64";
 		auto binDir = engineRoot / "bin" / buildOutputDir / "CandyGame";
@@ -1182,7 +1183,7 @@ namespace Candy {
 		// Structure inside the pak:
 		//   engine/        <- engine Content/ files
 		//   game/          <- game Content/ files (Config/, project.candyproj)
-		auto engineContent = ProjectUtils::GetEngineContentPath();
+		auto engineContent = std::filesystem::path("..") / "Candy" / "Content";
 		auto projectContent = project->GetProjectDirectory() / "Content";
 		auto projFile = project->GetProjectFileName();
 

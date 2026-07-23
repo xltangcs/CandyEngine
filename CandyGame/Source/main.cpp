@@ -1,6 +1,6 @@
 #include <Candy.h>
 #include <Runtime/Core/EntryPoint.h>
-#include <Runtime/Project/ProjectSettings.h>
+#include <Runtime/Project/Project.h>
 
 #include "GameLayer.h"
 
@@ -22,7 +22,6 @@ namespace Candy {
 					return;
 				}
 				LoadProject(projectPath);
-				ProjectSettings::Get().Load();
 			}
 			else
 			{
@@ -31,11 +30,9 @@ namespace Candy {
 				LoadProjectFromVfs("VFS://Game/project.candyproj");
 			}
 
-			// Apply window size from ProjectSettings (window is non-resizable in game mode)
-			{
-				auto& ps = ProjectSettings::Get();
-				GetWindow().SetSize(ps.DefaultWidth, ps.DefaultHeight);
-			}
+			// Apply window size from Project (window is non-resizable in game mode)
+			if (auto project = Application::Get().GetProject())
+				GetWindow().SetSize(project->GetDefaultWidth(), project->GetDefaultHeight());
 
 			// VFS .pak mount happens after Application base ctor (which already ran ImGuiLayer::OnAttach).
 			// Reload fonts now so they can be read from VFS.

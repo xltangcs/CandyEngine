@@ -8,7 +8,7 @@
 #include "Runtime/Core/UUID.h"
 #include "Runtime/Core/FileSystem.h"
 #include "Runtime/Core/VfsPath.h"
-#include "Runtime/Project/ProjectUtils.h"
+#include "Runtime/Core/Application.h"
 
 #include <pybind11/embed.h>
 
@@ -56,7 +56,9 @@ void ScriptSystem::InitPython()
     Py_Initialize();
 
     // Resolve scripts directory: project Content/Scripts (filesystem path)
-    std::filesystem::path scriptsDir = std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / "Scripts");
+    auto project = Application::Get().GetProject();
+    auto projectDir = project ? project->GetProjectDirectory() : std::filesystem::current_path();
+    std::filesystem::path scriptsDir = std::filesystem::absolute(projectDir / "Content" / "Scripts");
     if (std::filesystem::exists(scriptsDir))
     {
         py::module_ sys = py::module_::import("sys");

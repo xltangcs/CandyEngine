@@ -5,7 +5,6 @@
 #include "Runtime/Scene/Scene.h"
 #include "Runtime/Scene/Entity.h"
 #include "Runtime/Scene/Components.h"
-#include "Runtime/Project/ProjectUtils.h"
 #include "Runtime/Core/FileSystem.h"
 #include "Runtime/Core/VfsPath.h"
 

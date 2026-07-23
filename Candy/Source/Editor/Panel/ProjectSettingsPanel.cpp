@@ -5,31 +5,44 @@
 #include <filesystem>
 
 #include "ImGuiUtils.h"
-#include "Runtime/Project/ProjectSettings.h"
 #include "Setting/EditorState.h"
+#include "Runtime/Core/Application.h"
 #include "Runtime/Core/VfsPath.h"
+#include "Runtime/Project/Project.h"
 
 namespace Candy {
 
 	void ProjectSettingsPanel::OnImGuiRender()
 	{
-		auto& settings = ProjectSettings::Get();
+		auto project = Application::Get().GetProject();
 		auto& editorState = EditorState::Get();
 
 		ImGui::Begin("Project Settings", &editorState.ShowProjectSettings);
+
+		if (!project)
+		{
+			ImGui::TextUnformatted("No project open.");
+			ImGui::End();
+			return;
+		}
 
 		if (ImGui::BeginTable("projectSettings", 2, ImGuiTableFlags_SizingFixedFit))
 		{
 			ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed);
 			ImGui::TableSetupColumn("Control", ImGuiTableColumnFlags_WidthStretch);
 
+			// Default Scene
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
 			ImGui::Text("Default Scene");
 			ImGui::TableSetColumnIndex(1);
-			ImGui::InputText("##DefaultScene", &settings.DefaultScene);
+			std::string defaultScene = project->GetDefaultScene();
+			ImGui::InputText("##DefaultScene", &defaultScene);
 			if (ImGui::IsItemDeactivatedAfterEdit())
-				settings.Save();
+			{
+				project->SetDefaultScene(defaultScene);
+				project->Save();
+			}
 			if (ImGui::BeginDragDropTarget())
 			{
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
@@ -41,35 +54,51 @@ namespace Candy {
 						std::filesystem::path relPath(vp.relativePath);
 						if (relPath.extension() == ".candy")
 						{
-							settings.DefaultScene = vp.ToString();
-							settings.Save();
+							project->SetDefaultScene(vp.ToString());
+							project->Save();
 						}
 					}
 				}
 				ImGui::EndDragDropTarget();
 			}
 
+			// Default Width
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
 			ImGui::Text("Default Width");
 			ImGui::TableSetColumnIndex(1);
-			if (ImGui::InputInt("##DefaultWidth", (int*)&settings.DefaultWidth))
-				settings.Save();
+			int defaultWidth = (int)project->GetDefaultWidth();
+			if (ImGui::InputInt("##DefaultWidth", &defaultWidth))
+			{
+				project->SetDefaultWidth((uint32_t)defaultWidth);
+				project->Save();
+			}
 
+			// Default Height
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
 			ImGui::Text("Default Height");
 			ImGui::TableSetColumnIndex(1);
-			if (ImGui::InputInt("##DefaultHeight", (int*)&settings.DefaultHeight))
-				settings.Save();
+			int defaultHeight = (int)project->GetDefaultHeight();
+			if (ImGui::InputInt("##DefaultHeight", &defaultHeight))
+			{
+				project->SetDefaultHeight((uint32_t)defaultHeight);
+				project->Save();
+			}
 
+			// Game Project
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
 			ImGui::Text("Game Project");
 			ImGui::TableSetColumnIndex(1);
-			ImGui::InputText("##GameProjectName", &settings.GameProjectName);
+			std::string gameProjectName = project->GetGameProjectName();
+			ImGui::InputText("##GameProjectName", &gameProjectName);
 			if (ImGui::IsItemDeactivatedAfterEdit())
-				settings.Save();
+			{
+				project->SetGameProjectName(gameProjectName);
+				project->Save();
+			}
+
 			ImGui::EndTable();
 		}
 

@@ -16,7 +16,6 @@
 #include <algorithm>
 
 #include "Runtime/Core/Application.h"
-#include "Runtime/Project/ProjectUtils.h"
 #include "Runtime/Core/VfsPath.h"
 #include "Runtime/Core/FileSystem.h"
 

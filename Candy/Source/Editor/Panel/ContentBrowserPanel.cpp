@@ -5,7 +5,6 @@
 #include <imgui/imgui.h>
 #include <imgui/misc/cpp/imgui_stdlib.h>
 #include "Runtime/Core/Application.h"
-#include "Runtime/Project/ProjectUtils.h"
 
 #include <algorithm>
 #include <cctype>
@@ -22,8 +21,12 @@ namespace Candy {
 
 	std::filesystem::path ContentBrowserPanel::ResolveDiskPath(Domain d, const std::filesystem::path& rel)
 	{
-		auto root = (d == Domain::Game) ? ProjectUtils::GetProjectContentPath()
-		                                : ProjectUtils::GetEngineContentPath();
+		// Engine Content lives at ../Candy/Content relative to the editor CWD
+		static const std::filesystem::path kEngineContent = std::filesystem::path("..") / "Candy" / "Content";
+
+		auto root = (d == Domain::Game)
+			? Application::Get().GetProject()->GetProjectDirectory() / "Content"
+			: kEngineContent;
 		return root / rel;
 	}
 

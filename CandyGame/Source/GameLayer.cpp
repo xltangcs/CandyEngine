@@ -7,8 +7,6 @@
 #include "Runtime/Renderer/Framebuffer.h"
 #include "Runtime/Renderer/GameFrameRenderer.h"
 #include "Runtime/Project/Project.h"
-#include "Runtime/Project/ProjectSettings.h"
-#include "Runtime/Project/ProjectUtils.h"
 #include "Runtime/Core/FileSystem.h"
 
 #include <GLFW/glfw3.h>
@@ -32,10 +30,10 @@ namespace Candy {
 
 		m_ActiveScene = CreateRef<Scene>();
 
-		auto sceneName = ProjectSettings::Get().DefaultScene;
+		auto sceneName = project->GetDefaultScene();
 		if (sceneName.empty())
 		{
-			CANDY_CORE_ERROR("No DefaultScene set in Config/ProjectSetting.candy");
+			CANDY_CORE_ERROR("No DefaultScene set in project");
 			return;
 		}
 

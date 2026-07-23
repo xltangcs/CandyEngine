@@ -6,7 +6,6 @@
 #include "Runtime/Core/FileSystem.h"
 #include "Runtime/Renderer/Renderer.h"
 #include "Runtime/Project/ProjectSerializer.h"
-#include "Runtime/Project/ProjectSettings.h"
 
 #include <glfw/glfw3.h>
 
@@ -192,11 +191,6 @@ namespace Candy {
 			UpdateWindowTitle();
 			// Content is mounted separately (Engine/Game domains)
 		}
-
-		// Load ProjectSettings from VFS (Config/ProjectSetting.candy inside the Game domain)
-		auto configYaml = FileSystem::Get().ReadText("VFS://Game/Config/ProjectSetting.candy");
-		if (configYaml)
-			ProjectSettings::Get().LoadFromString(*configYaml);
 	}
 
 	void Application::CreateProject(const std::filesystem::path& directory, const std::string& name)

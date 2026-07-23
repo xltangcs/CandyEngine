@@ -6,7 +6,6 @@
 #include "Runtime/Renderer/UniformBuffer.h"
 #include "Runtime/Renderer/RenderCommand.h"
 #include "Runtime/Core/FileSystem.h"
-#include "Runtime/Project/ProjectUtils.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -166,7 +165,6 @@ namespace Candy {
 		for (uint32_t i = 0; i < s_Data.MaxTextureSlots; i++)
 			samplers[i] = i;
 
-		const auto& shadersPath = ProjectUtils::GetEngineShadersPath();
 		auto loadShader = [](const char* name, const char* vfsPath) -> Ref<Shader> {
 			auto source = FileSystem::Get().ReadText(vfsPath);
 			if (source)

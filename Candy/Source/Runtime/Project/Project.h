@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <string>
+#include <cstdint>
 
 namespace Candy {
 
@@ -25,6 +26,13 @@ namespace Candy {
 		const std::string& GetDefaultScene() const { return m_DefaultScene; }
 		void SetDefaultScene(const std::string& scene) { m_DefaultScene = scene; }
 
+		uint32_t GetDefaultWidth() const { return m_DefaultWidth; }
+		void SetDefaultWidth(uint32_t w) { m_DefaultWidth = w; }
+		uint32_t GetDefaultHeight() const { return m_DefaultHeight; }
+		void SetDefaultHeight(uint32_t h) { m_DefaultHeight = h; }
+		const std::string& GetGameProjectName() const { return m_GameProjectName; }
+		void SetGameProjectName(const std::string& name) { m_GameProjectName = name; }
+
 		friend class ProjectSerializer;
 
 	private:
@@ -32,6 +40,9 @@ namespace Candy {
 
 		std::string m_Name;
 		std::string m_DefaultScene;
+		uint32_t m_DefaultWidth = 1280;
+		uint32_t m_DefaultHeight = 720;
+		std::string m_GameProjectName = "CandyGame";   // premake project name to build for standalone game distribution
 		std::filesystem::path m_ProjectFileName;
 	};
 
