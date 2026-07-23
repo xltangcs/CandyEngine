@@ -30,8 +30,6 @@
 
 namespace Candy {
 
-	bool EditorLayer::m_ShowPhysicsColliders = false;
-
 	EditorLayer::EditorLayer()
 		: Layer("EditorLayer"), m_CameraController(1280.0f / 720.0f), m_SquareColor({ 0.2f, 0.3f, 0.8f, 1.0f })
 	{
@@ -69,7 +67,7 @@ namespace Candy {
 
 		auto& editorSettings = EditorSettings::Get();
 		editorSettings.Load();
-		ImGuiLayer::RebuildFont(Application::Get().GetFontPath());
+		ImGuiLayer::RebuildFont(editorSettings.m_FontPath);
 
 		m_RecentProjects = RecentProjects::Load();
 
@@ -222,6 +220,8 @@ namespace Candy {
 	void EditorLayer::OnImGuiRender()
 	{
 		CANDY_PROFILE_FUNCTION();
+
+		ImGui::PushFont(ImGui::GetIO().FontDefault, EditorSettings::Get().m_FontSize);
 		
 		// Note: Switch this to true to enable dockspace
 		static bool dockspaceOpen = true;
@@ -526,6 +526,8 @@ namespace Candy {
 		UI_BuildDialog();
 
 		ImGui::End();
+
+		ImGui::PopFont();
 	}
 
 
@@ -646,7 +648,7 @@ namespace Candy {
 			Renderer2D::BeginScene(m_EditorCamera);
 		}
 
-		if (m_ShowPhysicsColliders)
+		if (EditorSettings::Get().m_ShowPhysicsColliders)
 		{
 			// Box Colliders
 			{

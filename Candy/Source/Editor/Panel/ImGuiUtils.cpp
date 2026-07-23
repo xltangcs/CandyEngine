@@ -4,10 +4,9 @@
 #include <imgui/imgui_internal.h>
 
 #include "Runtime/Core/Base.h"
+#include "Setting/EditorSettings.h"
 
 namespace Candy {
-
-	float ImGuiUtils::s_ColumnWidth = 150.0f;
 
 	bool ImGuiUtils::DrawContentPathControl(const std::string& label, std::string& path)
 	{
@@ -16,7 +15,7 @@ namespace Candy {
 		ImGui::PushID(label.c_str());
 
 		ImGui::Columns(2);
-		ImGui::SetColumnWidth(0, s_ColumnWidth);
+		ImGui::SetColumnWidth(0, EditorSettings::Get().m_ColumnWidth);
 
 		ImGui::Text("%s", label.c_str());
 		ImGui::NextColumn();
@@ -24,6 +23,7 @@ namespace Candy {
 		ImGui::PushItemWidth(-1.0f);
 		ImGui::InputText("##value", &path);
 		ImGui::PopItemWidth();
+		modified |= ImGui::IsItemDeactivatedAfterEdit();
 
 		if (ImGui::BeginDragDropTarget())
 		{
@@ -48,13 +48,35 @@ namespace Candy {
 		ImGui::PushID(label.c_str());
 
 		ImGui::Columns(2);
-		ImGui::SetColumnWidth(0, s_ColumnWidth);
+		ImGui::SetColumnWidth(0, EditorSettings::Get().m_ColumnWidth);
 
 		ImGui::Text("%s", label.c_str());
 		ImGui::NextColumn();
 
 		ImGui::PushItemWidth(-1.0f);
 		modified |= ImGui::DragFloat("##value", &value, speed, min, max, format);
+		ImGui::PopItemWidth();
+
+		ImGui::Columns(1);
+		ImGui::PopID();
+
+		return modified;
+	}
+
+	bool ImGuiUtils::DrawSliderFloat(const std::string& label, float& value, float min, float max, const char* format)
+	{
+		bool modified = false;
+
+		ImGui::PushID(label.c_str());
+
+		ImGui::Columns(2);
+		ImGui::SetColumnWidth(0, EditorSettings::Get().m_ColumnWidth);
+
+		ImGui::Text("%s", label.c_str());
+		ImGui::NextColumn();
+
+		ImGui::PushItemWidth(-1.0f);
+		modified |= ImGui::SliderFloat("##value", &value, min, max, format);
 		ImGui::PopItemWidth();
 
 		ImGui::Columns(1);
@@ -70,7 +92,7 @@ namespace Candy {
 		ImGui::PushID(label.c_str());
 
 		ImGui::Columns(2);
-		ImGui::SetColumnWidth(0, s_ColumnWidth);
+		ImGui::SetColumnWidth(0, EditorSettings::Get().m_ColumnWidth);
 
 		ImGui::Text("%s", label.c_str());
 		ImGui::NextColumn();
@@ -92,7 +114,7 @@ namespace Candy {
 		ImGui::PushID(label.c_str());
 
 		ImGui::Columns(2);
-		ImGui::SetColumnWidth(0, s_ColumnWidth);
+		ImGui::SetColumnWidth(0, EditorSettings::Get().m_ColumnWidth);
 
 		ImGui::Text("%s", label.c_str());
 		ImGui::NextColumn();
@@ -112,7 +134,7 @@ namespace Candy {
 		ImGui::PushID(label.c_str());
 
 		ImGui::Columns(2);
-		ImGui::SetColumnWidth(0, s_ColumnWidth);
+		ImGui::SetColumnWidth(0, EditorSettings::Get().m_ColumnWidth);
 
 		ImGui::Text("%s", label.c_str());
 		ImGui::NextColumn();
@@ -132,7 +154,7 @@ namespace Candy {
 		ImGui::PushID(label.c_str());
 
 		ImGui::Columns(2);
-		ImGui::SetColumnWidth(0, s_ColumnWidth);
+		ImGui::SetColumnWidth(0, EditorSettings::Get().m_ColumnWidth);
 
 		ImGui::Text("%s", label.c_str());
 		ImGui::NextColumn();
@@ -154,7 +176,7 @@ namespace Candy {
 		ImGui::PushID(label.c_str());
 
 		ImGui::Columns(2);
-		ImGui::SetColumnWidth(0, s_ColumnWidth);
+		ImGui::SetColumnWidth(0, EditorSettings::Get().m_ColumnWidth);
 
 		ImGui::Text("%s", label.c_str());
 		ImGui::NextColumn();
@@ -190,7 +212,7 @@ namespace Candy {
 		ImGui::PushID(label.c_str());
 
 		ImGui::Columns(2);
-		ImGui::SetColumnWidth(0, s_ColumnWidth);
+		ImGui::SetColumnWidth(0, EditorSettings::Get().m_ColumnWidth);
 
 		ImGui::Text("%s", label.c_str());
 		ImGui::NextColumn();
@@ -213,7 +235,7 @@ namespace Candy {
 		ImGui::PushID(label.c_str());
 
 		ImGui::Columns(2);
-		ImGui::SetColumnWidth(0, s_ColumnWidth);
+		ImGui::SetColumnWidth(0, EditorSettings::Get().m_ColumnWidth);
 		ImGui::Text(label.c_str());
 		ImGui::NextColumn();
 

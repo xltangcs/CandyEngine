@@ -53,12 +53,6 @@ namespace Candy {
 		void SchedulePopLayer(Layer* layer);
 		void SchedulePushLayer(Layer* layer);
 		void ProcessScheduledLayerChanges();
-
-		void SetFontSize(float size) { m_FontSize = size; }
-		const float GetFontSize() const { return m_FontSize; }
-		void SetFontPath(const std::string& path) { m_FontPath = path; }
-		const std::string GetFontPath() const { return m_FontPath; }
-
 	private:
 		void Run();
 		bool OnWindowClose(WindowCloseEvent& e);
@@ -71,9 +65,6 @@ namespace Candy {
 		bool m_Minimized = false;
 		float m_LastFrameTime = 0.0f;
 		bool m_IsEditor = true;
-
-		float m_FontSize = 18.0f;
-		std::string m_FontPath = "VFS://Engine/Fonts/opensans/OpenSans-Regular.ttf";
 
 		Scope<Window> m_Window;
 		ImGuiLayer* m_ImGuiLayer;

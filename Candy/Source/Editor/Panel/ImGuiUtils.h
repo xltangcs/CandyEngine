@@ -10,11 +10,11 @@ namespace Candy {
 	class ImGuiUtils
 	{
 	public:
-		static float s_ColumnWidth;
-
 		static bool DrawContentPathControl(const std::string& label, std::string& path);
 
 		static bool DrawDragFloat(const std::string& label, float& value, float speed = 0.1f, float min = 0.0f, float max = 0.0f, const char* format = "%.3f");
+
+		static bool DrawSliderFloat(const std::string& label, float& value, float min = 0.0f, float max = 0.0f, const char* format = "%.3f");
 
 		static bool DrawDragFloat2(const std::string& label, glm::vec2& values, float speed = 0.1f, float min = 0.0f, float max = 0.0f, const char* format = "%.3f");
 

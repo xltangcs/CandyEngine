@@ -35,7 +35,7 @@ namespace Candy {
 		m_ImGuiLayer = new ImGuiLayer();
 		PushOverlay(m_ImGuiLayer);
 
-		ImGuiLayer::RebuildFont(m_FontPath);
+		ImGuiLayer::RebuildFont("VFS://Engine/Fonts/opensans/OpenSans-Regular.ttf");
 	}
 
 	void Application::MountContent()
