@@ -174,8 +174,7 @@ namespace Candy {
 
 	std::optional<std::filesystem::path> FileSystem::ResolveToDiskPath(const std::string& virtualPath)
 	{
-		// Only VFS:// paths are resolved at runtime. Legacy / disk paths are the
-		// concern of the serialization layer (MigrateLegacyPath), not the caller.
+		// Only VFS:// paths are resolved at runtime.
 		if (!virtualPath.starts_with("VFS://"))
 			return std::nullopt;
 

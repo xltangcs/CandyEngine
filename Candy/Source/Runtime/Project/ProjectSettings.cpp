@@ -43,11 +43,7 @@ namespace Candy {
 		auto s = doc["ProjectSettings"];
 		if (!s) return;
 
-		if (s["DefaultScene"])
-		{
-			std::string raw = s["DefaultScene"].as<std::string>();
-			DefaultScene = raw.empty() ? raw : MigrateLegacyPath(raw).ToString();
-		}
+		if (s["DefaultScene"]) std::string raw = s["DefaultScene"].as<std::string>();
 		if (s["DefaultWidth"]) DefaultWidth = s["DefaultWidth"].as<uint32_t>();
 		if (s["DefaultHeight"]) DefaultHeight = s["DefaultHeight"].as<uint32_t>();
 		if (s["GameProjectName"]) GameProjectName = s["GameProjectName"].as<std::string>();
@@ -59,11 +55,7 @@ namespace Candy {
 		auto s = doc["ProjectSettings"];
 		if (!s) return;
 
-		if (s["DefaultScene"])
-		{
-			std::string raw = s["DefaultScene"].as<std::string>();
-			DefaultScene = raw.empty() ? raw : MigrateLegacyPath(raw).ToString();
-		}
+		if (s["DefaultScene"]) std::string raw = s["DefaultScene"].as<std::string>();
 		if (s["DefaultWidth"]) DefaultWidth = s["DefaultWidth"].as<uint32_t>();
 		if (s["DefaultHeight"]) DefaultHeight = s["DefaultHeight"].as<uint32_t>();
 		if (s["GameProjectName"]) GameProjectName = s["GameProjectName"].as<std::string>();

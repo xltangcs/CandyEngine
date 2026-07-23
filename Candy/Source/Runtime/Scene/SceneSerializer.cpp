@@ -471,7 +471,7 @@ namespace Candy {
 						std::string raw = tp.as<std::string>();
 						if (!raw.empty())
 						{
-							src.TexturePath = MigrateLegacyPath(raw).ToString();
+							src.TexturePath = raw;
 							auto tex = Texture2D::Create(src.TexturePath);
 							if (tex && tex->IsLoaded())
 								src.Texture = tex;
@@ -527,7 +527,7 @@ namespace Candy {
 				{
 					auto& sc = deserializedEntity.AddComponent<ScriptComponent>();
 					std::string rawScript = scriptComponent["ScriptPath"].as<std::string>();
-					sc.ScriptPath = rawScript.empty() ? rawScript : MigrateLegacyPath(rawScript).ToString();
+					sc.ScriptPath = rawScript;
 					sc.ClassName = scriptComponent["ClassName"].as<std::string>();
 				}
 
@@ -536,7 +536,7 @@ namespace Candy {
 				{
 					auto& asc = deserializedEntity.AddComponent<AudioSourceComponent>();
 					std::string rawSound = audioSourceComponent["SoundPath"].as<std::string>();
-					asc.SoundPath = rawSound.empty() ? rawSound : MigrateLegacyPath(rawSound).ToString();
+					asc.SoundPath = rawSound;
 					asc.Volume = audioSourceComponent["Volume"].as<float>();
 					asc.Looping = audioSourceComponent["Looping"].as<bool>();
 					asc.PlayOnStart = audioSourceComponent["PlayOnStart"].as<bool>();

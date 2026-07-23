@@ -10,7 +10,6 @@
 #include "Runtime/Project/ProjectSettings.h"
 #include "Runtime/Project/ProjectUtils.h"
 #include "Runtime/Core/FileSystem.h"
-#include "Runtime/Core/VfsPath.h"
 
 #include <GLFW/glfw3.h>
 #include <imgui/imgui.h>
@@ -40,10 +39,8 @@ namespace Candy {
 			return;
 		}
 
-		// DefaultScene is stored in VFS:// format (migrated by ProjectSettings::Load).
-		// MigrateLegacyPath normalizes any legacy bare paths to VFS://Game/...
-		VfsPath sceneVp = MigrateLegacyPath(sceneName);
-		auto vfsScenePath = sceneVp.ToString();
+		// DefaultScene is stored in VFS:// format.
+		auto vfsScenePath = sceneName;
 		if (FileSystem::Get().Exists(vfsScenePath))
 		{
 			auto yamlContent = FileSystem::Get().ReadText(vfsScenePath);

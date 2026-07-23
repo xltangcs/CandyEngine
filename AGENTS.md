@@ -31,6 +31,7 @@ msbuild CandyEngine.sln /p:Configuration=Debug
 - **保持引擎与编辑器的一体化设计**（像 Godot/UE 一样，编辑器是引擎的增强模式）
 - **场景即数据**：`.candy` 场景文件应可版本控制、可合并
 - **ECS 是实现手段，不是目的**：用户面对的是 Entity + Component API，而非裸 entt
+- **向前迭代，不向后兼容**：引擎处于快速演进期，重构时直接替换旧系统/旧代码，**不要**为了兼容旧格式、旧 API、旧路径而保留双轨逻辑或垫片代码（如 `MigrateLegacyPath` fallback、新旧两套路径并存等）。除非需求明确要求兼容，否则默认以最新架构为准
 
 ## Project Structure
 
@@ -67,6 +68,10 @@ Candy::Application* Candy::CreateApplication() {
 - **原生脚本**: `ScriptableEntity` 基类 + `NativeScriptComponent::Bind<T>()`
 - **Python 脚本**（计划中）：pybind11 已加入依赖但**引擎源码尚未使用**
 - **序列化**: yaml-cpp，`.candy` 文件。`SerializeRuntime()` 尚未实现
+- **虚拟文件系统 (VFS)**：所有资源路径统一使用 `VFS://Engine/...` 或 `VFS://Game/...` 格式
+  - 读取资源一律通过 `FileSystem::Get().Read()` / `ReadText()` / `Exists()`，**不要直接用 `std::filesystem`**
+  - 需要磁盘路径时用 `FileSystem::Get().ToDiskPath()` / `ResolveToDiskPath()`
+  - **不要为新功能添加旧格式兼容逻辑**（如 `ProjectUtils::GetProjectContentPath()` fallback），所有路径天然就是 VFS 格式
 
 ## Code Conventions
 

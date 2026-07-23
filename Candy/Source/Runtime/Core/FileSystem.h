@@ -66,8 +66,7 @@ namespace Candy {
 		//   - Directory mounts return the actual on-disk path (fast path).
 		//   - Pak mounts extract the file to a temp directory once, then reuse it.
 		// Returns nullopt for non-VFS paths or if the file cannot be resolved.
-		// Legacy / disk paths are the concern of the serialization layer
-		// (MigrateLegacyPath), not of callers requesting a real file.
+		// Only VFS:// paths are supported.
 		std::optional<std::filesystem::path> ResolveToDiskPath(const std::string& virtualPath);
 		std::optional<std::filesystem::path> ResolveToDiskPath(const VfsPath& p) { return ResolveToDiskPath(p.ToString()); }
 

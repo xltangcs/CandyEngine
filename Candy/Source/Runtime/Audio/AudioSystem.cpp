@@ -24,38 +24,13 @@ namespace Candy {
 
 			if (!asc.SoundPath.empty() && asc.PlayOnStart)
 				{
-					std::filesystem::path soundPath;
-					if (asc.SoundPath.starts_with("VFS://"))
+					auto disk = FileSystem::Get().ResolveToDiskPath(asc.SoundPath);
+					if (!disk)
 					{
-						auto disk = FileSystem::Get().ToDiskPath(asc.SoundPath);
-						if (disk) soundPath = *disk;
+						CANDY_CORE_ERROR("AudioSystem: failed to resolve {0}", asc.SoundPath);
+						continue;
 					}
-					else
-					{
-						soundPath = std::filesystem::path(asc.SoundPath);
-						if (soundPath.is_relative())
-							soundPath = std::filesystem::absolute(ProjectUtils::GetProjectContentPath() / soundPath);
-					}
-
-					// VFS fallback: if the file is not on disk (standalone / pak mode),
-					// extract it from the VFS to a temp directory.
-					if (!std::filesystem::exists(soundPath))
-					{
-						VfsPath vp = MigrateLegacyPath(asc.SoundPath);
-						auto data = FileSystem::Get().Read(vp.ToString());
-						if (data)
-						{
-							auto tempDir = std::filesystem::temp_directory_path() / "CandyGame";
-							auto tempPath = tempDir / vp.relativePath;
-							std::filesystem::create_directories(tempPath.parent_path());
-							{
-								std::ofstream out(tempPath, std::ios::binary);
-								out.write(reinterpret_cast<const char*>(data->data()), data->size());
-							}
-							CANDY_CORE_INFO("Extracted audio to temp: {0}", tempPath.string());
-							soundPath = tempPath;
-						}
-					}
+					std::filesystem::path soundPath = *disk;
 
 					ma_engine* engine = AudioEngine::GetEngineHandle();
 					if (engine)
