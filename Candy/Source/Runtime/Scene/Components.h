@@ -13,6 +13,8 @@
 
 #include <unordered_map>
 
+#include "Runtime/Scripting/ScriptBindingsMacros.h"
+
 namespace Candy {
 
 	struct IDComponent
@@ -24,8 +26,10 @@ namespace Candy {
 		IDComponent(const UUID& id) : ID(id) {} 
 	};
 
+	CANDY_CLASS()
 	struct TagComponent
 	{
+		CANDY_PROPERTY()
 		std::string Tag;
 
 		TagComponent() = default;
@@ -33,10 +37,14 @@ namespace Candy {
 		TagComponent(const std::string& tag)
 			: Tag(tag) {}
 	};
+	CANDY_CLASS()
 	struct TransformComponent
 	{
+		CANDY_PROPERTY()
 		glm::vec3 Translation = { 0.0f, 0.0f, 0.0f };
+		CANDY_PROPERTY()
 		glm::vec3 Rotation = { 0.0f, 0.0f, 0.0f };
+		CANDY_PROPERTY()
 		glm::vec3 Scale = { 1.0f, 1.0f, 1.0f };
 
 		TransformComponent() = default;
@@ -54,11 +62,15 @@ namespace Candy {
 		}
 	};
 
+	CANDY_CLASS()
 	struct SpriteRendererComponent
 	{
+		CANDY_PROPERTY()
 		glm::vec4 Color{ 1.0f, 1.0f, 1.0f, 1.0f };
 		Ref<Texture2D> Texture;
+		CANDY_PROPERTY()
 		std::string TexturePath;     // VFS:// format, empty = no texture (serialized for save/load)
+		CANDY_PROPERTY()
 		float TilingFactor = 1.0f;
 		SpriteRendererComponent() = default;
 		SpriteRendererComponent(const SpriteRendererComponent&) = default;
@@ -105,8 +117,10 @@ namespace Candy {
 
 	// Physics
 
+	// Rigidbody2DComponent bound manually in PythonBindings.cpp (custom physics methods)
 	struct Rigidbody2DComponent
 	{
+		CANDY_ENUM()
 		enum class BodyType { Static = 0, Dynamic, Kinematic };
 		BodyType Type = BodyType::Static;
 		bool FixedRotation = false;
@@ -118,13 +132,19 @@ namespace Candy {
 		Rigidbody2DComponent(const Rigidbody2DComponent&) = default;
 	};
 
+	CANDY_CLASS()
 	struct BoxCollider2DComponent
 	{
+		CANDY_PROPERTY()
 		glm::vec2 Offset = { 0.0f, 0.0f };
+		CANDY_PROPERTY()
 		glm::vec2 Size = { 0.5f, 0.5f };
 
+		CANDY_PROPERTY()
 		float Density = 1.0f;
+		CANDY_PROPERTY()
 		float Friction = 0.5f;
+		CANDY_PROPERTY()
 		float Restitution = 0.0f;
 		float RestitutionThreshold = 0.5f;
 
@@ -135,13 +155,19 @@ namespace Candy {
 		BoxCollider2DComponent(const BoxCollider2DComponent&) = default;
 	};
 
+	CANDY_CLASS()
 	struct CircleCollider2DComponent
 	{
+		CANDY_PROPERTY()
 		glm::vec2 Offset = { 0.0f, 0.0f };
+		CANDY_PROPERTY()
 		float Radius = 0.5f;
 
+		CANDY_PROPERTY()
 		float Density = 1.0f;
+		CANDY_PROPERTY()
 		float Friction = 0.5f;
+		CANDY_PROPERTY()
 		float Restitution = 0.0f;
 		float RestitutionThreshold = 0.5f;
 
@@ -152,9 +178,12 @@ namespace Candy {
 		CircleCollider2DComponent(const CircleCollider2DComponent&) = default;
 	};
 
+	CANDY_CLASS()
 	struct ScriptComponent
 	{
+		CANDY_PROPERTY()
 		std::string ScriptPath;
+		CANDY_PROPERTY()
 		std::string ClassName;
 
 		ScriptComponent() = default;
@@ -163,11 +192,16 @@ namespace Candy {
 
 	// Audio
 
+	CANDY_CLASS()
 	struct AudioSourceComponent
 	{
+		CANDY_PROPERTY()
 		std::string SoundPath;
+		CANDY_PROPERTY()
 		float Volume = 1.0f;
+		CANDY_PROPERTY()
 		bool Looping = false;
+		CANDY_PROPERTY()
 		bool PlayOnStart = false;
 
 		void* RuntimeHandle = nullptr;  // ma_sound* at runtime
@@ -178,15 +212,22 @@ namespace Candy {
 
 	// UI
 
+	CANDY_CLASS()
 	struct TextBlockUIData
 	{
+		CANDY_PROPERTY()
 		std::string Text;
+		CANDY_PROPERTY()
 		glm::vec4 Color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		CANDY_PROPERTY()
 		glm::vec2 Position = { 0.0f, 0.0f };
+		CANDY_PROPERTY()
 		float FontSize = 24.0f;
+		CANDY_PROPERTY()
 		bool Visible = true;
 	};
 
+	// UITextBlockComponent bound manually in PythonBindings.cpp (custom set_text/set_text_visible methods)
 	struct UITextBlockComponent
 	{
 		std::unordered_map<std::string, TextBlockUIData> TextBlockDatas;
@@ -196,16 +237,24 @@ namespace Candy {
 		UITextBlockComponent(const UITextBlockComponent&) = default;
 	};
 
+	CANDY_CLASS()
 	struct ButtonUIData
 	{
+		CANDY_PROPERTY()
 		std::string Text;
+		CANDY_PROPERTY()
 		float FontSize = 24.0f;
+		CANDY_PROPERTY()
 		glm::vec2 Size = { 200.0f, 50.0f };
+		CANDY_PROPERTY()
 		glm::vec2 Position = { 0.0f, 0.0f };
+		CANDY_PROPERTY()
 		std::string OnClick;
+		CANDY_PROPERTY()
 		bool Visible = true;
 	};
 
+	// UIButtonComponent bound manually in PythonBindings.cpp (custom set_button_*/get_button_* methods)
 	struct UIButtonComponent
 	{
 		std::unordered_map<std::string, ButtonUIData> ButtonDatas;
