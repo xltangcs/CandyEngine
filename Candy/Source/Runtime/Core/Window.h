@@ -47,6 +47,9 @@ namespace Candy {
 
 		virtual void* GetNativeWindow() const = 0;
 
+		/// Returns the platform-native window handle (HWND on Windows).
+		virtual void* GetNativeWindowHandle() const = 0;
+
 		static Scope<Window> Create(const WindowProps& props = WindowProps());
 	};
 

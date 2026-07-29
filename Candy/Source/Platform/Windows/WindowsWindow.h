@@ -27,6 +27,9 @@ namespace Candy {
 		void SetSize(uint32_t w, uint32_t h) override;
 
 		inline virtual void* GetNativeWindow() const { return m_Window; }
+
+		void* GetNativeWindowHandle() const override;
+
 	private:
 		virtual void Init(const WindowProps& props);
 		virtual void Shutdown();

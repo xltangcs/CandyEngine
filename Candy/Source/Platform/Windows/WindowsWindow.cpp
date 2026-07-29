@@ -12,6 +12,8 @@
 
 #include "Platform/OpenGL/OpenGLContext.h"
 
+#include <GLFW/glfw3native.h>
+
 namespace Candy {
 
 	static uint8_t s_GLFWWindowCount = 0;
@@ -189,6 +191,11 @@ namespace Candy {
 	bool WindowsWindow::IsVSync() const
 	{
 		return m_Data.VSync;
+	}
+
+	void* WindowsWindow::GetNativeWindowHandle() const
+	{
+		return glfwGetWin32Window(m_Window);
 	}
 
 }
