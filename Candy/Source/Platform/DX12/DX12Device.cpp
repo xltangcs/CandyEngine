@@ -850,4 +850,17 @@ float4 main(PSInput input) : SV_TARGET
 		return gpuBuffer;
 	}
 
+	Ref<RHIBuffer> DX12Device::CreateIdentityMVPBuffer()
+	{
+		// 4x4 row-major identity matrix (64 bytes)
+		float identity[16] = {
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f
+		};
+		return CreateGPUBufferWithData(identity, sizeof(identity),
+		                               ResourceUsage::ConstantBuffer, "IdentityMVP");
+	}
+
 } // namespace Candy

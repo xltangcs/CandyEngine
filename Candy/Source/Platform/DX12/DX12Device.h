@@ -93,6 +93,8 @@ namespace Candy {
 		Candy::Ref<RHIBuffer> CreateGPUBufferWithData(const void* data, uint64_t size,
 		                                              ResourceUsage usage,
 		                                              std::string_view debugName = "");
+		/// Create a constant buffer with an identity MVP matrix (64 bytes, aligned to 256).
+		Candy::Ref<RHIBuffer> CreateIdentityMVPBuffer();
 
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device>        m_NativeDevice;
