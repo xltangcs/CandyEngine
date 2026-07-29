@@ -1,3 +1,4 @@
+﻿#include "CandyPCH.h"
 #include <Windows.h>
 
 #include "Platform/DX12/DX12RendererAPI.h"

@@ -1,1 +1,1 @@
-﻿@
+﻿// Vulkan video codec stub

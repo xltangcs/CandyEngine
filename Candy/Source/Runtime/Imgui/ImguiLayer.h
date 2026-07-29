@@ -8,8 +8,10 @@
 struct ImGuiContext;
 struct ImDrawData;
 struct ImGuiIO;
-
-// DX12 forward declarations (Windows-only)
+struct GLFWwindow;
+#ifdef CANDY_PLATFORM_WINDOWS
+struct ImGui_ImplDX12_InitInfo;
+#endif
 #ifdef CANDY_PLATFORM_WINDOWS
 struct ID3D12Device;
 struct ID3D12CommandQueue;

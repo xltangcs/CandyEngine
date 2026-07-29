@@ -1,3 +1,4 @@
+﻿#include "CandyPCH.h"
 #include "Platform/Vulkan/VulkanGraphicsContext.h"
 #include "Platform/Vulkan/VulkanDevice.h"
 #include "Platform/Vulkan/VulkanSwapChain.h"

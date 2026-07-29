@@ -24,7 +24,7 @@ namespace Candy {
 		void SwapBuffers() override;
 
 		[[nodiscard]] DX12Device*     GetDevice()     const { return m_Device.get(); }
-		[[nodiscard]] DX12SwapChain*  GetSwapChain()  const { return static_cast<DX12SwapChain*>(m_SwapChainRef.get()); }
+		[[nodiscard]] DX12SwapChain*  GetSwapChain()  const { return reinterpret_cast<DX12SwapChain*>(m_SwapChainRef.get()); }
 
 	private:
 		GLFWwindow*                 m_Window = nullptr;
