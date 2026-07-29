@@ -380,7 +380,7 @@ namespace Candy {
 					ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (remaining - tw) * 0.5f);
 			
 				Ref<Texture2D> playIcon = (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate) ? m_IconPlay : m_IconStop;
-				if (ImGui::ImageButton("##PlayStop", (ImTextureID)playIcon->GetRendererID(), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0.0f, 0.0f, 0.0f, 0.0f), tint) && enabled)
+				if (ImGui::ImageButton("##PlayStop", reinterpret_cast<void*>(playIcon->GetRendererID64()), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0.0f, 0.0f, 0.0f, 0.0f), tint) && enabled)
 				{
 					if (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate)
 						OnScenePlay();
@@ -389,7 +389,7 @@ namespace Candy {
 				}
 				ImGui::SameLine();
 				Ref<Texture2D> simIcon = (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Play) ? m_IconSimulate : m_IconStop;
-				if (ImGui::ImageButton("##Simulate", (ImTextureID)simIcon->GetRendererID(), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0.0f, 0.0f, 0.0f, 0.0f), tint) && enabled)
+				if (ImGui::ImageButton("##Simulate", reinterpret_cast<void*>(simIcon->GetRendererID64()), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0.0f, 0.0f, 0.0f, 0.0f), tint) && enabled)
 				{
 					if (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Play)
 						OnSceneSimulate();
