@@ -208,6 +208,22 @@ namespace Candy {
 		LOAD_DEV(fnCreateFence); LOAD_DEV(fnDestroyFence);
 		LOAD_DEV(fnWaitForFences); LOAD_DEV(fnResetFences);
 
+		// Additional functions for Texture/Sampler/Descriptor/Renderer2D
+		LOAD_DEV(fnCreateImage);               LOAD_DEV(fnDestroyImage);
+		LOAD_DEV(fnGetImageMemoryRequirements); LOAD_DEV(fnBindImageMemory);
+		LOAD_DEV(fnCreateSampler);             LOAD_DEV(fnDestroySampler);
+		LOAD_DEV(fnCreateDescriptorSetLayout);  LOAD_DEV(fnDestroyDescriptorSetLayout);
+		LOAD_DEV(fnCreateDescriptorPool);      LOAD_DEV(fnDestroyDescriptorPool);
+		LOAD_DEV(fnAllocateDescriptorSets);    LOAD_DEV(fnUpdateDescriptorSets);
+		LOAD_DEV(fnCmdBindDescriptorSets);     LOAD_DEV(fnCmdCopyBufferToImage);
+		LOAD_DEV(fnCmdPipelineBarrier);        LOAD_DEV(fnCreateSemaphore);
+		LOAD_DEV(fnDestroySemaphore);          LOAD_DEV(fnGetBufMemReqs);
+		LOAD_DEV(fnBeginCommandBuffer);        LOAD_DEV(fnEndCommandBuffer);
+		LOAD_DEV(fnQueueSubmit);              LOAD_DEV(fnCmdDraw);
+		LOAD_DEV(fnCmdDrawIndexed);           LOAD_DEV(fnCmdBindVertexBuffers);
+		LOAD_DEV(fnCmdBindIndexBuffer);       LOAD_DEV(fnCmdSetViewport);
+		LOAD_DEV(fnCmdSetScissor);
+
 		// Instance extensions
 		LOAD(fnCreateSwapchainKHR);   LOAD_DEV(fnDestroySwapchainKHR);
 		LOAD_DEV(fnGetSwapchainImagesKHR);
@@ -220,13 +236,11 @@ namespace Candy {
 		VkCommandPoolCreateInfo poolCI = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
 		poolCI.queueFamilyIndex = m_GraphicsQueueFamilyIndex;
 		poolCI.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		VkCommandPool pool;
-		fnCreateCommandPool(m_Device, &poolCI, nullptr, &pool);
+		fnCreateCommandPool(m_Device, &poolCI, nullptr, &m_CommandPool);
 
-		VkQueue queue;
-		vkGetDeviceQueue(m_Device, m_GraphicsQueueFamilyIndex, 0, &queue);
+		vkGetDeviceQueue(m_Device, m_GraphicsQueueFamilyIndex, 0, &m_Queue);
 
-		m_CommandQueue = CreateScope<VulkanCommandQueue>(this, queue, m_GraphicsQueueFamilyIndex, pool);
+		m_CommandQueue = CreateScope<VulkanCommandQueue>(this, m_Queue, m_GraphicsQueueFamilyIndex, m_CommandPool);
 
 		m_Initialized = true;
 		CANDY_CORE_INFO("VulkanDevice: ready");

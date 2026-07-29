@@ -45,6 +45,8 @@ namespace Candy {
 		[[nodiscard]] VkPhysicalDevice GetVkPhysicalDevice() const { return m_PhysicalDevice; }
 		[[nodiscard]] VkDevice         GetVkDevice()         const { return m_Device; }
 		[[nodiscard]] uint32_t         GetGraphicsQueueFamilyIndex() const { return m_GraphicsQueueFamilyIndex; }
+		[[nodiscard]] VkCommandPool    GetVkCommandPool() const { return m_CommandPool; }
+		[[nodiscard]] VkQueue          GetVkQueue()       const { return m_Queue; }
 
 		// ---- Built-in triangle SPIR-V --------------------------------------
 
@@ -91,6 +93,35 @@ namespace Candy {
 		PFN_vkWaitForFences  fnWaitForFences  = nullptr;
 		PFN_vkResetFences    fnResetFences    = nullptr;
 
+		// ---- Missing functions needed for Texture/Sampler/Descriptor/Renderer2D ---
+		PFN_vkCreateImage               fnCreateImage               = nullptr;
+		PFN_vkDestroyImage              fnDestroyImage              = nullptr;
+		PFN_vkGetImageMemoryRequirements fnGetImageMemoryRequirements = nullptr;
+		PFN_vkBindImageMemory           fnBindImageMemory           = nullptr;
+		PFN_vkCreateSampler             fnCreateSampler             = nullptr;
+		PFN_vkDestroySampler            fnDestroySampler            = nullptr;
+		PFN_vkCreateDescriptorSetLayout  fnCreateDescriptorSetLayout  = nullptr;
+		PFN_vkDestroyDescriptorSetLayout fnDestroyDescriptorSetLayout = nullptr;
+		PFN_vkCreateDescriptorPool      fnCreateDescriptorPool      = nullptr;
+		PFN_vkDestroyDescriptorPool     fnDestroyDescriptorPool     = nullptr;
+		PFN_vkAllocateDescriptorSets    fnAllocateDescriptorSets    = nullptr;
+		PFN_vkUpdateDescriptorSets      fnUpdateDescriptorSets      = nullptr;
+		PFN_vkCmdBindDescriptorSets     fnCmdBindDescriptorSets     = nullptr;
+		PFN_vkCmdCopyBufferToImage      fnCmdCopyBufferToImage      = nullptr;
+		PFN_vkCmdPipelineBarrier        fnCmdPipelineBarrier        = nullptr;
+		PFN_vkCreateSemaphore           fnCreateSemaphore           = nullptr;
+		PFN_vkDestroySemaphore          fnDestroySemaphore          = nullptr;
+		PFN_vkGetBufferMemoryRequirements fnGetBufMemReqs           = nullptr;
+		PFN_vkBeginCommandBuffer        fnBeginCommandBuffer        = nullptr;
+		PFN_vkEndCommandBuffer          fnEndCommandBuffer          = nullptr;
+		PFN_vkQueueSubmit               fnQueueSubmit               = nullptr;
+		PFN_vkCmdDraw                   fnCmdDraw                   = nullptr;
+		PFN_vkCmdDrawIndexed            fnCmdDrawIndexed            = nullptr;
+		PFN_vkCmdBindVertexBuffers      fnCmdBindVertexBuffers      = nullptr;
+		PFN_vkCmdBindIndexBuffer        fnCmdBindIndexBuffer        = nullptr;
+		PFN_vkCmdSetViewport            fnCmdSetViewport            = nullptr;
+		PFN_vkCmdSetScissor             fnCmdSetScissor             = nullptr;
+
 	private:
 		void LoadAllFunctions();
 
@@ -99,6 +130,8 @@ namespace Candy {
 		VkDevice         m_Device                   = VK_NULL_HANDLE;
 		uint32_t         m_GraphicsQueueFamilyIndex = UINT32_MAX;
 		bool             m_Initialized              = false;
+		VkCommandPool    m_CommandPool              = VK_NULL_HANDLE;
+		VkQueue          m_Queue                    = VK_NULL_HANDLE;
 
 		std::unique_ptr<VulkanFunctionLoader> m_FunctionLoader;
 		Candy::Scope<RHICommandQueue>         m_CommandQueue;

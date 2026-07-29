@@ -6,6 +6,8 @@
 #include "Platform/OpenGL/OpenGLTexture.h"
 #include "Platform/DX12/DX12Texture2D.h"
 #include "Platform/DX12/DX12GraphicsContext.h"
+#include "Platform/Vulkan/VulkanTexture2D.h"
+#include "Platform/Vulkan/VulkanGraphicsContext.h"
 #include "Runtime/Core/Application.h"
 
 namespace Candy {
@@ -29,6 +31,13 @@ namespace Candy {
 			if (dev) return CreateRef<DX12Texture2D>(dev, width, height);
 			return nullptr;
 		}
+		case RendererAPI::API::Vulkan:
+		{
+			auto* ctx = Application::Get().GetWindow().GetGraphicsContext();
+			auto* vkCtx = dynamic_cast<VulkanGraphicsContext*>(ctx);
+			if (vkCtx) return CreateRef<VulkanTexture2D>(vkCtx->GetDevice(), width, height);
+			return nullptr;
+		}
 		}
 
 		CANDY_CORE_ASSERT(false, "Unknown RendererAPI!");
@@ -44,6 +53,13 @@ namespace Candy {
 		{
 			auto* dev = GetDX12Device();
 			if (dev) return CreateRef<DX12Texture2D>(dev, path);
+			return nullptr;
+		}
+		case RendererAPI::API::Vulkan:
+		{
+			auto* ctx = Application::Get().GetWindow().GetGraphicsContext();
+			auto* vkCtx = dynamic_cast<VulkanGraphicsContext*>(ctx);
+			if (vkCtx) return CreateRef<VulkanTexture2D>(vkCtx->GetDevice(), path);
 			return nullptr;
 		}
 		}
