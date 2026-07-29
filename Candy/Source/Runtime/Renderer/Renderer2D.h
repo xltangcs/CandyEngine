@@ -8,6 +8,10 @@
 #include "Runtime/Scene/Components.h"
 
 namespace Candy {
+	class DX12Framebuffer;
+}
+
+namespace Candy {
 	class Renderer2D
 	{
 	public:
@@ -56,6 +60,9 @@ namespace Candy {
 
 		static void ResetStats();
 		static Statistics GetStats();
+
+		/// Sets the active DX12 framebuffer for the next Flush() call (DX12 only).
+		static void SetDX12ActiveFramebuffer(DX12Framebuffer* fb);
 	private:
 		static void StartBatch();
 		static void NextBatch();
