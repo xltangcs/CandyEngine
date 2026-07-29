@@ -8,10 +8,10 @@
 
 namespace Candy {
 
-	OpenGLContext::OpenGLContext(GLFWwindow* windowHandle)
-		: m_WindowHandle(windowHandle)
+	OpenGLContext::OpenGLContext(const WindowHandle& handle)
+		: m_WindowHandle(static_cast<GLFWwindow*>(handle.Native))
 	{
-		CANDY_CORE_ASSERT(windowHandle, "Window handle is null!")
+		CANDY_CORE_ASSERT(m_WindowHandle, "Window handle is null!")
 	}
 
 	void OpenGLContext::Init()

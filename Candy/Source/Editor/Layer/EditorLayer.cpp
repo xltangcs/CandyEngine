@@ -126,6 +126,8 @@ namespace Candy {
 		Candy::Renderer2D::ResetStats();
 
 		m_Framebuffer->Bind();
+		const auto& spec = m_Framebuffer->GetSpecification();
+		Candy::RenderCommand::SetViewport(0, 0, spec.Width, spec.Height);
 
 		// Clear color+depth FIRST, then clear entity-ID attachment to -1.
 		// Order matters: glClear wipes all draw buffers (including RED_INTEGER) with the
@@ -834,6 +836,7 @@ namespace Candy {
 		sceneCamera.SetViewportSize(prevWidth, prevHeight);
 
 		m_CameraPreviewFramebuffer->Bind();
+		RenderCommand::SetViewport(0, 0, prevWidth, prevHeight);
 		RenderCommand::SetClearColor({ 0.0f, 0.0f, 0.0f, 1.0f });
 		RenderCommand::Clear();
 
@@ -841,6 +844,8 @@ namespace Candy {
 
 		m_CameraPreviewFramebuffer->Unbind();
 		m_Framebuffer->Bind(); // Re-bind main FBO for subsequent UI rendering
+		const auto& mainSpec = m_Framebuffer->GetSpecification();
+		RenderCommand::SetViewport(0, 0, mainSpec.Width, mainSpec.Height);
 
 		// Restore camera viewport to main viewport size
 		sceneCamera.SetViewportSize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);

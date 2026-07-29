@@ -94,6 +94,8 @@ namespace Candy {
 		// Render scene + UI into SwapChainTarget (framebuffer 0)
 		// Clear first -- RenderSceneTo no longer clears, caller controls clear order.
 		m_GameFramebuffer->Bind();
+		const auto& fbSpec = m_GameFramebuffer->GetSpecification();
+		RenderCommand::SetViewport(0, 0, fbSpec.Width, fbSpec.Height);
 		RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1 });
 		RenderCommand::Clear();
 		GameFrameRenderer::RenderSceneTo(*m_GameFramebuffer, *m_ActiveScene, nullptr);

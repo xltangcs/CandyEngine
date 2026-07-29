@@ -8,7 +8,7 @@ namespace Candy {
 	class OpenGLContext : public GraphicsContext
 	{
 	public:
-		OpenGLContext(GLFWwindow* windowHandle);
+		OpenGLContext(const WindowHandle& handle);
 
 		virtual void Init() override;
 		virtual void SwapBuffers() override;

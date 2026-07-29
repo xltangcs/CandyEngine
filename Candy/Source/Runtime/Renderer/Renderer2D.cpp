@@ -247,7 +247,7 @@ namespace Candy {
 				s_Data.TextureSlots[i]->Bind(i);
 
 			s_Data.QuadShader->Bind();
-			RenderCommand::DrawIndexed(s_Data.QuadVertexArray, s_Data.QuadIndexCount);
+			RenderCommand::DrawIndexed(s_Data.QuadVertexArray, PrimitiveTopology::Triangles, s_Data.QuadIndexCount);
 			s_Data.Stats.DrawCalls++;
 		}
 
@@ -257,7 +257,7 @@ namespace Candy {
 			s_Data.CircleVertexBuffer->SetData(s_Data.CircleVertexBufferBase, dataSize);
 
 			s_Data.CircleShader->Bind();
-			RenderCommand::DrawIndexed(s_Data.CircleVertexArray, s_Data.CircleIndexCount);
+			RenderCommand::DrawIndexed(s_Data.CircleVertexArray, PrimitiveTopology::Triangles, s_Data.CircleIndexCount);
 			s_Data.Stats.DrawCalls++;
 		}
 
@@ -268,7 +268,7 @@ namespace Candy {
 
 			s_Data.LineShader->Bind();
 			//RenderCommand::SetLineWidth(s_Data.LineWidth);
-			RenderCommand::DrawLines(s_Data.LineVertexArray, s_Data.LineVertexCount);
+			RenderCommand::Draw(s_Data.LineVertexArray, PrimitiveTopology::Lines, s_Data.LineVertexCount);
 			s_Data.Stats.DrawCalls++;
 		}
 	}

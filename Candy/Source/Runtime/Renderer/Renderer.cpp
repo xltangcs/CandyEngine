@@ -3,14 +3,19 @@
 #include "Runtime/Renderer/Renderer.h"
 #include "Runtime/Renderer/Renderer2D.h"
 
-#include "Platform/OpenGL/OpenGLShader.h"
+#include "Runtime/RHI/RHIPipelineState.h"
 
 namespace Candy {
 	Scope<Renderer::SceneData> Renderer::s_SceneData = CreateScope<Renderer::SceneData>();
 
 	void Renderer::Init()
 	{
-		RenderCommand::Init();
+		PipelineStateDescription defaultState;
+		defaultState.Blend = true;
+		defaultState.DepthTest = true;
+		defaultState.LineSmooth = true;
+
+		RenderCommand::Init(defaultState);
 		Renderer2D::Init();
 	}
 
@@ -40,6 +45,6 @@ namespace Candy {
 		shader->SetMat4("u_Transform", transform);
 
 		vertexArray->Bind();
-		RenderCommand::DrawIndexed(vertexArray);
+		RenderCommand::DrawIndexed(vertexArray, PrimitiveTopology::Triangles);
 	}
 }

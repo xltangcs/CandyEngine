@@ -5,6 +5,20 @@
 #include <glad/glad.h>
 
 namespace Candy {
+
+	static GLenum TopologyToGL(PrimitiveTopology topology)
+	{
+		switch (topology)
+		{
+		case PrimitiveTopology::Triangles: return GL_TRIANGLES;
+		case PrimitiveTopology::Lines:     return GL_LINES;
+		case PrimitiveTopology::Points:    return GL_POINTS;
+		default:
+			CANDY_CORE_ASSERT(false, "Unknown PrimitiveTopology!");
+			return GL_TRIANGLES;
+		}
+	}
+
 	void OpenGLMessageCallback(
 		unsigned source,
 		unsigned type,
@@ -25,7 +39,7 @@ namespace Candy {
 			CANDY_CORE_ASSERT(false, "Unknown severity level!");
 		}
 
-	void OpenGLRendererAPI::Init()
+	void OpenGLRendererAPI::Init(const PipelineStateDescription& defaultState)
 	{
 		#ifdef CANDY_DEBUG
 				glEnable(GL_DEBUG_OUTPUT);
@@ -34,15 +48,15 @@ namespace Candy {
 
 				glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, NULL, GL_FALSE);
 		#endif
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		glEnable(GL_DEPTH_TEST);
-		glEnable(GL_LINE_SMOOTH);
+
+		SetDefaultPipelineState(defaultState);
 	}
+
 	void OpenGLRendererAPI::SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
 	{
 		glViewport(x, y, width, height);
 	}
+
 	void OpenGLRendererAPI::SetClearColor(const glm::vec4& color)
 	{
 		glClearColor(color.r, color.g, color.b, color.a);
@@ -53,22 +67,45 @@ namespace Candy {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
 
-	void OpenGLRendererAPI::DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount)
+	void OpenGLRendererAPI::DrawIndexed(const Ref<VertexArray>& vertexArray, PrimitiveTopology topology, uint32_t indexCount)
 	{
 		vertexArray->Bind();
 		uint32_t count = indexCount ? indexCount : vertexArray->GetIndexBuffer()->GetCount();
-		glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, nullptr);
+		glDrawElements(TopologyToGL(topology), count, GL_UNSIGNED_INT, nullptr);
 	}
 
-	void OpenGLRendererAPI::DrawLines(const Ref<VertexArray>& vertexArray, uint32_t vertexCount)
+	void OpenGLRendererAPI::Draw(const Ref<VertexArray>& vertexArray, PrimitiveTopology topology, uint32_t elementCount)
 	{
 		vertexArray->Bind();
-		glDrawArrays(GL_LINES, 0, vertexCount);
+		glDrawArrays(TopologyToGL(topology), 0, elementCount);
 	}
 
 	void OpenGLRendererAPI::SetLineWidth(float width)
 	{
 		glLineWidth(width);
+	}
+
+	void OpenGLRendererAPI::SetDefaultPipelineState(const PipelineStateDescription& state)
+	{
+		if (state.Blend)
+		{
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		}
+		else
+		{
+			glDisable(GL_BLEND);
+		}
+
+		if (state.DepthTest)
+			glEnable(GL_DEPTH_TEST);
+		else
+			glDisable(GL_DEPTH_TEST);
+
+		if (state.LineSmooth)
+			glEnable(GL_LINE_SMOOTH);
+		else
+			glDisable(GL_LINE_SMOOTH);
 	}
 
 }

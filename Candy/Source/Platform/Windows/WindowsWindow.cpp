@@ -55,7 +55,7 @@ namespace Candy {
 		
 		s_GLFWWindowCount ++;
 
-		m_Context = GraphicsContext::Create(m_Window);
+		m_Context = GraphicsContext::Create(WindowHandle{m_Window});
 		m_Context->Init();
 
 		glfwSetWindowUserPointer(m_Window, &m_Data);

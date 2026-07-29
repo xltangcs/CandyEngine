@@ -15,6 +15,8 @@ namespace Candy {
 	void GameFrameRenderer::RenderSceneTo(Framebuffer& target, Scene& scene, EditorCamera* editorCamera)
 	{
 		target.Bind();
+		auto& spec = target.GetSpecification();
+		RenderCommand::SetViewport(0, 0, spec.Width, spec.Height);
 		// Note: caller is responsible for SetClearColor/Clear (and ClearAttachment for entity-pick FBO)
 		// so the order between Clear and ClearAttachment(id, -1) is controlled by the caller.
 
