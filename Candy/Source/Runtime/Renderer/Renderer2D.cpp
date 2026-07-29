@@ -19,6 +19,8 @@
 #include "Platform/DX12/DX12PipelineState.h"
 #include "Platform/DX12/DX12Framebuffer.h"
 #include "Platform/DX12/DX12CommandBuffer.h"
+#include "Platform/DX12/DX12Texture2D.h"
+#include "Platform/DX12/DX12Texture.h"
 
 
 namespace Candy {
@@ -122,6 +124,9 @@ namespace Candy {
 		Ref<RHIShaderModule> DX12CircleVS, DX12CirclePS;
 		Ref<RHIShaderModule> DX12LineVS, DX12LinePS;
 
+		// Textured root signature (shared by quad pipeline)
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> DX12TexturedRootSig;
+
 		// Active render target for DX12 flushing
 		DX12Framebuffer* DX12ActiveFramebuffer = nullptr;
 	};
@@ -210,7 +215,7 @@ namespace Candy {
 			}
 
 			// --- Compile HLSL shaders ---
-			// Quad
+			// Quad (textured)
 			{
 				static const char* quadVSSrc = R"(
 cbuffer TransformCB : register(b0) { float4x4 u_ViewProjection; };
@@ -218,22 +223,23 @@ struct VSInput {
 	float3 Position : POSITION; float4 Color : COLOR; float2 TexCoord : TEXCOORD;
 	float  TexIndex : TEXINDEX; float TilingFactor : TILINGFACTOR; int EntityID : ENTITYID;
 };
-struct VSOutput { float4 Position : SV_POSITION; float4 Color : COLOR; int EntityID : ENTITYID; };
-VSOutput VSMain(VSInput i) { VSOutput o; o.Position = mul(u_ViewProjection, float4(i.Position,1)); o.Color=i.Color; o.EntityID=i.EntityID; return o; }
+struct VSOutput { float4 Position : SV_POSITION; float4 Color : COLOR; float2 TexCoord : TEXCOORD; float TexIndex : TEXINDEX; float TilingFactor : TILINGFACTOR; int EntityID : ENTITYID; };
+VSOutput VSMain(VSInput i) { VSOutput o; o.Position = mul(u_ViewProjection, float4(i.Position,1)); o.Color=i.Color; o.TexCoord=i.TexCoord; o.TexIndex=i.TexIndex; o.TilingFactor=i.TilingFactor; o.EntityID=i.EntityID; return o; }
 )";
 				auto blob = dev->CompileHLSL(quadVSSrc, "VSMain", "vs_5_0", "Renderer2D_QuadVS");
 				if (blob)
 					s_Data.DX12QuadVS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "QuadVS");
-			}
-			{
+
 				static const char* quadPSSrc = R"(
-struct PSInput { float4 Position : SV_POSITION; float4 Color : COLOR; int EntityID : ENTITYID; };
+Texture2D u_Textures[32] : register(t0);
+SamplerState u_Sampler : register(s0);
+struct PSInput { float4 Position : SV_POSITION; float4 Color : COLOR; float2 TexCoord : TEXCOORD; float TexIndex : TEXINDEX; float TilingFactor : TILINGFACTOR; int EntityID : ENTITYID; };
 struct PSOutput { float4 Color : SV_TARGET0; int EntityID : SV_TARGET1; };
-PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID; return o; }
+PSOutput PSMain(PSInput i) { float2 uv = i.TexCoord * i.TilingFactor; int idx = max(0, min(31, int(i.TexIndex))); float4 texColor = i.Color * u_Textures[idx].Sample(u_Sampler, uv); PSOutput o; o.Color=texColor; o.EntityID=i.EntityID; return o; }
 )";
-				auto blob = dev->CompileHLSL(quadPSSrc, "PSMain", "ps_5_0", "Renderer2D_QuadPS");
-				if (blob)
-					s_Data.DX12QuadPS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "QuadPS");
+				auto psBlob = dev->CompileHLSL(quadPSSrc, "PSMain", "ps_5_0", "Renderer2D_QuadPS");
+				if (psBlob)
+					s_Data.DX12QuadPS = dev->CreateShaderModule(psBlob->GetBufferPointer(), static_cast<uint32_t>(psBlob->GetBufferSize()), "QuadPS");
 			}
 
 			// Circle
@@ -288,6 +294,9 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 					s_Data.DX12LinePS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "LinePS");
 			}
 
+			// --- Create textured root signature (shared by quad) ---
+			s_Data.DX12TexturedRootSig = dev->CreateTexturedRootSignature();
+
 			// --- Create pipelines ---
 			{
 				GraphicsPipelineDesc pipeDesc;
@@ -302,7 +311,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 				pipeDesc.Blend.WriteMask           = ColorWriteMask::All;
 				pipeDesc.RenderTargetFormats = { RHIFormat::R8G8B8A8Unorm, RHIFormat::R32Sint };
 
-				// Quad pipeline
+				// Quad pipeline (textured — uses TexturedRootSignature)
 				{
 					GraphicsPipelineDesc qd = pipeDesc;
 					VertexInputLayout::VertexBinding binding;
@@ -317,7 +326,17 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 					qd.VertexInput.Attributes.push_back({ 4, 0, RHIFormat::R32Float,          offsetof(QuadVertex, TilingFactor) });  // TilingFactor
 					qd.VertexInput.Attributes.push_back({ 5, 0, RHIFormat::R32Sint,           offsetof(QuadVertex, EntityID) });      // EntityID
 
-					s_Data.DX12QuadPipeline = dev->CreateGraphicsPipeline(qd, s_Data.DX12QuadVS, s_Data.DX12QuadPS);
+					if (s_Data.DX12TexturedRootSig)
+					{
+						// Create pipeline directly with textured root signature
+						s_Data.DX12QuadPipeline = dev->CreateGraphicsPipelineWithRootSig(
+							qd, s_Data.DX12QuadVS, s_Data.DX12QuadPS,
+							s_Data.DX12TexturedRootSig.Get());
+					}
+					else
+					{
+						s_Data.DX12QuadPipeline = dev->CreateGraphicsPipeline(qd, s_Data.DX12QuadVS, s_Data.DX12QuadPS);
+					}
 				}
 
 				// Circle pipeline
@@ -486,6 +505,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			s_Data.DX12QuadVS.reset(); s_Data.DX12QuadPS.reset();
 			s_Data.DX12CircleVS.reset(); s_Data.DX12CirclePS.reset();
 			s_Data.DX12LineVS.reset(); s_Data.DX12LinePS.reset();
+			s_Data.DX12TexturedRootSig.Reset();
 		}
 	}
 
@@ -615,7 +635,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			cmd->SetViewport(0, 0, static_cast<float>(vpW), static_cast<float>(vpH));
 			cmd->SetScissor(0, 0, vpW, vpH);
 
-			// --- Quad batch ---
+			// --- Quad batch (textured) ---
 			if (s_Data.QuadIndexCount && s_Data.DX12QuadPipeline)
 			{
 				uint32_t dataSize = static_cast<uint32_t>(
@@ -634,6 +654,48 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 				cmd->SetConstantBuffer(0, 0, s_Data.DX12CameraCB);
 				cmd->SetVertexBuffer(s_Data.DX12QuadVB);
 				cmd->SetIndexBuffer(s_Data.DX12QuadIB);
+
+				// --- Bind textures via descriptor table ---
+				ID3D12DescriptorHeap* srvHeap = dev->GetCBVSRVUAVHeap();
+				uint32_t descSize = dev->GetCBVSRVDescriptorSize();
+				if (srvHeap && s_Data.DX12TexturedRootSig)
+				{
+					// Allocate 32 SRV slots at descriptor range start (slot 0)
+					constexpr uint32_t kBaseSlot = 0;
+					D3D12_CPU_DESCRIPTOR_HANDLE cpuBase = srvHeap->GetCPUDescriptorHandleForHeapStart();
+					cpuBase.ptr += static_cast<SIZE_T>(kBaseSlot) * descSize;
+
+					// Write SRV descriptors for each texture slot
+					for (uint32_t i = 0; i < Renderer2DData::MaxTextureSlots; ++i)
+					{
+						D3D12_CPU_DESCRIPTOR_HANDLE dstCPU = cpuBase;
+						dstCPU.ptr += static_cast<SIZE_T>(i) * descSize;
+
+						auto* dx12Tex = dynamic_cast<DX12Texture2D*>(s_Data.TextureSlots[i].get());
+						if (dx12Tex && dx12Tex->GetRHI() && dx12Tex->GetRHI()->GetResource())
+						{
+							// Copy SRV descriptor from the texture's slot
+							D3D12_CPU_DESCRIPTOR_HANDLE srcCPU = srvHeap->GetCPUDescriptorHandleForHeapStart();
+							srcCPU.ptr += static_cast<SIZE_T>(dx12Tex->GetRHI() ? 160 : 0) * descSize;
+
+							// Rather than copy, just re-create the SRV at the target slot
+							dx12Tex->GetRHI()->CreateSRV(srvHeap, kBaseSlot + i, descSize);
+						}
+						else
+						{
+							// White texture fallback: use the first Texture2D (slot 0)
+							auto* whiteTex = dynamic_cast<DX12Texture2D*>(s_Data.TextureSlots[0].get());
+							if (whiteTex && whiteTex->GetRHI())
+								whiteTex->GetRHI()->CreateSRV(srvHeap, kBaseSlot + i, descSize);
+						}
+					}
+
+					// Bind descriptor table (root parameter 1)
+					D3D12_GPU_DESCRIPTOR_HANDLE gpuTable = srvHeap->GetGPUDescriptorHandleForHeapStart();
+					gpuTable.ptr += static_cast<SIZE_T>(kBaseSlot) * descSize;
+					dx12cb->GetNativeCommandList()->SetGraphicsRootDescriptorTable(1, gpuTable);
+				}
+
 				cmd->DrawIndexed(s_Data.QuadIndexCount);
 				s_Data.Stats.DrawCalls++;
 			}

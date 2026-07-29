@@ -32,6 +32,12 @@ namespace Candy {
 
 		Candy::Ref<RHIGraphicsPipeline> CreateGraphicsPipeline(const GraphicsPipelineDesc& desc, const Candy::Ref<RHIShaderModule>& vs, const Candy::Ref<RHIShaderModule>& fs) override;
 
+		/// Create a graphics pipeline with a specific root signature (for textured batch rendering).
+		Candy::Ref<RHIGraphicsPipeline> CreateGraphicsPipelineWithRootSig(
+			const GraphicsPipelineDesc& desc,
+			const Candy::Ref<RHIShaderModule>& vs, const Candy::Ref<RHIShaderModule>& fs,
+			ID3D12RootSignature* rootSig);
+
 		Candy::Ref<RHISwapChain> CreateSwapChain(const SwapChainDesc& desc) override;
 
 		// ---- Command submission --------------------------------------------
@@ -68,6 +74,10 @@ namespace Candy {
 
 		/// Create a minimal root signature for a simple triangle pipeline.
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateMinimalRootSignature();
+
+		/// Create a root signature for textured 2D rendering (CBV + 32 SRV + sampler).
+		/// Parameter 0: CBV (b0), Parameter 1: descriptor table 32 SRV (t0-t31), Static sampler (s0).
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateTexturedRootSignature();
 
 		/// Get the built-in triangle VS bytecode (compiled on first call).
 		const std::vector<uint8_t>& GetTriangleVSBytecode();

@@ -471,6 +471,80 @@ float4 main(PSInput input) : SV_TARGET
 		return rootSig;
 	}
 
+	ComPtr<ID3D12RootSignature> DX12Device::CreateTexturedRootSignature()
+	{
+		// Parameter 0: CBV (b0)
+		// Parameter 1: descriptor table with 32 SRVs (t0-t31)
+		D3D12_ROOT_PARAMETER rootParams[2] = {};
+
+		rootParams[0].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		rootParams[0].Descriptor       = {};
+		rootParams[0].Descriptor.ShaderRegister = 0;
+		rootParams[0].Descriptor.RegisterSpace  = 0;
+		rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+		D3D12_DESCRIPTOR_RANGE srvRange = {};
+		srvRange.RangeType          = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		srvRange.NumDescriptors     = 32;
+		srvRange.BaseShaderRegister = 0;
+		srvRange.RegisterSpace      = 0;
+		srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		rootParams[1].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParams[1].DescriptorTable.NumDescriptorRanges = 1;
+		rootParams[1].DescriptorTable.pDescriptorRanges   = &srvRange;
+		rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+		// Static sampler (s0) — linear wrap
+		D3D12_STATIC_SAMPLER_DESC staticSampler = {};
+		staticSampler.Filter           = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+		staticSampler.AddressU         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		staticSampler.AddressV         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		staticSampler.AddressW         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		staticSampler.MipLODBias       = 0.0f;
+		staticSampler.MaxAnisotropy    = 1;
+		staticSampler.ComparisonFunc   = D3D12_COMPARISON_FUNC_NEVER;
+		staticSampler.MinLOD           = 0.0f;
+		staticSampler.MaxLOD           = D3D12_FLOAT32_MAX;
+		staticSampler.ShaderRegister   = 0;
+		staticSampler.RegisterSpace    = 0;
+		staticSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+		D3D12_ROOT_SIGNATURE_DESC rootSigDesc = {};
+		rootSigDesc.NumParameters     = 2;
+		rootSigDesc.pParameters       = rootParams;
+		rootSigDesc.NumStaticSamplers = 1;
+		rootSigDesc.pStaticSamplers   = &staticSampler;
+		rootSigDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+		ComPtr<ID3DBlob> signature;
+		ComPtr<ID3DBlob> error;
+		HRESULT hr = D3D12SerializeRootSignature(
+			&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+			&signature, &error);
+
+		if (FAILED(hr))
+		{
+			if (error)
+				CANDY_CORE_ERROR("DX12Device: TexturedRootSignature error:\n{}",
+				                 static_cast<const char*>(error->GetBufferPointer()));
+			return nullptr;
+		}
+
+		ComPtr<ID3D12RootSignature> rootSig;
+		hr = m_NativeDevice->CreateRootSignature(
+			0, signature->GetBufferPointer(), signature->GetBufferSize(),
+			IID_PPV_ARGS(&rootSig));
+
+		if (FAILED(hr))
+		{
+			CANDY_CORE_ERROR("DX12Device: CreateTexturedRootSignature failed");
+			return nullptr;
+		}
+
+		return rootSig;
+	}
+
 	// ---- Resource creation ---------------------------------------------------
 
 	Ref<RHIBuffer> DX12Device::CreateBuffer(const BufferDesc& desc)
@@ -704,6 +778,102 @@ float4 main(PSInput input) : SV_TARGET
 		                desc.VertexInput.Attributes.size(), desc.RenderTargetFormats.size());
 
 		return pipeline;
+	}
+
+	Ref<RHIGraphicsPipeline> DX12Device::CreateGraphicsPipelineWithRootSig(
+		const GraphicsPipelineDesc& desc,
+		const Ref<RHIShaderModule>& vs, const Ref<RHIShaderModule>& fs,
+		ID3D12RootSignature* rootSig)
+	{
+		if (!rootSig)
+		{
+			CANDY_CORE_ERROR("DX12Device::CreateGraphicsPipelineWithRootSig: null root signature");
+			return nullptr;
+		}
+
+		// Build D3D12 pipeline state (same as CreateGraphicsPipeline but with custom root sig)
+		std::vector<D3D12_INPUT_ELEMENT_DESC> inputElements;
+		static const auto MapFormat = [](RHIFormat fmt) -> DXGI_FORMAT
+		{
+			switch (fmt)
+			{
+			case RHIFormat::R32G32Float:       return DXGI_FORMAT_R32G32_FLOAT;
+			case RHIFormat::R32G32B32Float:    return DXGI_FORMAT_R32G32B32_FLOAT;
+			case RHIFormat::R32G32B32A32Float: return DXGI_FORMAT_R32G32B32A32_FLOAT;
+			case RHIFormat::R8G8B8A8Unorm:     return DXGI_FORMAT_R8G8B8A8_UNORM;
+			case RHIFormat::R32Float:          return DXGI_FORMAT_R32_FLOAT;
+			case RHIFormat::R32Sint:           return DXGI_FORMAT_R32_SINT;
+			default:                           return DXGI_FORMAT_UNKNOWN;
+			}
+		};
+
+		for (const auto& attr : desc.VertexInput.Attributes)
+		{
+			D3D12_INPUT_ELEMENT_DESC elem = {};
+			elem.SemanticName         = "TEXCOORD";
+			elem.SemanticIndex        = attr.Location;
+			elem.Format               = MapFormat(attr.Format);
+			elem.InputSlot            = attr.Binding;
+			elem.AlignedByteOffset    = attr.Offset;
+			elem.InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+			elem.InstanceDataStepRate = 0;
+
+			if (attr.Location == 0)      elem.SemanticName = "POSITION";
+			else if (attr.Location == 1) elem.SemanticName = "COLOR";
+			else if (attr.Location == 2) elem.SemanticName = "TEXCOORD";
+
+			inputElements.push_back(elem);
+		}
+
+		D3D12_RASTERIZER_DESC rasterizer = {};
+		rasterizer.FillMode = D3D12_FILL_MODE_SOLID;
+		rasterizer.CullMode = D3D12_CULL_MODE_NONE;
+
+		D3D12_DEPTH_STENCIL_DESC depthStencil = {};
+		depthStencil.DepthEnable    = desc.DepthStencil.DepthTestEnable;
+		depthStencil.DepthWriteMask = desc.DepthStencil.DepthWriteEnable
+			? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
+
+		D3D12_BLEND_DESC blend = {};
+		blend.RenderTarget[0].BlendEnable   = desc.Blend.BlendEnable;
+		blend.RenderTarget[0].SrcBlend      = D3D12_BLEND_SRC_ALPHA;
+		blend.RenderTarget[0].DestBlend     = D3D12_BLEND_INV_SRC_ALPHA;
+		blend.RenderTarget[0].BlendOp       = D3D12_BLEND_OP_ADD;
+		blend.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+		blend.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+		blend.RenderTarget[0].BlendOpAlpha  = D3D12_BLEND_OP_ADD;
+		blend.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+		psoDesc.pRootSignature        = rootSig;
+		psoDesc.VS                    = { vs->GetBytecode(), vs->GetBytecodeSize() };
+		psoDesc.PS                    = { fs->GetBytecode(), fs->GetBytecodeSize() };
+		psoDesc.BlendState            = blend;
+		psoDesc.SampleMask            = UINT_MAX;
+		psoDesc.RasterizerState       = rasterizer;
+		psoDesc.DepthStencilState     = depthStencil;
+		psoDesc.InputLayout           = { inputElements.data(), static_cast<UINT>(inputElements.size()) };
+		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		psoDesc.NumRenderTargets      = 2;
+
+		// RTV0 = RGBA8, RTV1 = R32Sint
+		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+		psoDesc.RTVFormats[1] = DXGI_FORMAT_R32_SINT;
+		psoDesc.DSVFormat     = DXGI_FORMAT_UNKNOWN;
+		psoDesc.SampleDesc.Count = 1;
+
+		ComPtr<ID3D12PipelineState> pso;
+		HRESULT hr = m_NativeDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pso));
+		if (FAILED(hr))
+		{
+			CANDY_CORE_ERROR("DX12Device::CreateGraphicsPipelineWithRootSig: CreateGraphicsPipelineState failed");
+			return nullptr;
+		}
+
+		auto pipeline = CreateRef<DX12GraphicsPipeline>(desc);
+		pipeline->SetNativePipeline(std::move(pso), rootSig);
+		return pipeline;
+	}
 	}
 
 	Ref<RHISwapChain> DX12Device::CreateSwapChain(const SwapChainDesc& desc)
