@@ -7,6 +7,16 @@
 namespace Candy {
 
 	// =========================================================================
+	// PipelineStateDescription — simplified legacy state for RendererAPI
+	// =========================================================================
+	struct PipelineStateDescription
+	{
+		bool Blend      = true;
+		bool DepthTest  = true;
+		bool LineSmooth = true;
+	};
+
+	// =========================================================================
 	// VertexInputLayout — describes per-vertex attribute layout
 	// =========================================================================
 	struct VertexInputLayout
