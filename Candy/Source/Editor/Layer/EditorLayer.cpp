@@ -851,12 +851,26 @@ namespace Candy {
 		RenderCommand::SetClearColor({ 0.0f, 0.0f, 0.0f, 1.0f });
 		RenderCommand::Clear();
 
+		// DX12: target camera preview framebuffer
+		if (Candy::Renderer::GetAPI() == Candy::RendererAPI::API::DX12)
+		{
+			auto* dx12FB = dynamic_cast<Candy::DX12Framebuffer*>(m_CameraPreviewFramebuffer.get());
+			Candy::Renderer2D::SetDX12ActiveFramebuffer(dx12FB);
+		}
+
 		m_ActiveScene->RenderSceneFromCamera(cameraComp, cameraTransform.GetTransform());
 
 		m_CameraPreviewFramebuffer->Unbind();
 		m_Framebuffer->Bind(); // Re-bind main FBO for subsequent UI rendering
 		const auto& mainSpec = m_Framebuffer->GetSpecification();
 		RenderCommand::SetViewport(0, 0, mainSpec.Width, mainSpec.Height);
+
+		// DX12: restore main framebuffer as active target
+		if (Candy::Renderer::GetAPI() == Candy::RendererAPI::API::DX12)
+		{
+			auto* dx12FB = dynamic_cast<Candy::DX12Framebuffer*>(m_Framebuffer.get());
+			Candy::Renderer2D::SetDX12ActiveFramebuffer(dx12FB);
+		}
 
 		// Restore camera viewport to main viewport size
 		sceneCamera.SetViewportSize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
