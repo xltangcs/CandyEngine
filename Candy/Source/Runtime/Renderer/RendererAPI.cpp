@@ -6,6 +6,10 @@
 #include "Platform/Vulkan/VulkanRendererAPI.h"
 
 namespace Candy {
+	// To switch rendering backend, change this line and rebuild:
+	//   API::OpenGL — default, fully functional
+	//   API::DX12   — D3D12 (Window + ImGui + Renderer2D + Framebuffer ready, no texture paths yet)
+	//   API::Vulkan — Vulkan (device + swap chain only, ImGui not yet rendered)
 	RendererAPI::API RendererAPI::s_API = RendererAPI::API::OpenGL;
 
 	Scope<RendererAPI> RendererAPI::Create()
