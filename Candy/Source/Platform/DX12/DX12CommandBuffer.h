@@ -2,18 +2,19 @@
 
 #include "Runtime/RHI/RHICommandBuffer.h"
 
+#include <d3d12.h>
+#include <wrl/client.h>
+
 namespace Candy {
 
 	// =========================================================================
-	// DX12CommandBuffer — Direct3D 12 command list skeleton
-	//
-	// Wraps ID3D12GraphicsCommandList recording once the DX12 Agility SDK
-	// is integrated.
+	// DX12CommandBuffer — wraps ID3D12GraphicsCommandList recording
 	// =========================================================================
 	class DX12CommandBuffer : public RHICommandBuffer
 	{
 	public:
-		DX12CommandBuffer();
+		DX12CommandBuffer(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList,
+		                  ID3D12CommandAllocator* allocator);
 		virtual ~DX12CommandBuffer();
 
 		// ---- Lifetime ------------------------------------------------------
@@ -56,6 +57,14 @@ namespace Candy {
 		                 uint32_t firstIndex    = 0,
 		                 int32_t  vertexOffset  = 0,
 		                 uint32_t firstInstance = 0) override;
+
+		// ---- DX12-specific ------------------------------------------------
+
+		[[nodiscard]] ID3D12GraphicsCommandList* GetNativeCommandList() const { return m_CommandList.Get(); }
+
+	private:
+		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> m_CommandList;
+		ID3D12CommandAllocator*                            m_Allocator = nullptr;
 	};
 
 } // namespace Candy

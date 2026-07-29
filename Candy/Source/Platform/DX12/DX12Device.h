@@ -3,15 +3,18 @@
 #include "Runtime/RHI/IR/IRDevice.h"
 
 #include <d3d12.h>
+#include <dxgi1_6.h>
 #include <wrl/client.h>
+
+#include <memory>
 
 namespace Candy {
 
 	// =========================================================================
 	// DX12Device — Direct3D 12 backend implementation
 	//
-	// Inherits from IR::IRDevice.  Uses ComPtr for automatic COM lifetime
-	// management.
+	// Owns ID3D12Device, IDXGIFactory6, ID3D12CommandQueue, and a fence for
+	// GPU-CPU synchronization.
 	// =========================================================================
 	class DX12Device : public IR::IRDevice
 	{
@@ -39,11 +42,27 @@ namespace Candy {
 
 		void WaitIdle() override;
 
-		[[nodiscard]] ID3D12Device* GetNativeDevice() const { return m_NativeDevice.Get(); }
+		// ---- DX12-specific native accessors --------------------------------
+
+		[[nodiscard]] ID3D12Device*        GetNativeDevice()  const { return m_NativeDevice.Get(); }
+		[[nodiscard]] IDXGIFactory6*       GetNativeFactory() const { return m_Factory.Get(); }
+		[[nodiscard]] ID3D12CommandQueue*  GetNativeQueue()   const;
+
+		/// Signal the internal fence to a new value; returns the fence value.
+		uint64_t SignalFence();
+
+		/// CPU-wait until the fence reaches the given value.
+		void WaitForFenceValue(uint64_t value);
 
 	private:
-		Microsoft::WRL::ComPtr<ID3D12Device> m_NativeDevice;
-		Candy::Scope<RHICommandQueue>        m_CommandQueue;
+		Microsoft::WRL::ComPtr<ID3D12Device>        m_NativeDevice;
+		Microsoft::WRL::ComPtr<IDXGIFactory6>       m_Factory;
+		Candy::Scope<RHICommandQueue>               m_CommandQueue;
+
+		// Synchronization
+		Microsoft::WRL::ComPtr<ID3D12Fence> m_Fence;
+		uint64_t                            m_FenceValue = 0;
+		HANDLE                              m_FenceEvent  = nullptr;
 	};
 
 } // namespace Candy
