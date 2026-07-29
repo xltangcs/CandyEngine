@@ -10,17 +10,6 @@
 #include "Panel/ProjectSettingsPanel.h"
 #include "Runtime/Renderer/EditorCamera.h"
 
-// Enable DX12 triangle rendering test
-#define CANDY_DX12_TEST 1
-
-#if CANDY_DX12_TEST
-struct GLFWwindow;
-namespace Candy {
-	class DX12Device;
-	class DX12SwapChain;
-}
-#endif
-
 namespace Candy {
 
 	class EditorLayer : public Layer
@@ -60,13 +49,6 @@ namespace Candy {
 		// Project
 		void OpenRecent(const std::filesystem::path& path);
 		void UI_BuildDialog();
-
-#if CANDY_DX12_TEST
-		// DX12 test: renders a colored triangle in a separate window
-		void InitDX12Test();
-		void RenderDX12Triangle();
-		void ShutdownDX12Test();
-#endif
 	
 	private:
 		Candy::OrthographicCameraController m_CameraController;
@@ -124,19 +106,6 @@ namespace Candy {
 		bool m_ShowBuildDialog = false;
 		int m_BuildMode = 0; // 0 = Content Only, 1 = Full Build (MSBuild)
 		int m_BuildConfig = 0; // 0 = Debug, 1 = Release, 2 = Dist
-
-#if CANDY_DX12_TEST
-		// DX12 test state
-		GLFWwindow*                  m_DX12TestWindow = nullptr;
-		Scope<DX12Device>            m_DX12Device;
-		Ref<RHISwapChain>            m_DX12SwapChain;
-		Ref<RHIBuffer>               m_DX12VertexBuffer;
-		Ref<RHIBuffer>               m_DX12MVPBuffer;
-		Ref<RHIShaderModule>         m_DX12VS;
-		Ref<RHIShaderModule>         m_DX12PS;
-		Ref<RHIGraphicsPipeline>     m_DX12Pipeline;
-		bool                         m_DX12Initialized = false;
-#endif
 	};
 
 }

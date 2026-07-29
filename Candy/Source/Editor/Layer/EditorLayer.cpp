@@ -26,16 +26,7 @@
 #include <cstdlib>
 
 #include "Runtime/Core/FileSystem.h"
-
-#if CANDY_DX12_TEST
-#include "Platform/DX12/DX12Device.h"
-#include "Platform/DX12/DX12SwapChain.h"
-#include "Platform/DX12/DX12CommandBuffer.h"
-#include "Platform/DX12/DX12PipelineState.h"
-#include "Runtime/RHI/RHICommandBuffer.h"
-#include "Runtime/RHI/RHICommandQueue.h"
-#include <GLFW/glfw3native.h>
-#endif
+#include "Platform/DX12/DX12Framebuffer.h"
 
 namespace Candy {
 
@@ -103,19 +94,11 @@ namespace Candy {
 			glfwMaximizeWindow(window);
 		else
 			glfwSetWindowSize(window, editorState.WindowWidth, editorState.WindowHeight);
-
-#if CANDY_DX12_TEST
-		InitDX12Test();
-#endif
 	}
 
 	void EditorLayer::OnDetach()
 	{
 		CANDY_PROFILE_FUNCTION();
-
-#if CANDY_DX12_TEST
-		ShutdownDX12Test();
-#endif
 
 		EditorSettings::Get().Save();
 		if (auto project = Application::Get().GetProject())
@@ -126,10 +109,6 @@ namespace Candy {
 	void EditorLayer::OnUpdate(Timestep ts)
 	{
 		CANDY_PROFILE_FUNCTION();
-
-#if CANDY_DX12_TEST
-		RenderDX12Triangle();
-#endif
 
 		// Resize
 		if (FramebufferSpecification spec = m_Framebuffer->GetSpecification();
@@ -152,9 +131,18 @@ namespace Candy {
 		const auto& spec = m_Framebuffer->GetSpecification();
 		Candy::RenderCommand::SetViewport(0, 0, spec.Width, spec.Height);
 
+		// DX12: set active framebuffer so Renderer2D::Flush knows where to render
+		if (Candy::Renderer::GetAPI() == Candy::RendererAPI::API::DX12)
+		{
+			auto* dx12FB = dynamic_cast<Candy::DX12Framebuffer*>(m_Framebuffer.get());
+			Candy::Renderer2D::SetDX12ActiveFramebuffer(dx12FB);
+		}
+
 		// Clear color+depth FIRST, then clear entity-ID attachment to -1.
 		// Order matters: glClear wipes all draw buffers (including RED_INTEGER) with the
 		// float clear color, which would overwrite -1 with 0 and break entity picking.
+		// Note: In DX12, clearing happens inside Renderer2D::Flush via BeginRenderPass(Clear)
+		//       and ClearAttachment creates a temp command buffer for the entity-ID RTV.
 		Candy::RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1 });
 		Candy::RenderCommand::Clear();
 		m_Framebuffer->ClearAttachment(1, -1);
@@ -1253,204 +1241,5 @@ namespace Candy {
 
 		FileDialogs::OpenInShell(buildDir.string());
 	}
-
-#if CANDY_DX12_TEST
-
-	// =========================================================================
-	// DX12 Triangle Test — renders a colored triangle in a separate window
-	// =========================================================================
-
-	void EditorLayer::InitDX12Test()
-	{
-		CANDY_CORE_INFO("DX12Test: initializing...");
-
-		// 1. Create a second GLFW window without OpenGL context
-		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-		m_DX12TestWindow = glfwCreateWindow(800, 600, "DX12 Triangle Test", nullptr, nullptr);
-		if (!m_DX12TestWindow)
-		{
-			CANDY_CORE_ERROR("DX12Test: failed to create GLFW window");
-			return;
-		}
-
-		HWND hwnd = glfwGetWin32Window(m_DX12TestWindow);
-
-		// 2. Create DX12 device
-		m_DX12Device = CreateScope<DX12Device>();
-		if (!m_DX12Device->GetNativeDevice())
-		{
-			CANDY_CORE_ERROR("DX12Test: DX12Device creation failed");
-			return;
-		}
-
-		// 3. Create swap chain
-		SwapChainDesc scDesc;
-		scDesc.Window      = WindowHandle{ hwnd };
-		scDesc.Width       = 800;
-		scDesc.Height      = 600;
-		scDesc.BufferCount = 2;
-		scDesc.VSync       = true;
-
-		m_DX12SwapChain = m_DX12Device->CreateSwapChain(scDesc);
-		if (!m_DX12SwapChain)
-		{
-			CANDY_CORE_ERROR("DX12Test: SwapChain creation failed");
-			return;
-		}
-
-		// 4. Create triangle vertex buffer
-		m_DX12VertexBuffer = m_DX12Device->CreateTriangleVertexBuffer();
-		if (!m_DX12VertexBuffer)
-		{
-			CANDY_CORE_ERROR("DX12Test: vertex buffer creation failed");
-			return;
-		}
-
-		// 5. Create identity MVP constant buffer
-		m_DX12MVPBuffer = m_DX12Device->CreateIdentityMVPBuffer();
-		if (!m_DX12MVPBuffer)
-		{
-			CANDY_CORE_ERROR("DX12Test: MVP buffer creation failed");
-			return;
-		}
-
-		// 6. Compile shaders
-		const auto& vsBytecode = m_DX12Device->GetTriangleVSBytecode();
-		const auto& psBytecode = m_DX12Device->GetTrianglePSBytecode();
-
-		if (vsBytecode.empty() || psBytecode.empty())
-		{
-			CANDY_CORE_ERROR("DX12Test: shader compilation failed");
-			return;
-		}
-
-		m_DX12VS = m_DX12Device->CreateShaderModule(vsBytecode.data(), static_cast<uint32_t>(vsBytecode.size()), "TriangleVS");
-		m_DX12PS = m_DX12Device->CreateShaderModule(psBytecode.data(), static_cast<uint32_t>(psBytecode.size()), "TrianglePS");
-
-		// 7. Create graphics pipeline
-		GraphicsPipelineDesc pipelineDesc;
-		pipelineDesc.Topology               = PrimitiveTopology::Triangles;
-		pipelineDesc.Rasterizer.Cull        = CullMode::None;
-		pipelineDesc.Rasterizer.Fill        = FillMode::Solid;
-		pipelineDesc.DepthStencil.DepthTestEnable  = false;
-		pipelineDesc.DepthStencil.DepthWriteEnable = false;
-		pipelineDesc.Blend.BlendEnable      = false;
-		pipelineDesc.RenderTargetFormats     = { RHIFormat::B8G8R8A8Unorm };
-
-		// Input layout: position(3 floats) + color(4 floats), stride = 28 bytes
-		{
-			VertexInputLayout::VertexBinding binding;
-			binding.Binding = 0;
-			binding.Stride  = 7 * sizeof(float); // pos(3) + color(4)
-			pipelineDesc.VertexInput.Bindings.push_back(binding);
-
-			VertexInputLayout::VertexAttribute posAttr;
-			posAttr.Location = 0;
-			posAttr.Binding  = 0;
-			posAttr.Format   = RHIFormat::R32G32B32Float;
-			posAttr.Offset   = 0;
-			pipelineDesc.VertexInput.Attributes.push_back(posAttr);
-
-			VertexInputLayout::VertexAttribute colorAttr;
-			colorAttr.Location = 1;
-			colorAttr.Binding  = 0;
-			colorAttr.Format   = RHIFormat::R32G32B32A32Float;
-			colorAttr.Offset   = 3 * sizeof(float); // after position
-			pipelineDesc.VertexInput.Attributes.push_back(colorAttr);
-		}
-
-		m_DX12Pipeline = m_DX12Device->CreateGraphicsPipeline(pipelineDesc, m_DX12VS, m_DX12PS);
-		if (!m_DX12Pipeline)
-		{
-			CANDY_CORE_ERROR("DX12Test: pipeline creation failed");
-			return;
-		}
-
-		m_DX12Initialized = true;
-		CANDY_CORE_INFO("DX12Test: initialization complete — ready to render triangle");
-	}
-
-	void EditorLayer::RenderDX12Triangle()
-	{
-		if (!m_DX12Initialized || !m_DX12Device || !m_DX12SwapChain)
-			return;
-
-		auto& queue = m_DX12Device->GetCommandQueue();
-		auto  cmd   = queue.CreateCommandBuffer();
-		if (!cmd) return;
-
-		auto* dx12sc = static_cast<DX12SwapChain*>(m_DX12SwapChain.get());
-		auto* dx12cb = static_cast<DX12CommandBuffer*>(cmd.get());
-
-		cmd->Begin();
-
-		// Bind swap chain as render target
-		dx12cb->SetSwapChainRenderTarget(dx12sc);
-
-		// Begin render pass with clear color
-		RenderPassDesc rpDesc;
-		{
-			RenderPassColorAttachment colorAttachment;
-			colorAttachment.Format     = RHIFormat::B8G8R8A8Unorm;
-			colorAttachment.LoadOp     = LoadOp::Clear;
-			colorAttachment.ClearColor[0] = 0.1f;
-			colorAttachment.ClearColor[1] = 0.1f;
-			colorAttachment.ClearColor[2] = 0.15f;
-			colorAttachment.ClearColor[3] = 1.0f;
-			rpDesc.ColorAttachments.push_back(colorAttachment);
-		}
-		cmd->BeginRenderPass(rpDesc);
-
-		// Viewport & scissor (matching swap chain size)
-		cmd->SetViewport(0.0f, 0.0f, 800.0f, 600.0f);
-		cmd->SetScissor(0, 0, 800, 600);
-
-		// Bind pipeline and resources
-		cmd->SetPipeline(m_DX12Pipeline);
-		cmd->SetVertexBuffer(m_DX12VertexBuffer);
-		cmd->SetConstantBuffer(0, 0, m_DX12MVPBuffer);
-
-		// Draw the triangle (3 vertices)
-		cmd->Draw(3);
-
-		cmd->EndRenderPass();
-		cmd->End();
-
-		// Submit + present
-		queue.Submit({ cmd.get() });
-		queue.Present(m_DX12SwapChain);
-
-		m_DX12Device->WaitIdle();
-	}
-
-	void EditorLayer::ShutdownDX12Test()
-	{
-		if (!m_DX12Initialized)
-			return;
-
-		CANDY_CORE_INFO("DX12Test: shutting down...");
-
-		// Destroy DX12 resources first (while device is still alive)
-		m_DX12Pipeline.reset();
-		m_DX12VS.reset();
-		m_DX12PS.reset();
-		m_DX12VertexBuffer.reset();
-		m_DX12MVPBuffer.reset();
-		m_DX12SwapChain.reset();
-		m_DX12Device.reset();
-
-		// Destroy the test window
-		if (m_DX12TestWindow)
-		{
-			glfwDestroyWindow(m_DX12TestWindow);
-			m_DX12TestWindow = nullptr;
-		}
-
-		m_DX12Initialized = false;
-		CANDY_CORE_INFO("DX12Test: shutdown complete");
-	}
-
-#endif // CANDY_DX12_TEST
 
 }
