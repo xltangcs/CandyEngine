@@ -17,6 +17,7 @@
 #ifdef CANDY_PLATFORM_WINDOWS
 #include <backends/imgui_impl_dx12.h>
 #include "Platform/DX12/DX12GraphicsContext.h"
+#include "Platform/Vulkan/VulkanGraphicsContext.h"
 #include "Platform/Windows/WindowsWindow.h"
 #endif
 
@@ -70,9 +71,17 @@ namespace Candy {
 		GLFWwindow* window = static_cast<GLFWwindow*>(app.GetWindow().GetNativeWindow());
 
 		// Detect backend
-		m_IsDX12 = (Renderer::GetAPI() == RendererAPI::API::DX12);
+		m_IsDX12   = (Renderer::GetAPI() == RendererAPI::API::DX12);
+		bool isVulkan = (Renderer::GetAPI() == RendererAPI::API::Vulkan);
 
-		if (m_IsDX12)
+		if (isVulkan)
+		{
+			// Vulkan: use GLFW for other (no OpenGL context), ImGui rendering via Vulkan backend
+			// Full Vulkan ImGui integration (ImGui_ImplVulkan) will be implemented in a follow-up
+			ImGui_ImplGlfw_InitForOther(window, true);
+			CANDY_CORE_WARN("ImGuiLayer: Vulkan backend — ImGui_ImplVulkan not yet integrated, UI will not render");
+		}
+		else if (m_IsDX12)
 		{
 #ifdef CANDY_PLATFORM_WINDOWS
 			// GLFW platform backend (no OpenGL context)
@@ -173,7 +182,12 @@ namespace Candy {
 		if (m_EditorChromeDisabled)
 			return;
 
-		if (m_IsDX12)
+		if (Renderer::GetAPI() == RendererAPI::API::Vulkan)
+		{
+			// Vulkan: GLFW new frame only (no ImGui rendering backend yet)
+			ImGui_ImplGlfw_NewFrame();
+		}
+		else if (m_IsDX12)
 		{
 #ifdef CANDY_PLATFORM_WINDOWS
 			NewFrameDX12();
@@ -202,7 +216,11 @@ namespace Candy {
 
 		ImGui::Render();
 
-		if (m_IsDX12)
+		if (Renderer::GetAPI() == RendererAPI::API::Vulkan)
+		{
+			// Vulkan: ImGui rendering not yet integrated — skip
+		}
+		else if (m_IsDX12)
 		{
 #ifdef CANDY_PLATFORM_WINDOWS
 			RenderDX12(ImGui::GetDrawData());
@@ -215,7 +233,8 @@ namespace Candy {
 #endif
 		}
 
-		if (!m_IsDX12 && (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable))
+		if (!m_IsDX12 && (Renderer::GetAPI() != RendererAPI::API::Vulkan)
+		    && (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable))
 		{
 #ifndef CANDY_PLATFORM_WINDOWS
 			GLFWwindow* backup_current_context = glfwGetCurrentContext();
