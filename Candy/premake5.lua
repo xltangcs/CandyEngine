@@ -65,7 +65,8 @@ project "Candy"
 		"opengl32.lib",
 		"d3d12.lib",
 		"dxgi.lib",
-		"dxguid.lib"
+		"dxguid.lib",
+		"d3dcompiler.lib"
 	}
 
 	if PythonLibDir and PythonLibDir ~= "" then

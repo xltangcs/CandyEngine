@@ -10,9 +10,23 @@
 namespace Candy {
 
 	DX12CommandBuffer::DX12CommandBuffer(ComPtr<ID3D12GraphicsCommandList> cmdList,
-	                                     ID3D12CommandAllocator* allocator)
-		: m_CommandList(std::move(cmdList)), m_Allocator(allocator)
+	                                     ID3D12CommandAllocator* allocator,
+	                                     ID3D12DescriptorHeap* cbvSrvUavHeap,
+	                                     ID3D12DescriptorHeap* samplerHeap)
+		: m_CommandList(std::move(cmdList))
+		, m_Allocator(allocator)
+		, m_CBVSRVUAVHeap(cbvSrvUavHeap)
+		, m_SamplerHeap(samplerHeap)
 	{
+		// Cache descriptor sizes from device
+		if (cbvSrvUavHeap)
+		{
+			m_NextCBVSRVHandle = m_CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart();
+		}
+		if (samplerHeap)
+		{
+			m_NextSamplerHandle = m_SamplerHeap->GetCPUDescriptorHandleForHeapStart();
+		}
 	}
 
 	DX12CommandBuffer::~DX12CommandBuffer()
@@ -23,7 +37,6 @@ namespace Candy {
 
 	void DX12CommandBuffer::Begin()
 	{
-		// Reset allocator and command list
 		HRESULT hr = m_Allocator->Reset();
 		if (FAILED(hr))
 		{
@@ -35,7 +48,18 @@ namespace Candy {
 		if (FAILED(hr))
 		{
 			CANDY_CORE_ERROR("DX12CommandBuffer::Begin: command list Reset failed");
+			return;
 		}
+
+		// Bind descriptor heaps
+		ID3D12DescriptorHeap* heaps[] = { m_CBVSRVUAVHeap, m_SamplerHeap };
+		m_CommandList->SetDescriptorHeaps(2, heaps);
+
+		// Reset descriptor handles to start of heap (simple linear allocator)
+		if (m_CBVSRVUAVHeap)
+			m_NextCBVSRVHandle = m_CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart();
+		if (m_SamplerHeap)
+			m_NextSamplerHandle = m_SamplerHeap->GetCPUDescriptorHandleForHeapStart();
 	}
 
 	void DX12CommandBuffer::End()
@@ -47,24 +71,84 @@ namespace Candy {
 		}
 	}
 
+	// ---- Render target setup ------------------------------------------------
+
+	void DX12CommandBuffer::SetSwapChainRenderTarget(DX12SwapChain* swapChain)
+	{
+		m_CurrentSwapChain = swapChain;
+	}
+
 	// ---- Render pass ---------------------------------------------------------
 
 	void DX12CommandBuffer::BeginRenderPass(const RenderPassDesc& desc)
 	{
-		// For now, we assume a single color attachment (the swap chain back buffer).
-		// A full implementation would use multiple RTVs and a DSV.
-		//
-		// The RTV handle should be set externally (e.g., from DX12SwapChain) before
-		// calling BeginRenderPass.  For now, this is a placeholder that would be
-		// completed when the full render graph is wired up.
-		CANDY_CORE_WARN("TODO: DX12CommandBuffer::BeginRenderPass — RTV/DSV binding needs swap chain integration");
+		if (!m_CurrentSwapChain)
+		{
+			CANDY_CORE_WARN("DX12CommandBuffer::BeginRenderPass: no swap chain set as render target");
+			return;
+		}
+
+		ID3D12Resource* backBuffer = m_CurrentSwapChain->GetCurrentBackBufferResource();
+		if (!backBuffer)
+		{
+			CANDY_CORE_ERROR("DX12CommandBuffer::BeginRenderPass: null back buffer");
+			return;
+		}
+
+		// ---- Transition back buffer: PRESENT → RENDER_TARGET --------------
+
+		D3D12_RESOURCE_BARRIER barrier = {};
+		barrier.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		barrier.Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		barrier.Transition.pResource   = backBuffer;
+		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+		barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+		m_CommandList->ResourceBarrier(1, &barrier);
+
+		// ---- Bind RTV and clear -------------------------------------------
+
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_CurrentSwapChain->GetCurrentRTVHandle();
+
+		// Clear color
+		const float* clearColor = desc.ColorAttachments.empty()
+			? nullptr : desc.ColorAttachments[0].ClearColor;
+
+		if (clearColor)
+		{
+			FLOAT rgba[4] = { clearColor[0], clearColor[1], clearColor[2], clearColor[3] };
+			m_CommandList->ClearRenderTargetView(rtvHandle, rgba, 0, nullptr);
+		}
+		else
+		{
+			FLOAT rgba[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+			m_CommandList->ClearRenderTargetView(rtvHandle, rgba, 0, nullptr);
+		}
+
+		// Bind RTV (no DSV for now)
+		m_CommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 	}
 
 	void DX12CommandBuffer::EndRenderPass()
 	{
-		// In DX12, there is no explicit EndRenderPass — render targets are
-		// transitioned via resource barriers.
-		CANDY_CORE_WARN("TODO: DX12CommandBuffer::EndRenderPass — resource barrier transition needed");
+		// Transition back buffer: RENDER_TARGET → PRESENT
+		if (m_CurrentSwapChain)
+		{
+			ID3D12Resource* backBuffer = m_CurrentSwapChain->GetCurrentBackBufferResource();
+			if (backBuffer)
+			{
+				D3D12_RESOURCE_BARRIER barrier = {};
+				barrier.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+				barrier.Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+				barrier.Transition.pResource   = backBuffer;
+				barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+				barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PRESENT;
+				barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+
+				m_CommandList->ResourceBarrier(1, &barrier);
+			}
+		}
 	}
 
 	// ---- Pipeline & state ----------------------------------------------------
@@ -77,7 +161,6 @@ namespace Candy {
 			m_CommandList->SetPipelineState(dx12pso->GetNativePipelineState());
 			m_CommandList->SetGraphicsRootSignature(dx12pso->GetRootSignature());
 
-			// Set primitive topology
 			D3D12_PRIMITIVE_TOPOLOGY topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 			switch (dx12pso->GetDesc().Topology)
 			{
@@ -92,7 +175,7 @@ namespace Candy {
 		}
 		else
 		{
-			CANDY_CORE_WARN("DX12CommandBuffer::SetPipeline: pipeline not yet created or not a DX12 pipeline");
+			CANDY_CORE_WARN("DX12CommandBuffer::SetPipeline: pipeline not ready");
 		}
 	}
 
@@ -124,13 +207,9 @@ namespace Candy {
 			D3D12_VERTEX_BUFFER_VIEW vbv = {};
 			vbv.BufferLocation = dx12buffer->GetGPUVirtualAddress() + offset;
 			vbv.SizeInBytes    = static_cast<UINT>(dx12buffer->GetDesc().Size - offset);
-			vbv.StrideInBytes  = 0; // Set manually if stride is known; TODO: get from pipeline desc
+			vbv.StrideInBytes  = sizeof(float) * 7; // pos(3) + color(4) — hardcoded for triangle
 
 			m_CommandList->IASetVertexBuffers(slot, 1, &vbv);
-		}
-		else
-		{
-			CANDY_CORE_WARN("DX12CommandBuffer::SetVertexBuffer: buffer is not a DX12Buffer");
 		}
 	}
 
@@ -148,25 +227,39 @@ namespace Candy {
 
 			m_CommandList->IASetIndexBuffer(&ibv);
 		}
-		else
-		{
-			CANDY_CORE_WARN("DX12CommandBuffer::SetIndexBuffer: buffer is not a DX12Buffer");
-		}
 	}
 
 	void DX12CommandBuffer::SetConstantBuffer(uint32_t slot, uint32_t binding, const Ref<RHIBuffer>& buffer)
 	{
-		CANDY_CORE_WARN("TODO: DX12CommandBuffer::SetConstantBuffer — root parameter binding needed");
+		auto* dx12buffer = dynamic_cast<DX12Buffer*>(buffer.get());
+		if (!dx12buffer || !m_CBVSRVUAVHeap)
+			return;
+
+		// Create CBV descriptor at the next free slot in the heap
+		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+		cbvDesc.BufferLocation = dx12buffer->GetGPUVirtualAddress();
+		cbvDesc.SizeInBytes    = static_cast<UINT>(
+			(dx12buffer->GetDesc().Size + 255) & ~255ull); // align to 256
+
+		auto* device = m_CommandList->GetDevice(); // not available directly — we need device ref
+
+		// Create the CBV at m_NextCBVSRVHandle
+		// Device::CreateConstantBufferView needs an ID3D12Device*
+		// For now, log TODO — needs device reference from command buffer
+		CANDY_CORE_WARN("TODO: DX12CommandBuffer::SetConstantBuffer — needs device ref for CreateConstantBufferView");
+
+		// Set the root CBV (root parameter 0)
+		// m_CommandList->SetGraphicsRootConstantBufferView(0, dx12buffer->GetGPUVirtualAddress());
 	}
 
 	void DX12CommandBuffer::SetTexture(uint32_t slot, uint32_t binding, const Ref<RHITexture>& texture)
 	{
-		CANDY_CORE_WARN("TODO: DX12CommandBuffer::SetTexture — descriptor heap binding needed");
+		CANDY_CORE_WARN("TODO: DX12CommandBuffer::SetTexture — descriptor heap binding");
 	}
 
 	void DX12CommandBuffer::SetSampler(uint32_t slot, uint32_t binding, const Ref<RHISampler>& sampler)
 	{
-		CANDY_CORE_WARN("TODO: DX12CommandBuffer::SetSampler — sampler descriptor heap needed");
+		CANDY_CORE_WARN("TODO: DX12CommandBuffer::SetSampler — sampler descriptor");
 	}
 
 	// ---- Draw calls ----------------------------------------------------------

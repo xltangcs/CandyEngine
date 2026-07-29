@@ -1,5 +1,6 @@
 #include <Windows.h>
 #include <d3d12.h>
+#include <d3dcompiler.h>
 #include <dxgi1_6.h>
 #include <wrl/client.h>
 
@@ -15,15 +16,60 @@ using Microsoft::WRL::ComPtr;
 namespace Candy {
 
 	// =========================================================================
-	// DX12CommandQueue — wraps ID3D12CommandQueue for submission / present
+	// Built-in triangle shader source (HLSL, compiled at runtime via D3DCompile)
+	// =========================================================================
+	static const char* kTriangleVS = R"(
+cbuffer TransformCB : register(b0)
+{
+	float4x4 u_MVP;
+};
+
+struct VSInput
+{
+	float3 Position : POSITION;
+	float4 Color    : COLOR;
+};
+
+struct VSOutput
+{
+	float4 Position : SV_POSITION;
+	float4 Color    : COLOR;
+};
+
+VSOutput main(VSInput input)
+{
+	VSOutput output;
+	output.Position = mul(u_MVP, float4(input.Position, 1.0));
+	output.Color    = input.Color;
+	return output;
+}
+)";
+
+	static const char* kTrianglePS = R"(
+struct PSInput
+{
+	float4 Position : SV_POSITION;
+	float4 Color    : COLOR;
+};
+
+float4 main(PSInput input) : SV_TARGET
+{
+	return input.Color;
+}
+)";
+
+	// =========================================================================
+	// DX12CommandQueue
 	// =========================================================================
 	class DX12CommandQueue : public RHICommandQueue
 	{
 	public:
-		DX12CommandQueue(ID3D12Device* device, ComPtr<ID3D12CommandQueue> queue)
+		DX12CommandQueue(ID3D12Device* device, ComPtr<ID3D12CommandQueue> queue,
+		                 ID3D12DescriptorHeap* cbvSrvUavHeap,
+		                 ID3D12DescriptorHeap* samplerHeap)
 			: m_Device(device), m_Queue(std::move(queue))
+			, m_CBVSRVUAVHeap(cbvSrvUavHeap), m_SamplerHeap(samplerHeap)
 		{
-			// Create a command allocator (reused for simplicity)
 			HRESULT hr = device->CreateCommandAllocator(
 				D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_CommandAllocator));
 			if (FAILED(hr))
@@ -44,25 +90,23 @@ namespace Candy {
 				return nullptr;
 			}
 
-			// Command list is created in recording state; close it initially
 			cmdList->Close();
 
 			return Candy::CreateScope<DX12CommandBuffer>(
-				std::move(cmdList), m_CommandAllocator.Get());
+				std::move(cmdList), m_CommandAllocator.Get(),
+				m_CBVSRVUAVHeap, m_SamplerHeap);
 		}
 
 		void Submit(const std::vector<RHICommandBuffer*>& commandBuffers) override
 		{
 			std::vector<ID3D12CommandList*> nativeLists;
 			nativeLists.reserve(commandBuffers.size());
-
 			for (auto* cb : commandBuffers)
 			{
 				auto* dx12cb = static_cast<DX12CommandBuffer*>(cb);
 				if (auto* list = dx12cb->GetNativeCommandList())
 					nativeLists.push_back(list);
 			}
-
 			if (!nativeLists.empty())
 				m_Queue->ExecuteCommandLists(static_cast<UINT>(nativeLists.size()), nativeLists.data());
 		}
@@ -79,8 +123,7 @@ namespace Candy {
 			UINT syncInterval = dx12sc->GetDesc().VSync ? 1u : 0u;
 			UINT presentFlags = dx12sc->GetDesc().VSync ? 0u : DXGI_PRESENT_ALLOW_TEARING;
 
-			IDXGISwapChain3* sc = dx12sc->GetSwapChain();
-			if (sc)
+			if (auto* sc = dx12sc->GetSwapChain())
 			{
 				sc->Present(syncInterval, presentFlags);
 				dx12sc->AdvanceFrame();
@@ -89,26 +132,27 @@ namespace Candy {
 
 		void WaitIdle() override
 		{
-			CANDY_CORE_WARN("TODO: DX12CommandQueue::WaitIdle — use DX12Device::WaitIdle instead");
+			CANDY_CORE_WARN("TODO: DX12CommandQueue::WaitIdle — use DX12Device::WaitIdle");
 		}
 
-		[[nodiscard]] ID3D12CommandQueue* GetNativeQueue() const { return m_Queue.Get(); }
-		[[nodiscard]] ID3D12CommandAllocator* GetAllocator() const { return m_CommandAllocator.Get(); }
+		[[nodiscard]] ID3D12CommandQueue*   GetNativeQueue()   const { return m_Queue.Get(); }
+		[[nodiscard]] ID3D12CommandAllocator* GetAllocator()    const { return m_CommandAllocator.Get(); }
 
-		/// Signal a fence on this queue
 		void Signal(ID3D12Fence* fence, uint64_t value)
 		{
 			m_Queue->Signal(fence, value);
 		}
 
 	private:
-		ID3D12Device*                       m_Device = nullptr;
-		ComPtr<ID3D12CommandQueue>          m_Queue;
-		ComPtr<ID3D12CommandAllocator>      m_CommandAllocator;
+		ID3D12Device*                  m_Device = nullptr;
+		ComPtr<ID3D12CommandQueue>     m_Queue;
+		ComPtr<ID3D12CommandAllocator> m_CommandAllocator;
+		ID3D12DescriptorHeap*          m_CBVSRVUAVHeap = nullptr;
+		ID3D12DescriptorHeap*          m_SamplerHeap   = nullptr;
 	};
 
 	// =========================================================================
-	// DX12Device
+	// DX12Device — Constructor
 	// =========================================================================
 
 	DX12Device::DX12Device()
@@ -116,7 +160,6 @@ namespace Candy {
 		CANDY_CORE_INFO("DX12Device: initializing...");
 
 #if defined(CANDY_DEBUG)
-		// Enable the D3D12 debug layer
 		ComPtr<ID3D12Debug> debugController;
 		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 		{
@@ -125,7 +168,7 @@ namespace Candy {
 		}
 #endif
 
-		// Create DXGI factory
+		// DXGI factory
 		HRESULT hr = CreateDXGIFactory2(
 #if defined(CANDY_DEBUG)
 			DXGI_CREATE_FACTORY_DEBUG,
@@ -135,9 +178,7 @@ namespace Candy {
 			IID_PPV_ARGS(&m_Factory));
 
 		if (FAILED(hr))
-		{
 			hr = CreateDXGIFactory2(0, IID_PPV_ARGS(&m_Factory));
-		}
 
 		if (FAILED(hr))
 		{
@@ -145,7 +186,7 @@ namespace Candy {
 			return;
 		}
 
-		// Select adapter — prefer high-performance GPU
+		// Adapter selection
 		ComPtr<IDXGIAdapter1> adapter;
 		for (UINT i = 0;
 		     m_Factory->EnumAdapterByGpuPreference(i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
@@ -154,9 +195,7 @@ namespace Candy {
 		{
 			DXGI_ADAPTER_DESC1 desc;
 			adapter->GetDesc1(&desc);
-
-			if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-				continue;
+			if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) continue;
 
 			if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0,
 			                                _uuidof(ID3D12Device), nullptr)))
@@ -166,13 +205,12 @@ namespace Candy {
 				CANDY_CORE_INFO("DX12Device: selected adapter '{}'", name);
 				break;
 			}
-
 			adapter.Reset();
 		}
 
 		if (!adapter)
 		{
-			CANDY_CORE_WARN("DX12Device: no high-performance adapter, falling back to first adapter");
+			CANDY_CORE_WARN("DX12Device: no high-performance adapter, fallback to first");
 			m_Factory->EnumAdapters1(0, &adapter);
 		}
 
@@ -182,48 +220,73 @@ namespace Candy {
 			return;
 		}
 
-		// Create D3D12 device
+		// D3D12 device
 		hr = D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0,
 		                       IID_PPV_ARGS(&m_NativeDevice));
-
 		if (FAILED(hr))
 		{
 			CANDY_CORE_ERROR("DX12Device: D3D12CreateDevice failed");
 			return;
 		}
 
-		// Create command queue
+		// Descriptor heaps
+		{
+			D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
+			cbvHeapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+			cbvHeapDesc.NumDescriptors = 256;
+			cbvHeapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+			cbvHeapDesc.NodeMask       = 0;
+
+			hr = m_NativeDevice->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_CBVSRVUAVHeap));
+			if (FAILED(hr))
+				CANDY_CORE_ERROR("DX12Device: CBV_SRV_UAV heap creation failed");
+			else
+				m_CBVSRVUAVDescriptorSize = m_NativeDevice->GetDescriptorHandleIncrementSize(
+					D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		}
+
+		{
+			D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc = {};
+			samplerHeapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+			samplerHeapDesc.NumDescriptors = 64;
+			samplerHeapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+			samplerHeapDesc.NodeMask       = 0;
+
+			hr = m_NativeDevice->CreateDescriptorHeap(&samplerHeapDesc, IID_PPV_ARGS(&m_SamplerHeap));
+			if (FAILED(hr))
+				CANDY_CORE_ERROR("DX12Device: Sampler heap creation failed");
+			else
+				m_SamplerDescriptorSize = m_NativeDevice->GetDescriptorHandleIncrementSize(
+					D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+		}
+
+		// Command queue
 		D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 		queueDesc.Type     = D3D12_COMMAND_LIST_TYPE_DIRECT;
 		queueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
 		queueDesc.Flags    = D3D12_COMMAND_QUEUE_FLAG_NONE;
-		queueDesc.NodeMask = 0;
 
 		ComPtr<ID3D12CommandQueue> commandQueue;
 		hr = m_NativeDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue));
-
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12Device: failed to create command queue");
+			CANDY_CORE_ERROR("DX12Device: command queue creation failed");
 			return;
 		}
 
-		m_CommandQueue = CreateScope<DX12CommandQueue>(m_NativeDevice.Get(), std::move(commandQueue));
+		m_CommandQueue = CreateScope<DX12CommandQueue>(
+			m_NativeDevice.Get(), std::move(commandQueue),
+			m_CBVSRVUAVHeap.Get(), m_SamplerHeap.Get());
 
-		// Create fence for synchronization
+		// Fence
 		hr = m_NativeDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_Fence));
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12Device: failed to create fence");
+			CANDY_CORE_ERROR("DX12Device: fence creation failed");
 			return;
 		}
 
 		m_FenceEvent = CreateEventA(nullptr, FALSE, FALSE, nullptr);
-		if (!m_FenceEvent)
-		{
-			CANDY_CORE_ERROR("DX12Device: failed to create fence event");
-			return;
-		}
 
 		CANDY_CORE_INFO("DX12Device: initialization complete");
 	}
@@ -231,14 +294,11 @@ namespace Candy {
 	DX12Device::~DX12Device()
 	{
 		WaitIdle();
-
-		if (m_FenceEvent)
-			CloseHandle(m_FenceEvent);
-
+		if (m_FenceEvent) CloseHandle(m_FenceEvent);
 		CANDY_CORE_INFO("DX12Device: shutdown complete");
 	}
 
-	// ---- Native accessor helpers ---------------------------------------------
+	// ---- Native accessors ---------------------------------------------------
 
 	ID3D12CommandQueue* DX12Device::GetNativeQueue() const
 	{
@@ -250,8 +310,7 @@ namespace Candy {
 	{
 		++m_FenceValue;
 		auto* q = static_cast<DX12CommandQueue*>(m_CommandQueue.get());
-		if (q)
-			q->Signal(m_Fence.Get(), m_FenceValue);
+		if (q) q->Signal(m_Fence.Get(), m_FenceValue);
 		return m_FenceValue;
 	}
 
@@ -264,6 +323,153 @@ namespace Candy {
 		}
 	}
 
+	// ---- Shader compilation -------------------------------------------------
+
+	ComPtr<ID3DBlob> DX12Device::CompileHLSL(
+		const char* source, const char* entryPoint,
+		const char* target, const std::string& debugName)
+	{
+		ComPtr<ID3DBlob> bytecode;
+		ComPtr<ID3DBlob> errors;
+
+		UINT compileFlags = D3DCOMPILE_PACK_MATRIX_ROW_MAJOR;
+#if defined(CANDY_DEBUG)
+		compileFlags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#else
+		compileFlags |= D3DCOMPILE_OPTIMIZATION_LEVEL3;
+#endif
+
+		HRESULT hr = D3DCompile(
+			source, strlen(source), debugName.c_str(),
+			nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+			entryPoint, target, compileFlags, 0,
+			&bytecode, &errors);
+
+		if (FAILED(hr))
+		{
+			if (errors)
+			{
+				CANDY_CORE_ERROR("DX12Device: HLSL compile error in '{}' ({}):\n{}",
+				                 debugName, entryPoint,
+				                 static_cast<const char*>(errors->GetBufferPointer()));
+			}
+			else
+			{
+				CANDY_CORE_ERROR("DX12Device: HLSL compile failed for '{}' ({})",
+				                 debugName, entryPoint);
+			}
+			return nullptr;
+		}
+
+		CANDY_CORE_INFO("DX12Device: compiled '{}' ({}) — {} bytes",
+		                debugName, target, bytecode->GetBufferSize());
+		return bytecode;
+	}
+
+	const std::vector<uint8_t>& DX12Device::GetTriangleVSBytecode()
+	{
+		if (m_TriangleVS.empty())
+		{
+			auto blob = CompileHLSL(kTriangleVS, "main", "vs_5_0", "TriangleVS");
+			if (blob)
+				m_TriangleVS.assign(
+					static_cast<const uint8_t*>(blob->GetBufferPointer()),
+					static_cast<const uint8_t*>(blob->GetBufferPointer()) + blob->GetBufferSize());
+		}
+		return m_TriangleVS;
+	}
+
+	const std::vector<uint8_t>& DX12Device::GetTrianglePSBytecode()
+	{
+		if (m_TrianglePS.empty())
+		{
+			auto blob = CompileHLSL(kTrianglePS, "main", "ps_5_0", "TrianglePS");
+			if (blob)
+				m_TrianglePS.assign(
+					static_cast<const uint8_t*>(blob->GetBufferPointer()),
+					static_cast<const uint8_t*>(blob->GetBufferPointer()) + blob->GetBufferSize());
+		}
+		return m_TrianglePS;
+	}
+
+	// ---- Root signature -----------------------------------------------------
+
+	ComPtr<ID3D12RootSignature> DX12Device::CreateMinimalRootSignature()
+	{
+		// Root parameter 0: CBV (b0) — transform / per-draw constants
+		D3D12_ROOT_PARAMETER rootParams[2] = {};
+
+		// Parameter 0: CBV
+		rootParams[0].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		rootParams[0].Descriptor       = {};
+		rootParams[0].Descriptor.ShaderRegister = 0;
+		rootParams[0].Descriptor.RegisterSpace  = 0;
+		rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+		// Parameter 1: Descriptor table with SRV (t0)
+		D3D12_DESCRIPTOR_RANGE srvRange = {};
+		srvRange.RangeType          = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		srvRange.NumDescriptors     = 1;
+		srvRange.BaseShaderRegister = 0;
+		srvRange.RegisterSpace      = 0;
+		srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		rootParams[1].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParams[1].DescriptorTable.NumDescriptorRanges = 1;
+		rootParams[1].DescriptorTable.pDescriptorRanges   = &srvRange;
+		rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+		// Static sampler (s0)
+		D3D12_STATIC_SAMPLER_DESC staticSampler = {};
+		staticSampler.Filter           = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+		staticSampler.AddressU         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		staticSampler.AddressV         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		staticSampler.AddressW         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		staticSampler.MipLODBias       = 0.0f;
+		staticSampler.MaxAnisotropy    = 1;
+		staticSampler.ComparisonFunc   = D3D12_COMPARISON_FUNC_NEVER;
+		staticSampler.BorderColor      = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+		staticSampler.MinLOD           = 0.0f;
+		staticSampler.MaxLOD           = D3D12_FLOAT32_MAX;
+		staticSampler.ShaderRegister   = 0;
+		staticSampler.RegisterSpace    = 0;
+		staticSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+		D3D12_ROOT_SIGNATURE_DESC rootSigDesc = {};
+		rootSigDesc.NumParameters     = 2;
+		rootSigDesc.pParameters       = rootParams;
+		rootSigDesc.NumStaticSamplers = 1;
+		rootSigDesc.pStaticSamplers   = &staticSampler;
+		rootSigDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+		ComPtr<ID3DBlob> signature;
+		ComPtr<ID3DBlob> error;
+		HRESULT hr = D3D12SerializeRootSignature(
+			&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+			&signature, &error);
+
+		if (FAILED(hr))
+		{
+			if (error)
+				CANDY_CORE_ERROR("DX12Device: RootSignature serialize error:\n{}",
+				                 static_cast<const char*>(error->GetBufferPointer()));
+			return nullptr;
+		}
+
+		ComPtr<ID3D12RootSignature> rootSig;
+		hr = m_NativeDevice->CreateRootSignature(
+			0, signature->GetBufferPointer(), signature->GetBufferSize(),
+			IID_PPV_ARGS(&rootSig));
+
+		if (FAILED(hr))
+		{
+			CANDY_CORE_ERROR("DX12Device: CreateRootSignature failed");
+			return nullptr;
+		}
+
+		return rootSig;
+	}
+
 	// ---- Resource creation ---------------------------------------------------
 
 	Ref<RHIBuffer> DX12Device::CreateBuffer(const BufferDesc& desc)
@@ -273,20 +479,53 @@ namespace Candy {
 
 	Ref<RHITexture> DX12Device::CreateTexture(const TextureDesc& desc)
 	{
-		CANDY_CORE_WARN("TODO: DX12Device::CreateTexture — not yet implemented");
+		CANDY_CORE_WARN("TODO: DX12Device::CreateTexture");
 		return nullptr;
 	}
 
 	Ref<RHISampler> DX12Device::CreateSampler(const SamplerDesc& desc)
 	{
-		CANDY_CORE_WARN("TODO: DX12Device::CreateSampler — not yet implemented");
+		CANDY_CORE_WARN("TODO: DX12Device::CreateSampler");
 		return nullptr;
 	}
 
-	Ref<RHIShaderModule> DX12Device::CreateShaderModule(const void* spirvBytecode, uint32_t byteSize, const std::string& debugName)
+	Ref<RHIShaderModule> DX12Device::CreateShaderModule(const void* bytecode, uint32_t byteSize, const std::string& debugName)
 	{
-		CANDY_CORE_WARN("TODO: DX12Device::CreateShaderModule — SPIR-V→DXIL compilation needed");
-		return nullptr;
+		// Store the bytecode for pipeline creation — the actual shader module
+		// is not a D3D12 runtime object; DX12 pipelines consume bytecode directly.
+		// We wrap it in a simple blob holder.
+		struct DX12ShaderModule : public RHIShaderModule
+		{
+			std::vector<uint8_t> Bytecode;
+			ShaderStage          Stage = ShaderStage::None;
+			std::string          Name;
+
+			DX12ShaderModule(const void* data, uint32_t size, ShaderStage stage, std::string_view name)
+				: Stage(stage), Name(name)
+			{
+				auto* ptr = static_cast<const uint8_t*>(data);
+				Bytecode.assign(ptr, ptr + size);
+			}
+
+			ShaderStage GetStage() const override { return Stage; }
+			const uint32_t* GetBytecode() const override
+			{
+				return reinterpret_cast<const uint32_t*>(Bytecode.data());
+			}
+			uint32_t GetBytecodeSize() const override
+			{
+				return static_cast<uint32_t>(Bytecode.size());
+			}
+			const std::string& GetDebugName() const override { return Name; }
+		};
+
+		if (!bytecode || byteSize == 0)
+		{
+			CANDY_CORE_ERROR("DX12Device::CreateShaderModule: null bytecode");
+			return nullptr;
+		}
+
+		return CreateRef<DX12ShaderModule>(bytecode, byteSize, ShaderStage::None, debugName);
 	}
 
 	Ref<RHIGraphicsPipeline> DX12Device::CreateGraphicsPipeline(
@@ -294,13 +533,176 @@ namespace Candy {
 		const Ref<RHIShaderModule>& vs,
 		const Ref<RHIShaderModule>& fs)
 	{
+		// Cache lookup
 		if (auto cached = GetPipelineCache().Find(desc))
 			return cached;
 
-		CANDY_CORE_WARN("TODO: DX12Device::CreateGraphicsPipeline — not yet implemented");
+		// ---- Vertex input layout --------------------------------------------
 
-		Ref<DX12GraphicsPipeline> pipeline = CreateRef<DX12GraphicsPipeline>(desc);
+		std::vector<D3D12_INPUT_ELEMENT_DESC> inputElements;
+
+		// Map RHIFormat → DXGI_FORMAT for common vertex attribute formats
+		static const auto MapFormat = [](RHIFormat fmt) -> DXGI_FORMAT
+		{
+			switch (fmt)
+			{
+			case RHIFormat::R32G32Float:       return DXGI_FORMAT_R32G32_FLOAT;
+			case RHIFormat::R32G32B32Float:    return DXGI_FORMAT_R32G32B32_FLOAT;
+			case RHIFormat::R32G32B32A32Float: return DXGI_FORMAT_R32G32B32A32_FLOAT;
+			case RHIFormat::R8G8B8A8Unorm:     return DXGI_FORMAT_R8G8B8A8_UNORM;
+			default:                           return DXGI_FORMAT_UNKNOWN;
+			}
+		};
+
+		for (const auto& attr : desc.VertexInput.Attributes)
+		{
+			D3D12_INPUT_ELEMENT_DESC elem = {};
+			elem.SemanticName         = "TEXCOORD"; // generic
+			elem.SemanticIndex        = attr.Location;
+			elem.Format               = MapFormat(attr.Format);
+			elem.InputSlot            = attr.Binding;
+			elem.AlignedByteOffset    = attr.Offset;
+			elem.InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+			elem.InstanceDataStepRate = 0;
+
+			// Use POSITION / COLOR semantics based on location
+			if (attr.Location == 0)
+				elem.SemanticName = "POSITION";
+			else if (attr.Location == 1)
+				elem.SemanticName = "COLOR";
+			else if (attr.Location == 2)
+				elem.SemanticName = "TEXCOORD";
+
+			inputElements.push_back(elem);
+		}
+
+		// ---- Root signature ------------------------------------------------
+
+		auto rootSig = CreateMinimalRootSignature();
+		if (!rootSig)
+		{
+			CANDY_CORE_ERROR("DX12Device::CreateGraphicsPipeline: root signature failed");
+			return nullptr;
+		}
+
+		// ---- Rasterizer state ----------------------------------------------
+
+		D3D12_RASTERIZER_DESC rasterizer = {};
+		rasterizer.FillMode              = (desc.Rasterizer.Fill == FillMode::Wireframe)
+		                                   ? D3D12_FILL_MODE_WIREFRAME
+		                                   : D3D12_FILL_MODE_SOLID;
+		rasterizer.CullMode              = (desc.Rasterizer.Cull == CullMode::None)  ? D3D12_CULL_MODE_NONE
+		                                 : (desc.Rasterizer.Cull == CullMode::Front) ? D3D12_CULL_MODE_FRONT
+		                                                                              : D3D12_CULL_MODE_BACK;
+		rasterizer.FrontCounterClockwise = FALSE;
+		rasterizer.DepthBias             = desc.Rasterizer.DepthBias;
+		rasterizer.DepthBiasClamp        = desc.Rasterizer.DepthBiasClamp;
+		rasterizer.SlopeScaledDepthBias  = desc.Rasterizer.DepthBiasSlopeFactor;
+		rasterizer.DepthClipEnable       = desc.Rasterizer.DepthClipEnable;
+		rasterizer.MultisampleEnable     = desc.SampleCount > 1;
+
+		// ---- Depth-stencil ------------------------------------------------
+
+		D3D12_DEPTH_STENCIL_DESC depthStencil = {};
+		depthStencil.DepthEnable      = desc.DepthStencil.DepthTestEnable;
+		depthStencil.DepthWriteMask   = desc.DepthStencil.DepthWriteEnable
+		                                ? D3D12_DEPTH_WRITE_MASK_ALL
+		                                : D3D12_DEPTH_WRITE_MASK_ZERO;
+		// Map CompareOp → D3D12_COMPARISON_FUNC
+		static const D3D12_COMPARISON_FUNC compMap[] = {
+			D3D12_COMPARISON_FUNC_NEVER,        // Never
+			D3D12_COMPARISON_FUNC_LESS,          // Less
+			D3D12_COMPARISON_FUNC_EQUAL,         // Equal
+			D3D12_COMPARISON_FUNC_LESS_EQUAL,    // LessEqual
+			D3D12_COMPARISON_FUNC_GREATER,       // Greater
+			D3D12_COMPARISON_FUNC_NOT_EQUAL,     // NotEqual
+			D3D12_COMPARISON_FUNC_GREATER_EQUAL, // GreaterEqual
+			D3D12_COMPARISON_FUNC_ALWAYS         // Always
+		};
+		depthStencil.DepthFunc = compMap[static_cast<int>(desc.DepthStencil.DepthCompareOp)];
+
+		// ---- Blend state ---------------------------------------------------
+
+		D3D12_BLEND_DESC blend = {};
+		blend.RenderTarget[0].BlendEnable   = desc.Blend.BlendEnable;
+		blend.RenderTarget[0].SrcBlend      = D3D12_BLEND_SRC_ALPHA;
+		blend.RenderTarget[0].DestBlend     = D3D12_BLEND_INV_SRC_ALPHA;
+		blend.RenderTarget[0].BlendOp       = D3D12_BLEND_OP_ADD;
+		blend.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+		blend.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+		blend.RenderTarget[0].BlendOpAlpha  = D3D12_BLEND_OP_ADD;
+
+		// Color write mask
+		UINT8 writeMask = 0;
+		if (HasFlag(desc.Blend.WriteMask, ColorWriteMask::Red))   writeMask |= D3D12_COLOR_WRITE_ENABLE_RED;
+		if (HasFlag(desc.Blend.WriteMask, ColorWriteMask::Green)) writeMask |= D3D12_COLOR_WRITE_ENABLE_GREEN;
+		if (HasFlag(desc.Blend.WriteMask, ColorWriteMask::Blue))  writeMask |= D3D12_COLOR_WRITE_ENABLE_BLUE;
+		if (HasFlag(desc.Blend.WriteMask, ColorWriteMask::Alpha)) writeMask |= D3D12_COLOR_WRITE_ENABLE_ALPHA;
+		blend.RenderTarget[0].RenderTargetWriteMask = writeMask;
+
+		// ---- PSO description ----------------------------------------------
+
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+		psoDesc.pRootSignature        = rootSig.Get();
+		psoDesc.VS                    = { vs->GetBytecode(), vs->GetBytecodeSize() };
+		psoDesc.PS                    = { fs->GetBytecode(), fs->GetBytecodeSize() };
+		psoDesc.BlendState            = blend;
+		psoDesc.SampleMask            = UINT_MAX;
+		psoDesc.RasterizerState       = rasterizer;
+		psoDesc.DepthStencilState     = depthStencil;
+		psoDesc.InputLayout           = { inputElements.data(), static_cast<UINT>(inputElements.size()) };
+		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		psoDesc.NumRenderTargets      = 1;
+
+		// Use swap chain format for RTV
+		if (!desc.RenderTargetFormats.empty())
+		{
+			switch (desc.RenderTargetFormats[0])
+			{
+			case RHIFormat::B8G8R8A8Unorm: psoDesc.RTVFormats[0] = DXGI_FORMAT_B8G8R8A8_UNORM; break;
+			case RHIFormat::B8G8R8A8Srgb:  psoDesc.RTVFormats[0] = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB; break;
+			default:                       psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM; break;
+			}
+		}
+		else
+		{
+			psoDesc.RTVFormats[0] = DXGI_FORMAT_B8G8R8A8_UNORM;
+		}
+
+		if (desc.DepthStencilFormat != RHIFormat::Unknown)
+		{
+			// Map depth format
+			switch (desc.DepthStencilFormat)
+			{
+			case RHIFormat::D32Float:       psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT; break;
+			case RHIFormat::D24UnormS8Uint:  psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT; break;
+			default:                         psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT; break;
+			}
+		}
+		else
+		{
+			psoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+		}
+
+		psoDesc.SampleDesc.Count   = desc.SampleCount;
+		psoDesc.SampleDesc.Quality = 0;
+
+		ComPtr<ID3D12PipelineState> pso;
+		HRESULT hr = m_NativeDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pso));
+		if (FAILED(hr))
+		{
+			CANDY_CORE_ERROR("DX12Device::CreateGraphicsPipeline: CreateGraphicsPipelineState failed");
+			return nullptr;
+		}
+
+		auto pipeline = CreateRef<DX12GraphicsPipeline>(desc);
+		pipeline->SetNativePipeline(std::move(pso), std::move(rootSig));
+
 		GetPipelineCache().Insert(desc, pipeline);
+
+		CANDY_CORE_INFO("DX12Device::CreateGraphicsPipeline: pipeline created ({} attributes, {} RT format(s))",
+		                desc.VertexInput.Attributes.size(), desc.RenderTargetFormats.size());
+
 		return pipeline;
 	}
 
@@ -311,7 +713,7 @@ namespace Candy {
 			GetNativeQueue(), desc);
 	}
 
-	// ---- Command submission --------------------------------------------------
+	// ---- Command submission -------------------------------------------------
 
 	RHICommandQueue& DX12Device::GetCommandQueue()
 	{
