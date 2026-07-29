@@ -36,6 +36,18 @@ PythonLibDir = "%{wks.location}/Candy/ThirdParty/Python3/libs"
 PythonLibName = "python314.lib"
 print("  Python embedded (ThirdParty/Python3)")
 
+-- Vulkan SDK detection: prefer VULKAN_SDK env var, fall back to bundled headers
+VulkanSDKPath = os.getenv("VULKAN_SDK")
+if VulkanSDKPath and VulkanSDKPath ~= "" then
+	IncludeDir["Vulkan"] = VulkanSDKPath .. "/Include"
+	print("  Vulkan SDK (env): " .. VulkanSDKPath)
+else
+	IncludeDir["Vulkan"] = "%{wks.location}/Candy/ThirdParty/Vulkan"
+	print("  Vulkan (bundled headers in ThirdParty/Vulkan)")
+end
+
+-- DX12: Windows SDK provides headers and libs automatically
+
 
 group "Dependencies"
 	include "Candy/ThirdParty/GLFW"

@@ -51,6 +51,7 @@ project "Candy"
 		"%{IncludeDir.ImGuizmo}",
 		"%{IncludeDir.pybind11}",
 		"%{IncludeDir.Python3}",
+		"%{IncludeDir.Vulkan}",
 		"ThirdParty/miniaudio"
 	}
 
@@ -61,7 +62,10 @@ project "Candy"
 		"Imgui",
 		"yaml-cpp",
 		"box2d",
-		"opengl32.lib"
+		"opengl32.lib",
+		"d3d12.lib",
+		"dxgi.lib",
+		"dxguid.lib"
 	}
 
 	if PythonLibDir and PythonLibDir ~= "" then
@@ -79,6 +83,12 @@ project "Candy"
 	flags { "NoPCH" }
 
 	filter "files:ThirdParty/miniaudio/**.cpp"
+	flags { "NoPCH" }
+
+	filter "files:Source/Platform/Vulkan/**.cpp"
+	flags { "NoPCH" }
+
+	filter "files:Source/Platform/DX12/**.cpp"
 	flags { "NoPCH" }
 
 	filter "system:windows"
