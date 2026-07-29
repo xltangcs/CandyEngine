@@ -184,15 +184,30 @@ namespace Candy {
 			s_Data.VkCircleVB = makeUploadVB(s_Data.MaxVertices * sizeof(CircleVertex),"Vk2D_CircleVB");
 			s_Data.VkLineVB   = makeUploadVB(s_Data.MaxVertices * sizeof(LineVertex),  "Vk2D_LineVB");
 
-			// Index buffer
+			// Index buffer (with data uploaded)
 			{
 				uint32_t* indices = new uint32_t[s_Data.MaxIndices];
 				uint32_t off = 0;
 				for (uint32_t i = 0; i < s_Data.MaxIndices; i += 6)
 				{ indices[i+0]=off; indices[i+1]=off+1; indices[i+2]=off+2; indices[i+3]=off+2; indices[i+4]=off+3; indices[i+5]=off; off+=4; }
-				s_Data.VkQuadIB = dev->CreateBuffer(BufferDesc{
-					s_Data.MaxIndices*sizeof(uint32_t), ResourceUsage::IndexBuffer, false, false, "Vk2D_QuadIB"
-				});
+
+				// Create host-visible index buffer and upload data
+				{
+					BufferDesc ibDesc;
+					ibDesc.Size = s_Data.MaxIndices * sizeof(uint32_t);
+					ibDesc.Usage = ResourceUsage::IndexBuffer;
+					ibDesc.CPUAccessible = true; // host-visible for upload
+					ibDesc.DebugName = "Vk2D_QuadIB";
+					s_Data.VkQuadIB = dev->CreateBuffer(ibDesc);
+				}
+				// Map + upload
+				auto* vkIB = dynamic_cast<VulkanBuffer*>(s_Data.VkQuadIB.get());
+				if (vkIB)
+				{
+					void* m = vkIB->Map();
+					memcpy(m, indices, s_Data.MaxIndices * sizeof(uint32_t));
+					vkIB->Unmap();
+				}
 				delete[] indices;
 			}
 

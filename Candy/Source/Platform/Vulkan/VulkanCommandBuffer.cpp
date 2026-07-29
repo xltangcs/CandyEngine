@@ -20,12 +20,12 @@ namespace Candy {
 	{
 		VkCommandBufferBeginInfo beginInfo = {};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		vkBeginCommandBuffer(m_CommandBuffer, &beginInfo);
+		m_DevicePtr->fnBeginCommandBuffer(m_CommandBuffer, &beginInfo);
 	}
 
 	void VulkanCommandBuffer::End()
 	{
-		vkEndCommandBuffer(m_CommandBuffer);
+		m_DevicePtr->fnEndCommandBuffer(m_CommandBuffer);
 	}
 
 	void VulkanCommandBuffer::SetRenderPassInfo(VkRenderPass rp, VkFramebuffer fb, VkExtent2D extent, const float* clearColor)
@@ -67,31 +67,31 @@ namespace Candy {
 		rpInfo.clearValueCount   = 1;
 		rpInfo.pClearValues      = &clearValue;
 
-		vkCmdBeginRenderPass(m_CommandBuffer, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+		m_DevicePtr->fnCmdBeginRenderPass(m_CommandBuffer, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
 	}
 
 	void VulkanCommandBuffer::EndRenderPass()
 	{
-		vkCmdEndRenderPass(m_CommandBuffer);
+		m_DevicePtr->fnCmdEndRenderPass(m_CommandBuffer);
 	}
 
 	void VulkanCommandBuffer::SetPipeline(const Ref<RHIGraphicsPipeline>& pipeline)
 	{
 		auto* vkp = dynamic_cast<VulkanGraphicsPipeline*>(pipeline.get());
 		if (vkp && vkp->GetVkPipeline())
-			vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkp->GetVkPipeline());
+			m_DevicePtr->fnCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkp->GetVkPipeline());
 	}
 
 	void VulkanCommandBuffer::SetViewport(float x, float y, float w, float h, float minD, float maxD)
 	{
 		VkViewport vp = { x, y, w, h, minD, maxD };
-		vkCmdSetViewport(m_CommandBuffer, 0, 1, &vp);
+		m_DevicePtr->fnCmdSetViewport(m_CommandBuffer, 0, 1, &vp);
 	}
 
 	void VulkanCommandBuffer::SetScissor(int32_t x, int32_t y, uint32_t w, uint32_t h)
 	{
 		VkRect2D sc = { { x, y }, { w, h } };
-		vkCmdSetScissor(m_CommandBuffer, 0, 1, &sc);
+		m_DevicePtr->fnCmdSetScissor(m_CommandBuffer, 0, 1, &sc);
 	}
 
 	void VulkanCommandBuffer::SetVertexBuffer(const Ref<RHIBuffer>& buffer, uint32_t slot, uint64_t offset)
@@ -101,7 +101,7 @@ namespace Candy {
 		{
 			VkBuffer buf = vkb->GetVkBuffer();
 			VkDeviceSize off = offset;
-			vkCmdBindVertexBuffers(m_CommandBuffer, slot, 1, &buf, &off);
+			m_DevicePtr->fnCmdBindVertexBuffers(m_CommandBuffer, slot, 1, &buf, &off);
 		}
 	}
 
@@ -110,25 +110,36 @@ namespace Candy {
 		auto* vkb = dynamic_cast<VulkanBuffer*>(buffer.get());
 		if (vkb)
 		{
-			vkCmdBindIndexBuffer(m_CommandBuffer, vkb->GetVkBuffer(), offset,
+			m_DevicePtr->fnCmdBindIndexBuffer(m_CommandBuffer, vkb->GetVkBuffer(), offset,
 				(format == IndexFormat::UInt16) ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32);
 		}
 	}
 
-	void VulkanCommandBuffer::SetConstantBuffer(uint32_t slot, uint32_t binding, const Ref<RHIBuffer>&) { CANDY_CORE_WARN("TODO: Vulkan SetConstantBuffer"); }
-	void VulkanCommandBuffer::SetTexture(uint32_t slot, uint32_t binding, const Ref<RHITexture>&)     { CANDY_CORE_WARN("TODO: Vulkan SetTexture"); }
-	void VulkanCommandBuffer::SetSampler(uint32_t slot, uint32_t binding, const Ref<RHISampler>&)     { CANDY_CORE_WARN("TODO: Vulkan SetSampler"); }
+	void VulkanCommandBuffer::SetConstantBuffer(uint32_t slot, uint32_t binding, const Ref<RHIBuffer>&)
+	{
+		CANDY_CORE_WARN("TODO: Vulkan SetConstantBuffer — descriptor set binding must be done at submit time");
+	}
+
+	void VulkanCommandBuffer::SetTexture(uint32_t slot, uint32_t binding, const Ref<RHITexture>&)
+	{
+		CANDY_CORE_WARN("TODO: Vulkan SetTexture");
+	}
+
+	void VulkanCommandBuffer::SetSampler(uint32_t slot, uint32_t binding, const Ref<RHISampler>&)
+	{
+		CANDY_CORE_WARN("TODO: Vulkan SetSampler");
+	}
 
 	void VulkanCommandBuffer::Draw(uint32_t vertexCount, uint32_t instanceCount,
 	                               uint32_t firstVertex, uint32_t firstInstance)
 	{
-		vkCmdDraw(m_CommandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+		m_DevicePtr->fnCmdDraw(m_CommandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 	}
 
 	void VulkanCommandBuffer::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
 	                                      uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance)
 	{
-		vkCmdDrawIndexed(m_CommandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+		m_DevicePtr->fnCmdDrawIndexed(m_CommandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 	}
 
 } // namespace Candy

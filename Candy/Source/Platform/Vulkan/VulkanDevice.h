@@ -47,6 +47,7 @@ namespace Candy {
 		[[nodiscard]] uint32_t         GetGraphicsQueueFamilyIndex() const { return m_GraphicsQueueFamilyIndex; }
 		[[nodiscard]] VkCommandPool    GetVkCommandPool() const { return m_CommandPool; }
 		[[nodiscard]] VkQueue          GetVkQueue()       const { return m_Queue; }
+		[[nodiscard]] PFN_vkVoidFunction GetProcAddr(const char* name) const;
 
 		// ---- Built-in triangle SPIR-V --------------------------------------
 
@@ -121,6 +122,9 @@ namespace Candy {
 		PFN_vkCmdBindIndexBuffer        fnCmdBindIndexBuffer        = nullptr;
 		PFN_vkCmdSetViewport            fnCmdSetViewport            = nullptr;
 		PFN_vkCmdSetScissor             fnCmdSetScissor             = nullptr;
+		PFN_vkCmdBeginRenderPass        fnCmdBeginRenderPass        = nullptr;
+		PFN_vkCmdEndRenderPass          fnCmdEndRenderPass          = nullptr;
+		PFN_vkCmdBindPipeline           fnCmdBindPipeline           = nullptr;
 
 	private:
 		void LoadAllFunctions();

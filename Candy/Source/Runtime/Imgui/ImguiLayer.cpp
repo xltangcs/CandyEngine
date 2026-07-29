@@ -666,7 +666,7 @@ namespace Candy {
 		// Load Vulkan functions for ImGui
 		ImGui_ImplVulkan_LoadFunctions([](const char* name, void* userData) -> PFN_vkVoidFunction {
 			auto* dev = static_cast<VulkanDevice*>(userData);
-			return dev->GetVkDevice() ? vkGetDeviceProcAddr(dev->GetVkDevice(), name) : nullptr;
+			return dev->GetProcAddr(name);
 		}, vkDev);
 
 		ImGui_ImplVulkan_Init(&initInfo);

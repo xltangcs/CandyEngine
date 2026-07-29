@@ -223,6 +223,8 @@ namespace Candy {
 		LOAD_DEV(fnCmdDrawIndexed);           LOAD_DEV(fnCmdBindVertexBuffers);
 		LOAD_DEV(fnCmdBindIndexBuffer);       LOAD_DEV(fnCmdSetViewport);
 		LOAD_DEV(fnCmdSetScissor);
+		LOAD_DEV(fnCmdBeginRenderPass); LOAD_DEV(fnCmdEndRenderPass);
+		LOAD_DEV(fnCmdBindPipeline);
 
 		// Instance extensions
 		LOAD(fnCreateSwapchainKHR);   LOAD_DEV(fnDestroySwapchainKHR);
@@ -244,6 +246,21 @@ namespace Candy {
 
 		m_Initialized = true;
 		CANDY_CORE_INFO("VulkanDevice: ready");
+	}
+
+	PFN_vkVoidFunction VulkanDevice::GetProcAddr(const char* name) const
+	{
+		auto ipa = m_FunctionLoader->GetIPA();
+		PFN_vkVoidFunction fn = nullptr;
+		// Try device-level first
+		auto getDevProc = reinterpret_cast<PFN_vkGetDeviceProcAddr>(
+			ipa(m_Instance, "vkGetDeviceProcAddr"));
+		if (getDevProc && m_Device)
+			fn = getDevProc(m_Device, name);
+		// Fallback to instance-level
+		if (!fn)
+			fn = ipa(m_Instance, name);
+		return fn;
 	}
 
 #undef LOAD
