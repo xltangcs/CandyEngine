@@ -9,6 +9,7 @@
 #include "Platform/DX12/DX12CommandBuffer.h"
 #include "Platform/DX12/DX12SwapChain.h"
 #include "Platform/DX12/DX12PipelineState.h"
+#include "Platform/DX12/DX12Texture.h"
 #include "Runtime/Core/Log.h"
 
 using Microsoft::WRL::ComPtr;
@@ -479,14 +480,13 @@ float4 main(PSInput input) : SV_TARGET
 
 	Ref<RHITexture> DX12Device::CreateTexture(const TextureDesc& desc)
 	{
-		CANDY_CORE_WARN("TODO: DX12Device::CreateTexture");
-		return nullptr;
+		return CreateRef<DX12Texture>(m_NativeDevice.Get(), desc);
 	}
 
 	Ref<RHISampler> DX12Device::CreateSampler(const SamplerDesc& desc)
 	{
-		CANDY_CORE_WARN("TODO: DX12Device::CreateSampler");
-		return nullptr;
+		return CreateRef<DX12Sampler>(m_NativeDevice.Get(), m_SamplerHeap.Get(),
+		                              m_SamplerDescriptorSize, desc);
 	}
 
 	Ref<RHIShaderModule> DX12Device::CreateShaderModule(const void* bytecode, uint32_t byteSize, const std::string& debugName)
