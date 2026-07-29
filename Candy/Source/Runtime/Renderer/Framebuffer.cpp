@@ -8,6 +8,8 @@
 #include <Windows.h>
 #include "Platform/DX12/DX12Framebuffer.h"
 #include "Platform/DX12/DX12GraphicsContext.h"
+#include "Platform/Vulkan/VulkanFramebuffer.h"
+#include "Platform/Vulkan/VulkanGraphicsContext.h"
 
 namespace Candy {
 
@@ -26,6 +28,15 @@ namespace Candy {
 			if (dx12Ctx)
 				return CreateRef<DX12Framebuffer>(spec, dx12Ctx->GetDevice());
 			CANDY_CORE_ERROR("Framebuffer::Create: DX12 API selected but no DX12GraphicsContext found");
+			return nullptr;
+		}
+		case RendererAPI::API::Vulkan:
+		{
+			auto* ctx = Application::Get().GetWindow().GetGraphicsContext();
+			auto* vkCtx = dynamic_cast<VulkanGraphicsContext*>(ctx);
+			if (vkCtx)
+				return CreateRef<VulkanFramebuffer>(spec, vkCtx->GetDevice());
+			CANDY_CORE_ERROR("Framebuffer::Create: Vulkan API selected but no VulkanGraphicsContext found");
 			return nullptr;
 		}
 		}

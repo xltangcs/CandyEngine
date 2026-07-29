@@ -137,6 +137,16 @@ namespace Candy {
 	{
 		s_Data.DX12Active = (Renderer::GetAPI() == RendererAPI::API::DX12);
 
+		if (Renderer::GetAPI() == RendererAPI::API::Vulkan)
+		{
+			// Vulkan Renderer2D not yet implemented — allocate CPU buffers only
+			CANDY_CORE_WARN("Renderer2D: Vulkan backend not yet implemented, 2D rendering disabled");
+			s_Data.QuadVertexBufferBase   = new QuadVertex[s_Data.MaxVertices];
+			s_Data.CircleVertexBufferBase = new CircleVertex[s_Data.MaxVertices];
+			s_Data.LineVertexBufferBase   = new LineVertex[s_Data.MaxVertices];
+			return;
+		}
+
 		if (s_Data.DX12Active)
 		{
 			CANDY_CORE_INFO("Renderer2D: initializing DX12 backend...");
@@ -559,6 +569,10 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 	}
 	void Renderer2D::Flush()
 	{
+		// Vulkan: not yet implemented
+		if (Renderer::GetAPI() == RendererAPI::API::Vulkan)
+			return;
+
 		if (s_Data.DX12Active)
 		{
 			// =====================================================
