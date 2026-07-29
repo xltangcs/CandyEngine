@@ -88,17 +88,26 @@ namespace Candy {
 		};
 		DX12ImGuiState m_DX12;
 		bool m_IsDX12 = false;
+		bool m_IsVulkan = false;
 
+		// DX12 methods
 		void InitDX12Backend(GLFWwindow* window);
 		void ShutdownDX12Backend();
 		void NewFrameDX12();
 		void RenderDX12(ImDrawData* drawData);
 		void CreateDX12FontTexture();
-
-		// SRV descriptor allocator for ImGui
 		static void SRVAllocator(ImGui_ImplDX12_InitInfo* info,
 		                         D3D12_CPU_DESCRIPTOR_HANDLE* outCPU,
 		                         D3D12_GPU_DESCRIPTOR_HANDLE* outGPU);
+
+		// Vulkan methods
+		void InitVulkanBackend(GLFWwindow* window);
+		void ShutdownVulkanBackend();
+		void NewFrameVulkan();
+		void RenderVulkan(ImDrawData* drawData);
+
+		// Vulkan resources (non-owning, used during frame)
+		void* m_VkDescriptorPool = nullptr; // VkDescriptorPool
 #endif
 	};
 

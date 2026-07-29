@@ -16,8 +16,12 @@
 
 #ifdef CANDY_PLATFORM_WINDOWS
 #include <backends/imgui_impl_dx12.h>
+#define IMGUI_IMPL_VULKAN_NO_PROTOTYPES
+#include <backends/imgui_impl_vulkan.h>
 #include "Platform/DX12/DX12GraphicsContext.h"
 #include "Platform/Vulkan/VulkanGraphicsContext.h"
+#include "Platform/Vulkan/VulkanDevice.h"
+#include "Platform/Vulkan/VulkanSwapChain.h"
 #include "Platform/Windows/WindowsWindow.h"
 #endif
 
@@ -72,14 +76,13 @@ namespace Candy {
 
 		// Detect backend
 		m_IsDX12   = (Renderer::GetAPI() == RendererAPI::API::DX12);
-		bool isVulkan = (Renderer::GetAPI() == RendererAPI::API::Vulkan);
+		m_IsVulkan = (Renderer::GetAPI() == RendererAPI::API::Vulkan);
 
-		if (isVulkan)
+		if (m_IsVulkan)
 		{
-			// Vulkan: use GLFW for other (no OpenGL context), ImGui rendering via Vulkan backend
-			// Full Vulkan ImGui integration (ImGui_ImplVulkan) will be implemented in a follow-up
-			ImGui_ImplGlfw_InitForOther(window, true);
-			CANDY_CORE_WARN("ImGuiLayer: Vulkan backend — ImGui_ImplVulkan not yet integrated, UI will not render");
+			ImGui_ImplGlfw_InitForVulkan(window, true);
+			InitVulkanBackend(window);
+			CANDY_CORE_INFO("ImGuiLayer: Vulkan backend initialized");
 		}
 		else if (m_IsDX12)
 		{
@@ -133,7 +136,18 @@ namespace Candy {
 
 	void ImGuiLayer::OnDetach()
 	{
-		if (m_IsDX12)
+		if (m_IsVulkan)
+		{
+#ifdef CANDY_PLATFORM_WINDOWS
+			ImGui::SetCurrentContext(m_GameUIContext);
+			ImGui_ImplVulkan_Shutdown();
+			ImGui::SetCurrentContext(m_EditorContext);
+			ImGui_ImplVulkan_Shutdown();
+			ImGui_ImplGlfw_Shutdown();
+			ShutdownVulkanBackend();
+#endif
+		}
+		else if (m_IsDX12)
 		{
 #ifdef CANDY_PLATFORM_WINDOWS
 			ImGui::SetCurrentContext(m_GameUIContext);
@@ -182,10 +196,9 @@ namespace Candy {
 		if (m_EditorChromeDisabled)
 			return;
 
-		if (Renderer::GetAPI() == RendererAPI::API::Vulkan)
+		if (m_IsVulkan)
 		{
-			// Vulkan: GLFW new frame only (no ImGui rendering backend yet)
-			ImGui_ImplGlfw_NewFrame();
+			NewFrameVulkan();
 		}
 		else if (m_IsDX12)
 		{
@@ -216,9 +229,9 @@ namespace Candy {
 
 		ImGui::Render();
 
-		if (Renderer::GetAPI() == RendererAPI::API::Vulkan)
+		if (m_IsVulkan)
 		{
-			// Vulkan: ImGui rendering not yet integrated — skip
+			RenderVulkan(ImGui::GetDrawData());
 		}
 		else if (m_IsDX12)
 		{
@@ -605,6 +618,85 @@ namespace Candy {
 
 		// Reset SRV descriptor allocator
 		m_DX12.SRVHeapUsed = 0;
+	}
+
+	// =========================================================================
+	// Vulkan ImGui backend
+	// =========================================================================
+
+	void ImGuiLayer::InitVulkanBackend(GLFWwindow* window)
+	{
+		auto* gfxCtx = static_cast<VulkanGraphicsContext*>(
+			static_cast<WindowsWindow*>(&Application::Get().GetWindow())->GetGraphicsContext());
+		auto* vkDev  = gfxCtx->GetDevice();
+		auto* vkSC   = gfxCtx->GetSwapChain();
+
+		VkDevice device = vkDev->GetVkDevice();
+
+		// Create descriptor pool for ImGui
+		{
+			VkDescriptorPoolSize poolSizes[] = {
+				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 16 },
+			};
+			VkDescriptorPoolCreateInfo dpci = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+			dpci.flags         = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+			dpci.maxSets       = 16;
+			dpci.poolSizeCount = 1;
+			dpci.pPoolSizes    = poolSizes;
+
+			VkDescriptorPool pool;
+			vkDev->fnCreateDescriptorPool(device, &dpci, nullptr, &pool);
+			m_VkDescriptorPool = pool;
+		}
+
+		// Init info
+		ImGui_ImplVulkan_InitInfo initInfo = {};
+		initInfo.Instance        = vkDev->GetVkInstance();
+		initInfo.PhysicalDevice  = vkDev->GetVkPhysicalDevice();
+		initInfo.Device          = device;
+		initInfo.QueueFamily     = vkDev->GetGraphicsQueueFamilyIndex();
+		initInfo.Queue           = vkDev->GetVkQueue();
+		initInfo.DescriptorPool  = static_cast<VkDescriptorPool>(m_VkDescriptorPool);
+		initInfo.MinImageCount   = 2;
+		initInfo.ImageCount      = 2;
+		initInfo.MSAASamples     = VK_SAMPLE_COUNT_1_BIT;
+		initInfo.PipelineInfoMain.RenderPass = vkSC->GetRenderPass();
+		initInfo.PipelineInfoMain.Subpass = 0;
+
+		// Load Vulkan functions for ImGui
+		ImGui_ImplVulkan_LoadFunctions([](const char* name, void* userData) -> PFN_vkVoidFunction {
+			auto* dev = static_cast<VulkanDevice*>(userData);
+			return dev->GetVkDevice() ? vkGetDeviceProcAddr(dev->GetVkDevice(), name) : nullptr;
+		}, vkDev);
+
+		ImGui_ImplVulkan_Init(&initInfo);
+	}
+
+	void ImGuiLayer::ShutdownVulkanBackend()
+	{
+		ImGui_ImplVulkan_Shutdown();
+
+		auto* gfxCtx = static_cast<VulkanGraphicsContext*>(
+			static_cast<WindowsWindow*>(&Application::Get().GetWindow())->GetGraphicsContext());
+		if (gfxCtx && gfxCtx->GetDevice() && m_VkDescriptorPool)
+		{
+			gfxCtx->GetDevice()->fnDestroyDescriptorPool(
+				gfxCtx->GetDevice()->GetVkDevice(),
+				static_cast<VkDescriptorPool>(m_VkDescriptorPool), nullptr);
+		}
+		m_VkDescriptorPool = nullptr;
+	}
+
+	void ImGuiLayer::NewFrameVulkan()
+	{
+		ImGui_ImplVulkan_NewFrame();
+		ImGui_ImplGlfw_NewFrame();
+	}
+
+	void ImGuiLayer::RenderVulkan(ImDrawData* drawData)
+	{
+		if (!drawData || drawData->CmdListsCount == 0) return;
+		ImGui_ImplVulkan_RenderDrawData(drawData, VK_NULL_HANDLE, false);
 	}
 
 #endif // CANDY_PLATFORM_WINDOWS
