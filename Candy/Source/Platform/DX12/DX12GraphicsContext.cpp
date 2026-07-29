@@ -1,4 +1,5 @@
 #include <GLFW/glfw3.h>
+#define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 
 #include "Platform/DX12/DX12GraphicsContext.h"
@@ -59,9 +60,8 @@ namespace Candy {
 			return;
 		}
 
-		// Transfer ownership from Ref<RHISwapChain> to unique_ptr
-		DX12SwapChain* raw = static_cast<DX12SwapChain*>(sc.release());
-		m_SwapChain.reset(raw);
+		// Store swap chain as Ref<> (shared_ptr), cast as needed
+		m_SwapChainRef = sc;
 
 		CANDY_CORE_INFO("DX12GraphicsContext: initialized ({}x{})", width, height);
 	}

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Runtime/Renderer/GraphicsContext.h"
+#include "Runtime/Core/Base.h"
 #include <memory>
 
 struct GLFWwindow;
@@ -23,12 +24,12 @@ namespace Candy {
 		void SwapBuffers() override;
 
 		[[nodiscard]] DX12Device*     GetDevice()     const { return m_Device.get(); }
-		[[nodiscard]] DX12SwapChain*  GetSwapChain()  const { return m_SwapChain.get(); }
+		[[nodiscard]] DX12SwapChain*  GetSwapChain()  const { return static_cast<DX12SwapChain*>(m_SwapChainRef.get()); }
 
 	private:
-		GLFWwindow*                      m_Window = nullptr;
-		std::unique_ptr<DX12Device>     m_Device;
-		std::unique_ptr<DX12SwapChain>  m_SwapChain;
+		GLFWwindow*                 m_Window = nullptr;
+		std::unique_ptr<DX12Device> m_Device;
+		Ref<RHISwapChain>           m_SwapChainRef;
 	};
 
 } // namespace Candy

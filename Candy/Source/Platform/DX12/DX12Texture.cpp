@@ -49,7 +49,7 @@ namespace Candy {
 		case SamplerAddressMode::Repeat:        return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 		case SamplerAddressMode::ClampToEdge:   return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 		case SamplerAddressMode::ClampToBorder: return D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		case SamplerAddressMode::MirrorRepeat:  return D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+		case SamplerAddressMode::MirroredRepeat:  return D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
 		default:                                return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 		}
 	}
@@ -214,8 +214,9 @@ namespace Candy {
 		srcLoc.PlacedFootprint.Offset = 0;
 
 		DXGI_FORMAT dxgiFormat = MapRHIFormatToDXGI(m_Desc.Format);
+		auto d3d12ResDesc = m_Resource->GetDesc();
 		m_Device->GetCopyableFootprints(
-			&CD3DX12_RESOURCE_DESC(m_Resource->GetDesc()), 0, 1, 0,
+			&d3d12ResDesc, 0, 1, 0,
 			&srcLoc.PlacedFootprint, nullptr, nullptr, nullptr);
 
 		tempCmdList->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
