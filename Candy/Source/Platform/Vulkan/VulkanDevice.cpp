@@ -5,459 +5,293 @@
 #include <vulkan/vulkan_win32.h>
 
 #include "Platform/Vulkan/VulkanDevice.h"
+#include "Platform/Vulkan/VulkanBuffer.h"
 #include "Platform/Vulkan/VulkanCommandBuffer.h"
 #include "Platform/Vulkan/VulkanSwapChain.h"
 #include "Platform/Vulkan/VulkanPipelineState.h"
+#include "Platform/Vulkan/VulkanSPIRV.h"
 #include "Runtime/Core/Log.h"
 
 #include <algorithm>
 
 namespace Candy {
 
-	// =========================================================================
-	// Vulkan function loader — dynamically loads vulkan-1.dll
-	// =========================================================================
 	class VulkanFunctionLoader
 	{
 	public:
 		VulkanFunctionLoader()
 		{
-			m_VulkanDLL = LoadLibraryA("vulkan-1.dll");
-			if (!m_VulkanDLL)
-			{
-				CANDY_CORE_ERROR("VulkanFunctionLoader: failed to load vulkan-1.dll");
-				return;
-			}
-
-			m_vkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(
-				GetProcAddress(m_VulkanDLL, "vkGetInstanceProcAddr"));
-
-			if (!m_vkGetInstanceProcAddr)
-			{
-				CANDY_CORE_ERROR("VulkanFunctionLoader: failed to load vkGetInstanceProcAddr");
-				return;
-			}
-
+			m_DLL = LoadLibraryA("vulkan-1.dll");
+			if (!m_DLL) { CANDY_CORE_ERROR("Vulkan: failed to load vulkan-1.dll"); return; }
+			m_vkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(m_DLL, "vkGetInstanceProcAddr"));
+			if (!m_vkGetInstanceProcAddr) { CANDY_CORE_ERROR("Vulkan: vkGetInstanceProcAddr not found"); return; }
 			m_Loaded = true;
-			CANDY_CORE_INFO("VulkanFunctionLoader: vulkan-1.dll loaded successfully");
 		}
-
-		~VulkanFunctionLoader()
-		{
-			if (m_VulkanDLL)
-				FreeLibrary(m_VulkanDLL);
-		}
-
-		[[nodiscard]] bool IsLoaded() const { return m_Loaded; }
-		[[nodiscard]] PFN_vkGetInstanceProcAddr GetInstanceProcAddr() const { return m_vkGetInstanceProcAddr; }
-
+		~VulkanFunctionLoader() { if (m_DLL) FreeLibrary(m_DLL); }
+		bool IsLoaded() const { return m_Loaded; }
+		PFN_vkGetInstanceProcAddr GetIPA() const { return m_vkGetInstanceProcAddr; }
 	private:
-		HMODULE m_VulkanDLL = nullptr;
+		HMODULE m_DLL = nullptr;
 		PFN_vkGetInstanceProcAddr m_vkGetInstanceProcAddr = nullptr;
 		bool m_Loaded = false;
 	};
 
 	// =========================================================================
-	// Command queue — wraps VkQueue, uses function pointers from VulkanDevice
+	// VulkanCommandQueue
 	// =========================================================================
 	class VulkanCommandQueue : public RHICommandQueue
 	{
 	public:
-		VulkanCommandQueue(VkQueue queue, uint32_t queueFamilyIndex, PFN_vkQueueWaitIdle fnQueueWaitIdle)
-			: m_Queue(queue), m_QueueFamilyIndex(queueFamilyIndex), m_vkQueueWaitIdle(fnQueueWaitIdle) {}
+		VulkanCommandQueue(VulkanDevice* dev, VkQueue queue, uint32_t qfi, VkCommandPool pool)
+			: m_Dev(dev), m_Queue(queue), m_QueueFamilyIndex(qfi), m_Pool(pool) {}
 
 		Scope<RHICommandBuffer> CreateCommandBuffer() override
 		{
-			CANDY_CORE_WARN("TODO: VulkanCommandQueue::CreateCommandBuffer — not yet implemented");
-			return Scope<VulkanCommandBuffer>(new VulkanCommandBuffer());
+			VkCommandBufferAllocateInfo allocInfo = {};
+			allocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+			allocInfo.commandPool        = m_Pool;
+			allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+			allocInfo.commandBufferCount = 1;
+
+			VkCommandBuffer cb;
+			if (m_Dev->fnAllocateCommandBuffers(m_Dev->GetVkDevice(), &allocInfo, &cb) != VK_SUCCESS)
+			{
+				CANDY_CORE_ERROR("VulkanCommandQueue: vkAllocateCommandBuffers failed");
+				return nullptr;
+			}
+			return Candy::CreateScope<VulkanCommandBuffer>(m_Dev, m_Pool, cb);
 		}
 
-		void Submit(const std::vector<RHICommandBuffer*>& commandBuffers) override
+		void Submit(const std::vector<RHICommandBuffer*>& cbs) override
 		{
-			CANDY_CORE_WARN("TODO: VulkanCommandQueue::Submit — not yet implemented");
+			std::vector<VkCommandBuffer> vkCbs;
+			for (auto* cb : cbs)
+				if (auto* vkc = dynamic_cast<VulkanCommandBuffer*>(cb))
+					vkCbs.push_back(vkc->GetVkCommandBuffer());
+
+			VkSubmitInfo si = {};
+			si.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			si.commandBufferCount = static_cast<uint32_t>(vkCbs.size());
+			si.pCommandBuffers    = vkCbs.data();
+
+			VkFence fence = VK_NULL_HANDLE;
+			m_Dev->fnCreateFence(m_Dev->GetVkDevice(), &VkFenceCreateInfo{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO}, nullptr, &fence);
+			vkQueueSubmit(m_Queue, 1, &si, fence);
+			m_Dev->fnWaitForFences(m_Dev->GetVkDevice(), 1, &fence, VK_TRUE, UINT64_MAX);
+			m_Dev->fnDestroyFence(m_Dev->GetVkDevice(), fence, nullptr);
 		}
 
-		void Present(const Ref<RHISwapChain>& swapChain) override
+		void Present(const Ref<RHISwapChain>& sc) override
 		{
-			CANDY_CORE_WARN("TODO: VulkanCommandQueue::Present — not yet implemented");
+			auto* vksc = dynamic_cast<VulkanSwapChain*>(sc.get());
+			if (!vksc) return;
+
+			uint32_t imgIndex = vksc->AcquireNextImage(VK_NULL_HANDLE, VK_NULL_HANDLE);
+			VkPresentInfoKHR pi = {};
+			pi.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+			pi.swapchainCount     = 1;
+			pi.pSwapchains        = &vksc->GetVkSwapchain();
+			pi.pImageIndices      = &imgIndex;
+			m_Dev->fnQueuePresentKHR(m_Queue, &pi);
 		}
 
-		void WaitIdle() override
-		{
-			if (m_Queue && m_vkQueueWaitIdle)
-				m_vkQueueWaitIdle(m_Queue);
-		}
+		void WaitIdle() override { if (m_Queue) vkQueueWaitIdle(m_Queue); }
 
-		[[nodiscard]] VkQueue  GetNativeQueue()       const { return m_Queue; }
-		[[nodiscard]] uint32_t GetQueueFamilyIndex() const { return m_QueueFamilyIndex; }
+		[[nodiscard]] VkQueue           GetQueue()           const { return m_Queue; }
+		[[nodiscard]] VkCommandPool     GetPool()            const { return m_Pool; }
+		[[nodiscard]] uint32_t          GetQueueFamilyIndex() const { return m_QueueFamilyIndex; }
 
 	private:
-		VkQueue             m_Queue            = VK_NULL_HANDLE;
-		uint32_t            m_QueueFamilyIndex = 0;
-		PFN_vkQueueWaitIdle m_vkQueueWaitIdle  = nullptr;
+		VulkanDevice* m_Dev = nullptr;
+		VkQueue       m_Queue = VK_NULL_HANDLE;
+		uint32_t      m_QueueFamilyIndex = 0;
+		VkCommandPool m_Pool = VK_NULL_HANDLE;
 	};
 
 	// =========================================================================
 	// VulkanDevice
 	// =========================================================================
 
+#define LOAD(fn) fn = reinterpret_cast<decltype(fn)>(GetIPA(#fn))
+#define LOAD_DEV(fn) fn = reinterpret_cast<decltype(fn)>(GetDevProc(#fn))
+
 	VulkanDevice::VulkanDevice()
 	{
 		CANDY_CORE_INFO("VulkanDevice: initializing...");
 
 		m_FunctionLoader = std::make_unique<VulkanFunctionLoader>();
-		if (!m_FunctionLoader->IsLoaded())
-		{
-			CANDY_CORE_ERROR("VulkanDevice: function loader failed");
-			return;
-		}
+		if (!m_FunctionLoader->IsLoaded()) return;
 
-		// ---- Load vkGetInstanceProcAddr entry point -----------------------
+		auto GetIPA = m_FunctionLoader->GetIPA();
 
-		auto GetIPA = m_FunctionLoader->GetInstanceProcAddr();
+		// ---- VkInstance ---------------------------------------------------
 
-		// ---- Create VkInstance ---------------------------------------------
-
-		VkApplicationInfo appInfo  = {};
-		appInfo.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-		appInfo.pApplicationName   = "CandyEngine";
-		appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-		appInfo.pEngineName        = "CandyEngine";
-		appInfo.engineVersion      = VK_MAKE_VERSION(1, 0, 0);
-		appInfo.apiVersion         = VK_API_VERSION_1_3;
+		VkApplicationInfo appInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
+		appInfo.pApplicationName = "CandyEngine";
+		appInfo.apiVersion       = VK_API_VERSION_1_3;
 
 		std::vector<const char*> extensions = {
-			VK_KHR_SURFACE_EXTENSION_NAME,
-			VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+			VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_EXTENSION_NAME
 		};
 
-		std::vector<const char*> validationLayers;
-#if defined(CANDY_DEBUG)
-		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-		validationLayers.push_back("VK_LAYER_KHRONOS_validation");
+		VkInstanceCreateInfo ici = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
+		ici.pApplicationInfo       = &appInfo;
+		ici.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+		ici.ppEnabledExtensionNames = extensions.data();
 
-		// Check if validation layers are available (use the loaded entry point)
+		auto vkCreateInstance = reinterpret_cast<PFN_vkCreateInstance>(GetIPA("vkCreateInstance"));
+		if (!vkCreateInstance || vkCreateInstance(&ici, nullptr, &m_Instance) != VK_SUCCESS)
 		{
-			auto vkEnumerateInstanceLayerPropertiesFn = reinterpret_cast<PFN_vkEnumerateInstanceLayerProperties>(
-				GetIPA(nullptr, "vkEnumerateInstanceLayerProperties"));
-
-			uint32_t layerCount = 0;
-			if (vkEnumerateInstanceLayerPropertiesFn)
-			{
-				vkEnumerateInstanceLayerPropertiesFn(&layerCount, nullptr);
-				std::vector<VkLayerProperties> availableLayers(layerCount);
-				vkEnumerateInstanceLayerPropertiesFn(&layerCount, availableLayers.data());
-
-				bool validationFound = false;
-				for (const auto& layer : availableLayers)
-				{
-					if (strcmp(layer.layerName, "VK_LAYER_KHRONOS_validation") == 0)
-					{
-						validationFound = true;
-						break;
-					}
-				}
-
-				if (!validationFound)
-				{
-					CANDY_CORE_WARN("VulkanDevice: VK_LAYER_KHRONOS_validation not available, proceeding without validation layers");
-					validationLayers.clear();
-					extensions.erase(std::remove(extensions.begin(), extensions.end(), VK_EXT_DEBUG_UTILS_EXTENSION_NAME), extensions.end());
-				}
-			}
-		}
-#endif
-
-		VkInstanceCreateInfo instanceCI = {};
-		instanceCI.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-		instanceCI.pApplicationInfo        = &appInfo;
-		instanceCI.enabledExtensionCount   = static_cast<uint32_t>(extensions.size());
-		instanceCI.ppEnabledExtensionNames = extensions.data();
-		instanceCI.enabledLayerCount       = static_cast<uint32_t>(validationLayers.size());
-		instanceCI.ppEnabledLayerNames     = validationLayers.data();
-
-		auto vkCreateInstanceFn = reinterpret_cast<PFN_vkCreateInstance>(
-			GetIPA(nullptr, "vkCreateInstance"));
-
-		if (!vkCreateInstanceFn)
-		{
-			CANDY_CORE_ERROR("VulkanDevice: failed to load vkCreateInstance");
+			CANDY_CORE_ERROR("VulkanDevice: vkCreateInstance failed");
 			return;
 		}
 
-		VkResult result = vkCreateInstanceFn(&instanceCI, nullptr, &m_Instance);
-		if (result != VK_SUCCESS)
+		// ---- Physical device ------------------------------------------------
+
+		uint32_t count = 0;
+		vkEnumeratePhysicalDevices(m_Instance, &count, nullptr);
+		std::vector<VkPhysicalDevice> devices(count);
+		vkEnumeratePhysicalDevices(m_Instance, &count, devices.data());
+		m_PhysicalDevice = devices.empty() ? VK_NULL_HANDLE : devices[0];
+
+		// Prefer discrete
+		for (auto d : devices) {
+			VkPhysicalDeviceProperties p;
+			vkGetPhysicalDeviceProperties(d, &p);
+			if (p.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) { m_PhysicalDevice = d; break; }
+		}
+
+		// ---- Queue family ------------------------------------------------
+
+		vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &count, nullptr);
+		std::vector<VkQueueFamilyProperties> qfProps(count);
+		vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &count, qfProps.data());
+		for (uint32_t i = 0; i < count; ++i)
+			if (qfProps[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) { m_GraphicsQueueFamilyIndex = i; break; }
+
+		// ---- Logical device ----------------------------------------------
+
+		float prio = 1.0f;
+		VkDeviceQueueCreateInfo qci = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
+		qci.queueFamilyIndex = m_GraphicsQueueFamilyIndex;
+		qci.queueCount = 1; qci.pQueuePriorities = &prio;
+
+		const char* devExts[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+		VkDeviceCreateInfo dci = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
+		dci.queueCreateInfoCount = 1; dci.pQueueCreateInfos = &qci;
+		dci.enabledExtensionCount = 1; dci.ppEnabledExtensionNames = devExts;
+
+		auto vkCreateDeviceFn = reinterpret_cast<PFN_vkCreateDevice>(GetIPA("vkCreateDevice"));
+		if (!vkCreateDeviceFn || vkCreateDeviceFn(m_PhysicalDevice, &dci, nullptr, &m_Device) != VK_SUCCESS)
 		{
-			CANDY_CORE_ERROR("VulkanDevice: vkCreateInstance failed ({})", static_cast<int>(result));
+			CANDY_CORE_ERROR("VulkanDevice: vkCreateDevice failed");
 			return;
 		}
 
-		// Load instance-level functions
-		LoadInstanceFunctions();
+		// ---- Load all functions ------------------------------------------
 
-		CANDY_CORE_INFO("VulkanDevice: VkInstance created");
+		auto GetDevProc = reinterpret_cast<PFN_vkGetDeviceProcAddr>(GetIPA("vkGetDeviceProcAddr"));
 
-		// ---- Select physical device ----------------------------------------
+		// Core 1.0
+		LOAD_DEV(fnCreateBuffer);   LOAD_DEV(fnDestroyBuffer);
+		LOAD_DEV(fnAllocateMemory); LOAD_DEV(fnFreeMemory);
+		LOAD_DEV(fnBindBufferMemory);
+		LOAD_DEV(fnMapMemory);      LOAD_DEV(fnUnmapMemory);
+		LOAD_DEV(fnCreateCommandPool); LOAD_DEV(fnDestroyCommandPool);
+		LOAD_DEV(fnAllocateCommandBuffers); LOAD_DEV(fnFreeCommandBuffers);
+		LOAD_DEV(fnCreateShaderModule); LOAD_DEV(fnDestroyShaderModule);
+		LOAD_DEV(fnCreatePipelineLayout); LOAD_DEV(fnDestroyPipelineLayout);
+		LOAD_DEV(fnCreateGraphicsPipelines); LOAD_DEV(fnDestroyPipeline);
+		LOAD_DEV(fnCreateRenderPass); LOAD_DEV(fnDestroyRenderPass);
+		LOAD_DEV(fnCreateFramebuffer); LOAD_DEV(fnDestroyFramebuffer);
+		LOAD_DEV(fnCreateImageView); LOAD_DEV(fnDestroyImageView);
+		LOAD_DEV(fnCreateFence); LOAD_DEV(fnDestroyFence);
+		LOAD_DEV(fnWaitForFences); LOAD_DEV(fnResetFences);
 
-		uint32_t deviceCount = 0;
-		m_Funcs.vkEnumeratePhysicalDevices(m_Instance, &deviceCount, nullptr);
-		if (deviceCount == 0)
-		{
-			CANDY_CORE_ERROR("VulkanDevice: no Vulkan-capable physical devices found");
-			return;
-		}
+		// Instance extensions
+		LOAD(fnCreateSwapchainKHR);   LOAD_DEV(fnDestroySwapchainKHR);
+		LOAD_DEV(fnGetSwapchainImagesKHR);
+		LOAD_DEV(fnAcquireNextImageKHR);
+		LOAD_DEV(fnQueuePresentKHR);
+		LOAD(fnCreateWin32SurfaceKHR); LOAD(fnDestroySurfaceKHR);
 
-		std::vector<VkPhysicalDevice> physicalDevices(deviceCount);
-		m_Funcs.vkEnumeratePhysicalDevices(m_Instance, &deviceCount, physicalDevices.data());
+		// ---- Command pool + queue ----------------------------------------
 
-		m_PhysicalDevice = VK_NULL_HANDLE;
-		for (auto device : physicalDevices)
-		{
-			VkPhysicalDeviceProperties props;
-			m_Funcs.vkGetPhysicalDeviceProperties(device, &props);
+		VkCommandPoolCreateInfo poolCI = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+		poolCI.queueFamilyIndex = m_GraphicsQueueFamilyIndex;
+		poolCI.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+		VkCommandPool pool;
+		fnCreateCommandPool(m_Device, &poolCI, nullptr, &pool);
 
-			if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
-			{
-				m_PhysicalDevice = device;
-				CANDY_CORE_INFO("VulkanDevice: selected discrete GPU: {}", props.deviceName);
-				break;
-			}
-		}
+		VkQueue queue;
+		vkGetDeviceQueue(m_Device, m_GraphicsQueueFamilyIndex, 0, &queue);
 
-		if (m_PhysicalDevice == VK_NULL_HANDLE)
-		{
-			m_PhysicalDevice = physicalDevices[0];
-			VkPhysicalDeviceProperties props;
-			m_Funcs.vkGetPhysicalDeviceProperties(m_PhysicalDevice, &props);
-			CANDY_CORE_INFO("VulkanDevice: no discrete GPU found, using: {}", props.deviceName);
-		}
-
-		// ---- Find graphics queue family ------------------------------------
-
-		uint32_t queueFamilyCount = 0;
-		m_Funcs.vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyCount, nullptr);
-		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-		m_Funcs.vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyCount, queueFamilies.data());
-
-		m_GraphicsQueueFamilyIndex = UINT32_MAX;
-		for (uint32_t i = 0; i < queueFamilyCount; ++i)
-		{
-			if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
-			{
-				m_GraphicsQueueFamilyIndex = i;
-				break;
-			}
-		}
-
-		if (m_GraphicsQueueFamilyIndex == UINT32_MAX)
-		{
-			CANDY_CORE_ERROR("VulkanDevice: no graphics queue family found");
-			return;
-		}
-
-		// ---- Create logical device -----------------------------------------
-
-		float queuePriority = 1.0f;
-		VkDeviceQueueCreateInfo queueCI = {};
-		queueCI.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queueCI.queueFamilyIndex = m_GraphicsQueueFamilyIndex;
-		queueCI.queueCount       = 1;
-		queueCI.pQueuePriorities = &queuePriority;
-
-		std::vector<const char*> deviceExtensions = {
-			VK_KHR_SWAPCHAIN_EXTENSION_NAME
-		};
-
-		VkPhysicalDeviceFeatures deviceFeatures = {};
-
-		VkDeviceCreateInfo deviceCI      = {};
-		deviceCI.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-		deviceCI.queueCreateInfoCount    = 1;
-		deviceCI.pQueueCreateInfos       = &queueCI;
-		deviceCI.enabledExtensionCount   = static_cast<uint32_t>(deviceExtensions.size());
-		deviceCI.ppEnabledExtensionNames = deviceExtensions.data();
-		deviceCI.pEnabledFeatures        = &deviceFeatures;
-
-		result = m_Funcs.vkCreateDevice(m_PhysicalDevice, &deviceCI, nullptr, &m_Device);
-		if (result != VK_SUCCESS)
-		{
-			CANDY_CORE_ERROR("VulkanDevice: vkCreateDevice failed ({})", static_cast<int>(result));
-			return;
-		}
-
-		// Load device-level functions
-		LoadDeviceFunctions();
-
-		// Get the graphics queue
-		VkQueue graphicsQueue = VK_NULL_HANDLE;
-		m_Funcs.vkGetDeviceQueue(m_Device, m_GraphicsQueueFamilyIndex, 0, &graphicsQueue);
-
-		m_CommandQueue = CreateScope<VulkanCommandQueue>(graphicsQueue, m_GraphicsQueueFamilyIndex, m_Funcs.vkQueueWaitIdle);
+		m_CommandQueue = CreateScope<VulkanCommandQueue>(this, queue, m_GraphicsQueueFamilyIndex, pool);
 
 		m_Initialized = true;
-		CANDY_CORE_INFO("VulkanDevice: initialization complete");
+		CANDY_CORE_INFO("VulkanDevice: ready");
 	}
+
+#undef LOAD
+#undef LOAD_DEV
 
 	VulkanDevice::~VulkanDevice()
 	{
 		WaitIdle();
-
-		if (m_Device)
-		{
-			m_Funcs.vkDestroyDevice(m_Device, nullptr);
-			m_Device = VK_NULL_HANDLE;
-		}
-
-		if (m_Instance)
-		{
-			m_Funcs.vkDestroyInstance(m_Instance, nullptr);
-			m_Instance = VK_NULL_HANDLE;
-		}
-
-		CANDY_CORE_INFO("VulkanDevice: shutdown complete");
+		if (m_Device)   { vkDestroyDevice(m_Device, nullptr);   m_Device   = VK_NULL_HANDLE; }
+		if (m_Instance) { vkDestroyInstance(m_Instance, nullptr); m_Instance = VK_NULL_HANDLE; }
 	}
 
-	void VulkanDevice::LoadInstanceFunctions()
-	{
-		auto load = [this](const char* name) {
-			return m_FunctionLoader->GetInstanceProcAddr()(m_Instance, name);
-		};
+	// ---- Built-in SPIR-V ---------------------------------------------------
 
-		m_Funcs.vkGetPhysicalDeviceProperties           = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties>(load("vkGetPhysicalDeviceProperties"));
-		m_Funcs.vkEnumeratePhysicalDevices              = reinterpret_cast<PFN_vkEnumeratePhysicalDevices>(load("vkEnumeratePhysicalDevices"));
-		m_Funcs.vkGetPhysicalDeviceQueueFamilyProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceQueueFamilyProperties>(load("vkGetPhysicalDeviceQueueFamilyProperties"));
-		m_Funcs.vkCreateDevice                          = reinterpret_cast<PFN_vkCreateDevice>(load("vkCreateDevice"));
-		m_Funcs.vkGetDeviceQueue                        = reinterpret_cast<PFN_vkGetDeviceQueue>(load("vkGetDeviceQueue"));
-		m_Funcs.vkDestroyInstance                       = reinterpret_cast<PFN_vkDestroyInstance>(load("vkDestroyInstance"));
-	}
-
-	void VulkanDevice::LoadDeviceFunctions()
-	{
-		// Load vkGetDeviceProcAddr first — it's the gateway to device functions
-		auto loadInstance = [this](const char* name) {
-			return m_FunctionLoader->GetInstanceProcAddr()(m_Instance, name);
-		};
-
-		PFN_vkGetDeviceProcAddr getDeviceProcAddr = reinterpret_cast<PFN_vkGetDeviceProcAddr>(
-			loadInstance("vkGetDeviceProcAddr"));
-
-		if (!getDeviceProcAddr)
-		{
-			CANDY_CORE_ERROR("VulkanDevice: failed to load vkGetDeviceProcAddr");
-			return;
-		}
-
-		auto loadDevice = [this, getDeviceProcAddr](const char* name) {
-			return getDeviceProcAddr(m_Device, name);
-		};
-
-		m_Funcs.vkDestroyDevice   = reinterpret_cast<PFN_vkDestroyDevice>(loadDevice("vkDestroyDevice"));
-		m_Funcs.vkQueueWaitIdle   = reinterpret_cast<PFN_vkQueueWaitIdle>(loadDevice("vkQueueWaitIdle"));
-		m_Funcs.vkDeviceWaitIdle  = reinterpret_cast<PFN_vkDeviceWaitIdle>(loadDevice("vkDeviceWaitIdle"));
-		m_Funcs.vkDevGetProcAddr  = getDeviceProcAddr;
-	}
-
-	// ---- Forwarding wrappers -----------------------------------------------
-
-	void VulkanDevice::vkGetPhysicalDeviceProperties(VkPhysicalDevice physDevice, VkPhysicalDeviceProperties* props)
-	{
-		m_Funcs.vkGetPhysicalDeviceProperties(physDevice, props);
-	}
-
-	VkResult VulkanDevice::vkEnumeratePhysicalDevices(VkInstance inst, uint32_t* count, VkPhysicalDevice* devices)
-	{
-		return m_Funcs.vkEnumeratePhysicalDevices(inst, count, devices);
-	}
-
-	void VulkanDevice::vkGetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice physDevice, uint32_t* count, VkQueueFamilyProperties* props)
-	{
-		m_Funcs.vkGetPhysicalDeviceQueueFamilyProperties(physDevice, count, props);
-	}
-
-	VkResult VulkanDevice::vkCreateDevice(VkPhysicalDevice physDevice, const VkDeviceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDevice* pDevice)
-	{
-		return m_Funcs.vkCreateDevice(physDevice, pCreateInfo, pAllocator, pDevice);
-	}
-
-	void VulkanDevice::vkGetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue)
-	{
-		m_Funcs.vkGetDeviceQueue(device, queueFamilyIndex, queueIndex, pQueue);
-	}
-
-	void VulkanDevice::vkDestroyInstance(VkInstance instance, const VkAllocationCallbacks* pAllocator)
-	{
-		m_Funcs.vkDestroyInstance(instance, pAllocator);
-	}
-
-	void VulkanDevice::vkDestroyDevice(VkDevice device, const VkAllocationCallbacks* pAllocator)
-	{
-		m_Funcs.vkDestroyDevice(device, pAllocator);
-	}
-
-	VkResult VulkanDevice::vkQueueWaitIdle(VkQueue queue)
-	{
-		return m_Funcs.vkQueueWaitIdle(queue);
-	}
-
-	VkResult VulkanDevice::vkDeviceWaitIdle(VkDevice device)
-	{
-		return m_Funcs.vkDeviceWaitIdle(device);
-	}
+	const std::vector<uint32_t>& VulkanDevice::GetTriangleVSSPIRV() { return VulkanSPIRV::GetTriangleVS(); }
+	const std::vector<uint32_t>& VulkanDevice::GetTrianglePSSPIRV() { return VulkanSPIRV::GetTrianglePS(); }
 
 	// ---- Resource creation ---------------------------------------------------
 
 	Ref<RHIBuffer> VulkanDevice::CreateBuffer(const BufferDesc& desc)
 	{
-		CANDY_CORE_WARN("TODO: VulkanDevice::CreateBuffer — not yet implemented");
+		return CreateRef<VulkanBuffer>(this, desc);
+	}
+
+	Ref<RHITexture> VulkanDevice::CreateTexture(const TextureDesc&)
+	{
+		CANDY_CORE_WARN("TODO: Vulkan CreateTexture");
 		return nullptr;
 	}
 
-	Ref<RHITexture> VulkanDevice::CreateTexture(const TextureDesc& desc)
+	Ref<RHISampler> VulkanDevice::CreateSampler(const SamplerDesc&)
 	{
-		CANDY_CORE_WARN("TODO: VulkanDevice::CreateTexture — not yet implemented");
+		CANDY_CORE_WARN("TODO: Vulkan CreateSampler");
 		return nullptr;
 	}
 
-	Ref<RHISampler> VulkanDevice::CreateSampler(const SamplerDesc& desc)
+	Ref<RHIShaderModule> VulkanDevice::CreateShaderModule(const void* spirv, uint32_t size, const std::string&)
 	{
-		CANDY_CORE_WARN("TODO: VulkanDevice::CreateSampler — not yet implemented");
-		return nullptr;
-	}
+		if (!spirv || size == 0) return nullptr;
 
-	Ref<RHIShaderModule> VulkanDevice::CreateShaderModule(const void* spirvBytecode, uint32_t byteSize, const std::string& debugName)
-	{
-		if (!spirvBytecode || byteSize == 0)
-		{
-			CANDY_CORE_ERROR("VulkanDevice::CreateShaderModule: null or empty bytecode");
-			return nullptr;
-		}
+		VkShaderModuleCreateInfo ci = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+		ci.codeSize = size;
+		ci.pCode    = static_cast<const uint32_t*>(spirv);
 
-		// Load vkCreateShaderModule dynamically
-		auto vkCreateShaderModuleFn = reinterpret_cast<PFN_vkCreateShaderModule>(
-			m_Funcs.vkDevGetProcAddr(m_Device, "vkCreateShaderModule"));
+		VkShaderModule sm;
+		if (fnCreateShaderModule(m_Device, &ci, nullptr, &sm) != VK_SUCCESS) return nullptr;
 
-		if (!vkCreateShaderModuleFn)
-		{
-			CANDY_CORE_ERROR("VulkanDevice::CreateShaderModule: vkCreateShaderModule not found");
-			return nullptr;
-		}
+		// Wrap in simple holder (same pattern as DX12)
+		struct VkShaderHolder : RHIShaderModule {
+			VkDevice dev; VkShaderModule mod; ShaderStage stage; std::string name;
+			PFN_vkDestroyShaderModule destroyFn;
+			VkShaderHolder(VkDevice d, VkShaderModule m, ShaderStage s, std::string n, PFN_vkDestroyShaderModule f)
+				: dev(d), mod(m), stage(s), name(n), destroyFn(f) {}
+			~VkShaderHolder() override { if (mod && destroyFn) destroyFn(dev, mod, nullptr); }
+			ShaderStage GetStage() const override { return stage; }
+			const uint32_t* GetBytecode() const override { return nullptr; }
+			uint32_t GetBytecodeSize() const override { return 0; }
+			const std::string& GetDebugName() const override { return name; }
+			VkShaderModule GetModule() const { return mod; }
+		};
 
-		VkShaderModuleCreateInfo shaderCI = {};
-		shaderCI.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-		shaderCI.codeSize = byteSize;
-		shaderCI.pCode    = static_cast<const uint32_t*>(spirvBytecode);
-
-		VkShaderModule shaderModule = VK_NULL_HANDLE;
-		VkResult result = vkCreateShaderModuleFn(m_Device, &shaderCI, nullptr, &shaderModule);
-		if (result == VK_SUCCESS)
-		{
-			CANDY_CORE_INFO("VulkanDevice::CreateShaderModule: '{}' created", debugName);
-			// TODO: wrap in RHIShaderModule
-			return nullptr; // placeholder
-		}
-
-		CANDY_CORE_ERROR("VulkanDevice::CreateShaderModule: vkCreateShaderModule failed ({})", static_cast<int>(result));
-		return nullptr;
+		return CreateRef<VkShaderHolder>(m_Device, sm, ShaderStage::None, std::string(), fnDestroyShaderModule);
 	}
 
 	Ref<RHIGraphicsPipeline> VulkanDevice::CreateGraphicsPipeline(
@@ -468,30 +302,127 @@ namespace Candy {
 		if (auto cached = GetPipelineCache().Find(desc))
 			return cached;
 
-		CANDY_CORE_WARN("TODO: VulkanDevice::CreateGraphicsPipeline — not yet implemented");
+		// Shader stages
+		auto* vsHolder = dynamic_cast<struct VkShaderHolder*>(vs.get());
+		auto* fsHolder = dynamic_cast<struct VkShaderHolder*>(fs.get());
 
-		Ref<VulkanGraphicsPipeline> pipeline = CreateRef<VulkanGraphicsPipeline>(desc);
-		GetPipelineCache().Insert(desc, pipeline);
-		return pipeline;
+		VkPipelineShaderStageCreateInfo stages[2] = {};
+		stages[0].sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		stages[0].stage  = VK_SHADER_STAGE_VERTEX_BIT;
+		stages[0].module = vsHolder ? vsHolder->GetModule() : VK_NULL_HANDLE;
+		stages[0].pName  = "main";
+		stages[1].sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		stages[1].stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
+		stages[1].module = fsHolder ? fsHolder->GetModule() : VK_NULL_HANDLE;
+		stages[1].pName  = "main";
+
+		// Vertex input
+		VkVertexInputBindingDescription bindings[1] = {};
+		if (!desc.VertexInput.Bindings.empty())
+		{
+			bindings[0].binding   = desc.VertexInput.Bindings[0].Binding;
+			bindings[0].stride    = desc.VertexInput.Bindings[0].Stride;
+			bindings[0].inputRate = desc.VertexInput.Bindings[0].PerInstance
+			                        ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX;
+		}
+		else
+		{
+			bindings[0].binding = 0; bindings[0].stride = 7 * sizeof(float);
+			bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		}
+
+		std::vector<VkVertexInputAttributeDescription> attrs;
+		for (const auto& a : desc.VertexInput.Attributes)
+		{
+			VkFormat fmt = VK_FORMAT_R32G32B32_SFLOAT;
+			switch (a.Format) {
+			case RHIFormat::R32G32Float:       fmt = VK_FORMAT_R32G32_SFLOAT; break;
+			case RHIFormat::R32G32B32Float:    fmt = VK_FORMAT_R32G32B32_SFLOAT; break;
+			case RHIFormat::R32G32B32A32Float: fmt = VK_FORMAT_R32G32B32A32_SFLOAT; break;
+			case RHIFormat::R8G8B8A8Unorm:     fmt = VK_FORMAT_R8G8B8A8_UNORM; break;
+			default: break;
+			}
+			attrs.push_back({ a.Location, a.Binding, fmt, a.Offset });
+		}
+		if (attrs.empty())
+		{
+			attrs.push_back({ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 });
+			attrs.push_back({ 1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 12 });
+		}
+
+		VkPipelineVertexInputStateCreateInfo vi = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+		vi.vertexBindingDescriptionCount   = 1;
+		vi.pVertexBindingDescriptions      = bindings;
+		vi.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
+		vi.pVertexAttributeDescriptions    = attrs.data();
+
+		VkPipelineInputAssemblyStateCreateInfo ia = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
+		ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+		VkPipelineLayoutCreateInfo plCI = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+		VkPipelineLayout layout;
+		fnCreatePipelineLayout(m_Device, &plCI, nullptr, &layout);
+
+		VkPipelineViewportStateCreateInfo vpState = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
+		vpState.viewportCount = 1; vpState.scissorCount = 1;
+
+		VkPipelineRasterizationStateCreateInfo rs = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
+		rs.polygonMode = (desc.Rasterizer.Fill == FillMode::Wireframe)
+		                 ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL;
+		rs.cullMode    = (desc.Rasterizer.Cull == CullMode::None) ? VK_CULL_MODE_NONE
+		               : (desc.Rasterizer.Cull == CullMode::Front) ? VK_CULL_MODE_FRONT_BIT
+		                                                           : VK_CULL_MODE_BACK_BIT;
+		rs.frontFace   = VK_FRONT_FACE_CLOCKWISE;
+		rs.lineWidth   = 1.0f;
+
+		VkPipelineMultisampleStateCreateInfo ms = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
+		ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+		VkPipelineColorBlendAttachmentState blendAttach = {};
+		blendAttach.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+		                           | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+		VkPipelineColorBlendStateCreateInfo blend = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
+		blend.attachmentCount = 1; blend.pAttachments = &blendAttach;
+
+		VkDynamicState dynStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+		VkPipelineDynamicStateCreateInfo dyn = { VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
+		dyn.dynamicStateCount = 2; dyn.pDynamicStates = dynStates;
+
+		VkGraphicsPipelineCreateInfo pci = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+		pci.stageCount = 2; pci.pStages = stages;
+		pci.pVertexInputState   = &vi;
+		pci.pInputAssemblyState = &ia;
+		pci.pViewportState      = &vpState;
+		pci.pRasterizationState = &rs;
+		pci.pMultisampleState   = &ms;
+		pci.pColorBlendState    = &blend;
+		pci.pDynamicState       = &dyn;
+		pci.layout = layout;
+		pci.renderPass = VK_NULL_HANDLE; // Will be set when bound to swapchain
+		pci.subpass = 0;
+
+		VkPipeline pipeline;
+		if (fnCreateGraphicsPipelines(m_Device, VK_NULL_HANDLE, 1, &pci, nullptr, &pipeline) != VK_SUCCESS)
+		{
+			CANDY_CORE_ERROR("VulkanDevice: CreateGraphicsPipeline failed");
+			fnDestroyPipelineLayout(m_Device, layout, nullptr);
+			return nullptr;
+		}
+
+		auto vkp = CreateRef<VulkanGraphicsPipeline>(desc);
+		vkp->SetVkPipeline(pipeline, layout);
+		GetPipelineCache().Insert(desc, vkp);
+		return vkp;
 	}
 
 	Ref<RHISwapChain> VulkanDevice::CreateSwapChain(const SwapChainDesc& desc)
 	{
-		CANDY_CORE_INFO("VulkanDevice::CreateSwapChain {}x{}", desc.Width, desc.Height);
-		return CreateRef<VulkanSwapChain>(desc);
+		return CreateRef<VulkanSwapChain>(this, desc);
 	}
 
-	// ---- Command submission --------------------------------------------------
+	RHICommandQueue& VulkanDevice::GetCommandQueue() { return *m_CommandQueue; }
 
-	RHICommandQueue& VulkanDevice::GetCommandQueue()
-	{
-		return *m_CommandQueue;
-	}
-
-	void VulkanDevice::WaitIdle()
-	{
-		if (m_Funcs.vkDeviceWaitIdle)
-			m_Funcs.vkDeviceWaitIdle(m_Device);
-	}
+	void VulkanDevice::WaitIdle() { if (m_Device) vkDeviceWaitIdle(m_Device); }
 
 } // namespace Candy

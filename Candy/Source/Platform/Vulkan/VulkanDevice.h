@@ -2,24 +2,22 @@
 
 #include "Runtime/RHI/IR/IRDevice.h"
 
-// Vulkan handle types (no prototypes — we use dynamic loading)
 #ifndef VK_NO_PROTOTYPES
 #define VK_NO_PROTOTYPES
 #endif
 #include <vulkan/vulkan.h>
 
 #include <memory>
+#include <vector>
 
 namespace Candy {
 
-	// Forward declaration — defined in VulkanDevice.cpp
 	class VulkanFunctionLoader;
 
 	// =========================================================================
-	// VulkanDevice — Vulkan backend implementation
+	// VulkanDevice — Vulkan backend
 	//
-	// Inherits from IR::IRDevice.  Uses dynamic loading of vulkan-1.dll so
-	// that no Vulkan SDK link library is required at build time.
+	// Dynamic loading of vulkan-1.dll; no SDK link library required.
 	// =========================================================================
 	class VulkanDevice : public IR::IRDevice
 	{
@@ -32,40 +30,69 @@ namespace Candy {
 		Candy::Ref<RHIBuffer>   CreateBuffer(const BufferDesc& desc) override;
 		Candy::Ref<RHITexture>  CreateTexture(const TextureDesc& desc) override;
 		Candy::Ref<RHISampler>  CreateSampler(const SamplerDesc& desc) override;
-
 		Candy::Ref<RHIShaderModule> CreateShaderModule(const void* spirvBytecode, uint32_t byteSize, const std::string& debugName = "") override;
-
 		Candy::Ref<RHIGraphicsPipeline> CreateGraphicsPipeline(const GraphicsPipelineDesc& desc, const Candy::Ref<RHIShaderModule>& vs, const Candy::Ref<RHIShaderModule>& fs) override;
-
 		Candy::Ref<RHISwapChain> CreateSwapChain(const SwapChainDesc& desc) override;
 
-		// ---- Command submission --------------------------------------------
-
 		RHICommandQueue& GetCommandQueue() override;
-
-		// ---- Query ---------------------------------------------------------
-
 		void WaitIdle() override;
 
 		[[nodiscard]] bool IsInitialized() const { return m_Initialized; }
 
-		// ---- Internal Vulkan function wrappers (loaded dynamically) --------
+		// ---- Vulkan native handles -----------------------------------------
 
-		VkResult vkEnumeratePhysicalDevices(VkInstance instance, uint32_t* pCount, VkPhysicalDevice* pDevices);
-		void     vkGetPhysicalDeviceProperties(VkPhysicalDevice physicalDevice, VkPhysicalDeviceProperties* pProperties);
-		void     vkGetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice physicalDevice, uint32_t* pCount, VkQueueFamilyProperties* pProperties);
-		VkResult vkCreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDevice* pDevice);
-		void     vkGetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue);
-		void     vkDestroyInstance(VkInstance instance, const VkAllocationCallbacks* pAllocator);
-		void     vkDestroyDevice(VkDevice device, const VkAllocationCallbacks* pAllocator);
-		VkResult vkQueueWaitIdle(VkQueue queue);
-		VkResult vkDeviceWaitIdle(VkDevice device);
+		[[nodiscard]] VkInstance       GetVkInstance()       const { return m_Instance; }
+		[[nodiscard]] VkPhysicalDevice GetVkPhysicalDevice() const { return m_PhysicalDevice; }
+		[[nodiscard]] VkDevice         GetVkDevice()         const { return m_Device; }
+		[[nodiscard]] uint32_t         GetGraphicsQueueFamilyIndex() const { return m_GraphicsQueueFamilyIndex; }
+
+		// ---- Built-in triangle SPIR-V --------------------------------------
+
+		const std::vector<uint32_t>& GetTriangleVSSPIRV();
+		const std::vector<uint32_t>& GetTrianglePSSPIRV();
+
+		// ---- Internal device functions (loaded dynamically) ----------------
+
+		PFN_vkCreateBuffer         fnCreateBuffer         = nullptr;
+		PFN_vkDestroyBuffer        fnDestroyBuffer        = nullptr;
+		PFN_vkAllocateMemory       fnAllocateMemory       = nullptr;
+		PFN_vkFreeMemory           fnFreeMemory            = nullptr;
+		PFN_vkBindBufferMemory     fnBindBufferMemory     = nullptr;
+		PFN_vkMapMemory            fnMapMemory             = nullptr;
+		PFN_vkUnmapMemory          fnUnmapMemory           = nullptr;
+		PFN_vkCreateCommandPool    fnCreateCommandPool    = nullptr;
+		PFN_vkDestroyCommandPool   fnDestroyCommandPool   = nullptr;
+		PFN_vkAllocateCommandBuffers fnAllocateCommandBuffers = nullptr;
+		PFN_vkFreeCommandBuffers   fnFreeCommandBuffers   = nullptr;
+		PFN_vkCreateShaderModule   fnCreateShaderModule   = nullptr;
+		PFN_vkDestroyShaderModule  fnDestroyShaderModule  = nullptr;
+		PFN_vkCreatePipelineLayout fnCreatePipelineLayout = nullptr;
+		PFN_vkDestroyPipelineLayout fnDestroyPipelineLayout = nullptr;
+		PFN_vkCreateGraphicsPipelines fnCreateGraphicsPipelines = nullptr;
+		PFN_vkDestroyPipeline      fnDestroyPipeline      = nullptr;
+		PFN_vkCreateRenderPass     fnCreateRenderPass     = nullptr;
+		PFN_vkDestroyRenderPass    fnDestroyRenderPass    = nullptr;
+		PFN_vkCreateFramebuffer    fnCreateFramebuffer    = nullptr;
+		PFN_vkDestroyFramebuffer   fnDestroyFramebuffer   = nullptr;
+		PFN_vkCreateImageView      fnCreateImageView      = nullptr;
+		PFN_vkDestroyImageView     fnDestroyImageView     = nullptr;
+
+		// Instance-level extensions
+		PFN_vkCreateSwapchainKHR    fnCreateSwapchainKHR    = nullptr;
+		PFN_vkDestroySwapchainKHR   fnDestroySwapchainKHR   = nullptr;
+		PFN_vkGetSwapchainImagesKHR fnGetSwapchainImagesKHR = nullptr;
+		PFN_vkAcquireNextImageKHR   fnAcquireNextImageKHR   = nullptr;
+		PFN_vkQueuePresentKHR       fnQueuePresentKHR       = nullptr;
+		PFN_vkCreateWin32SurfaceKHR fnCreateWin32SurfaceKHR = nullptr;
+		PFN_vkDestroySurfaceKHR     fnDestroySurfaceKHR     = nullptr;
+
+		PFN_vkCreateFence    fnCreateFence    = nullptr;
+		PFN_vkDestroyFence   fnDestroyFence   = nullptr;
+		PFN_vkWaitForFences  fnWaitForFences  = nullptr;
+		PFN_vkResetFences    fnResetFences    = nullptr;
 
 	private:
-		void LoadInstanceFunctions();
-		void LoadDeviceFunctions();
-
-		// ---- Vulkan handles -------------------------------------------------
+		void LoadAllFunctions();
 
 		VkInstance       m_Instance                 = VK_NULL_HANDLE;
 		VkPhysicalDevice m_PhysicalDevice           = VK_NULL_HANDLE;
@@ -73,27 +100,12 @@ namespace Candy {
 		uint32_t         m_GraphicsQueueFamilyIndex = UINT32_MAX;
 		bool             m_Initialized              = false;
 
-		// ---- Loader & queue -------------------------------------------------
-
 		std::unique_ptr<VulkanFunctionLoader> m_FunctionLoader;
 		Candy::Scope<RHICommandQueue>         m_CommandQueue;
 
-		// ---- Dynamically-loaded function pointers ---------------------------
-
-		struct DeviceFunctions
-		{
-			PFN_vkGetPhysicalDeviceProperties            vkGetPhysicalDeviceProperties            = nullptr;
-			PFN_vkEnumeratePhysicalDevices               vkEnumeratePhysicalDevices               = nullptr;
-			PFN_vkGetPhysicalDeviceQueueFamilyProperties  vkGetPhysicalDeviceQueueFamilyProperties  = nullptr;
-			PFN_vkCreateDevice                           vkCreateDevice                           = nullptr;
-			PFN_vkGetDeviceQueue                         vkGetDeviceQueue                         = nullptr;
-			PFN_vkDestroyInstance                        vkDestroyInstance                        = nullptr;
-			PFN_vkDestroyDevice                          vkDestroyDevice                          = nullptr;
-			PFN_vkQueueWaitIdle                          vkQueueWaitIdle                          = nullptr;
-			PFN_vkDeviceWaitIdle                         vkDeviceWaitIdle                         = nullptr;
-			PFN_vkGetDeviceProcAddr                      vkDevGetProcAddr                         = nullptr;
-		};
-		DeviceFunctions m_Funcs;
+		// Built-in shader cache
+		std::vector<uint32_t> m_TriangleVS;
+		std::vector<uint32_t> m_TrianglePS;
 	};
 
 } // namespace Candy

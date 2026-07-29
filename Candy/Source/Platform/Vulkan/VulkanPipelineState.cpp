@@ -8,16 +8,13 @@
 
 namespace Candy {
 
-	VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineDesc& desc)
-		: m_Desc(desc)
-	{
-		CANDY_CORE_INFO("VulkanGraphicsPipeline: created (topology: {}, samples: {})",
-		                static_cast<int>(desc.Topology), desc.SampleCount);
-	}
+	VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineDesc& desc) : m_Desc(desc) {}
+	VulkanGraphicsPipeline::~VulkanGraphicsPipeline() = default;
 
-	VulkanGraphicsPipeline::~VulkanGraphicsPipeline()
+	void VulkanGraphicsPipeline::SetVkPipeline(VkPipeline pipeline, VkPipelineLayout layout)
 	{
-		CANDY_CORE_INFO("VulkanGraphicsPipeline: destroyed");
+		m_Pipeline       = pipeline;
+		m_PipelineLayout  = layout;
 	}
 
 } // namespace Candy
