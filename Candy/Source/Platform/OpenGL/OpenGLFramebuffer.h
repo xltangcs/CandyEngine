@@ -24,6 +24,11 @@ namespace Candy {
 			return m_ColorAttachments[index]; 
 		}
 
+		virtual uint64_t GetColorAttachmentGPUHandle(uint32_t index = 0) const override
+		{
+			return static_cast<uint64_t>(GetColorAttachmentRendererID(index));
+		}
+
 		virtual const FramebufferSpecification& GetSpecification() const override { return m_Specification; }
 
 		bool IsSwapChainTarget() const { return m_Specification.SwapChainTarget; }

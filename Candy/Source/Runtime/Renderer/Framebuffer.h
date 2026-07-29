@@ -58,6 +58,11 @@ namespace Candy {
 		virtual void ClearAttachment(uint32_t attachmentIndex, int value) = 0;
 		virtual uint32_t GetColorAttachmentRendererID(uint32_t index = 0) const = 0;
 
+		/// Returns a 64-bit GPU handle for the color attachment SRV.
+		/// In DX12, this is the D3D12_GPU_DESCRIPTOR_HANDLE.ptr (used as ImTextureID).
+		/// In OpenGL, returns GetColorAttachmentRendererID() zero-extended.
+		virtual uint64_t GetColorAttachmentGPUHandle(uint32_t index = 0) const = 0;
+
 		virtual const FramebufferSpecification& GetSpecification() const = 0;
 
 		static Ref<Framebuffer> Create(const FramebufferSpecification& spec);

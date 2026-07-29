@@ -8,6 +8,8 @@
 
 namespace Candy {
 
+	class GraphicsContext;
+
 	struct WindowProps
 	{
 		std::string Title;
@@ -49,6 +51,9 @@ namespace Candy {
 
 		/// Returns the platform-native window handle (HWND on Windows).
 		virtual void* GetNativeWindowHandle() const = 0;
+
+		/// Returns the graphics context for backend-specific operations.
+		virtual GraphicsContext* GetGraphicsContext() = 0;
 
 		static Scope<Window> Create(const WindowProps& props = WindowProps());
 	};

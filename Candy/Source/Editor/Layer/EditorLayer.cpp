@@ -443,7 +443,7 @@ namespace Candy {
 		ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
 		m_ViewportSize = { viewportPanelSize.x, viewportPanelSize.y };
 
-		uint64_t textureID = m_Framebuffer->GetColorAttachmentRendererID();
+		uint64_t textureID = m_Framebuffer->GetColorAttachmentGPUHandle();
 		ImGui::Image(reinterpret_cast<void*>(textureID), ImVec2{ m_ViewportSize.x, m_ViewportSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 		
 		if (ImGui::BeginDragDropTarget())
@@ -534,7 +534,7 @@ namespace Candy {
 
 			// Preview image
 			ImGui::SetCursorPos(previewPos);
-			uint64_t previewTextureID = m_CameraPreviewFramebuffer->GetColorAttachmentRendererID();
+			uint64_t previewTextureID = m_CameraPreviewFramebuffer->GetColorAttachmentGPUHandle();
 			ImGui::Image(
 				reinterpret_cast<void*>(previewTextureID),
 				ImVec2(previewWidth, previewHeight),

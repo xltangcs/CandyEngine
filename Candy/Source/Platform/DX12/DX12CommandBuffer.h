@@ -8,6 +8,7 @@
 namespace Candy {
 
 	class DX12SwapChain;
+	class DX12Framebuffer;
 
 	// =========================================================================
 	// DX12CommandBuffer — wraps ID3D12GraphicsCommandList recording
@@ -34,6 +35,9 @@ namespace Candy {
 
 		/// Set the swap chain as the current render target.
 		void SetSwapChainRenderTarget(DX12SwapChain* swapChain);
+
+		/// Set a framebuffer as the current render target (for off-screen rendering).
+		void SetFramebufferRenderTarget(DX12Framebuffer* framebuffer);
 
 		// ---- Pipeline & state ----------------------------------------------
 
@@ -83,8 +87,9 @@ namespace Candy {
 		ID3D12DescriptorHeap* m_SamplerHeap   = nullptr;
 		uint32_t              m_CBVSRVDescriptorSize = 0;
 
-		// Current render target (swap chain)
-		DX12SwapChain* m_CurrentSwapChain = nullptr;
+		// Current render target
+		DX12SwapChain*   m_CurrentSwapChain   = nullptr;
+		DX12Framebuffer* m_CurrentFramebuffer = nullptr;
 
 		// Simple linear descriptor allocator
 		D3D12_CPU_DESCRIPTOR_HANDLE m_NextCBVSRVHandle = {};

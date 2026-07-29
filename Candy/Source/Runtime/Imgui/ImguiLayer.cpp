@@ -425,7 +425,7 @@ namespace Candy {
 		// Get DX12 device/queue from GraphicsContext
 		auto* win = static_cast<WindowsWindow*>(&Application::Get().GetWindow());
 		auto* gfxCtx = static_cast<DX12GraphicsContext*>(
-			win->GetGraphicsContext().get());
+			win->GetGraphicsContext());
 
 		m_DX12.Device = gfxCtx->GetDevice()->GetNativeDevice();
 		m_DX12.Queue  = gfxCtx->GetDevice()->GetNativeQueue();
@@ -572,7 +572,7 @@ namespace Candy {
 		// Present the DX12 swap chain
 		auto* gfxCtx = static_cast<DX12GraphicsContext*>(
 			static_cast<WindowsWindow*>(&Application::Get().GetWindow())
-				->GetGraphicsContext().get());
+				->GetGraphicsContext());
 
 		if (auto* sc = gfxCtx->GetSwapChain())
 		{

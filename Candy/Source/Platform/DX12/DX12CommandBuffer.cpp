@@ -4,6 +4,7 @@
 #include "Platform/DX12/DX12CommandBuffer.h"
 #include "Platform/DX12/DX12Buffer.h"
 #include "Platform/DX12/DX12SwapChain.h"
+#include "Platform/DX12/DX12Framebuffer.h"
 #include "Platform/DX12/DX12PipelineState.h"
 #include "Runtime/Core/Log.h"
 
@@ -77,16 +78,60 @@ namespace Candy {
 
 	void DX12CommandBuffer::SetSwapChainRenderTarget(DX12SwapChain* swapChain)
 	{
-		m_CurrentSwapChain = swapChain;
+		m_CurrentSwapChain   = swapChain;
+		m_CurrentFramebuffer = nullptr;
+	}
+
+	void DX12CommandBuffer::SetFramebufferRenderTarget(DX12Framebuffer* framebuffer)
+	{
+		m_CurrentFramebuffer = framebuffer;
+		m_CurrentSwapChain   = nullptr;
 	}
 
 	// ---- Render pass ---------------------------------------------------------
 
 	void DX12CommandBuffer::BeginRenderPass(const RenderPassDesc& desc)
 	{
+		// ---- Framebuffer target paths ----
+		if (m_CurrentFramebuffer)
+		{
+			uint32_t colorCount = m_CurrentFramebuffer->GetColorAttachmentCount();
+			CANDY_CORE_ASSERT(colorCount <= 4);
+			D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[4] = {};
+			for (uint32_t i = 0; i < colorCount; ++i)
+				rtvHandles[i] = m_CurrentFramebuffer->GetRTVHandle(i);
+
+			D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = {};
+			bool hasDepth = m_CurrentFramebuffer->HasDepthAttachment();
+			if (hasDepth)
+				dsvHandle = m_CurrentFramebuffer->GetDSVHandle();
+
+			// Clear color attachments
+			for (uint32_t i = 0; i < colorCount && i < desc.ColorAttachments.size(); ++i)
+			{
+				const float* cc = desc.ColorAttachments[i].ClearColor;
+				FLOAT rgba[4] = { cc ? cc[0] : 0.0f, cc ? cc[1] : 0.0f,
+				                  cc ? cc[2] : 0.0f, cc ? cc[3] : 1.0f };
+				m_CommandList->ClearRenderTargetView(rtvHandles[i], rgba, 0, nullptr);
+			}
+
+			// Clear depth
+			if (hasDepth)
+			{
+				m_CommandList->ClearDepthStencilView(dsvHandle,
+					D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL,
+					1.0f, 0, 0, nullptr);
+			}
+
+			m_CommandList->OMSetRenderTargets(colorCount, rtvHandles, FALSE,
+				hasDepth ? &dsvHandle : nullptr);
+			return;
+		}
+
+		// ---- Swap chain target paths -----
 		if (!m_CurrentSwapChain)
 		{
-			CANDY_CORE_WARN("DX12CommandBuffer::BeginRenderPass: no swap chain set as render target");
+			CANDY_CORE_WARN("DX12CommandBuffer::BeginRenderPass: no render target set");
 			return;
 		}
 
@@ -125,6 +170,13 @@ namespace Candy {
 
 	void DX12CommandBuffer::EndRenderPass()
 	{
+		if (m_CurrentFramebuffer)
+		{
+			// Framebuffer resources stay in RENDER_TARGET state.
+			// Transition is handled by ReadPixel when needed.
+			return;
+		}
+
 		if (m_CurrentSwapChain)
 		{
 			ID3D12Resource* backBuffer = m_CurrentSwapChain->GetCurrentBackBufferResource();
