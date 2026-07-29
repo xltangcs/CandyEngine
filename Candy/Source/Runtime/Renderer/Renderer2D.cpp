@@ -21,6 +21,10 @@
 #include "Platform/DX12/DX12CommandBuffer.h"
 #include "Platform/DX12/DX12Texture2D.h"
 #include "Platform/DX12/DX12Texture.h"
+#include "Platform/Vulkan/VulkanDevice.h"
+#include "Platform/Vulkan/VulkanGraphicsContext.h"
+#include "Platform/Vulkan/VulkanBuffer.h"
+#include "Platform/Vulkan/VulkanPipelineState.h"
 
 
 namespace Candy {
@@ -129,6 +133,22 @@ namespace Candy {
 
 		// Active render target for DX12 flushing
 		DX12Framebuffer* DX12ActiveFramebuffer = nullptr;
+
+		// ---- Vulkan backend data ----
+		bool VkActive = false;
+		VulkanDevice* VkDev = nullptr;
+
+		// Vulkan vertex/index buffers
+		Ref<RHIBuffer> VkQuadVB, VkQuadIB, VkCircleVB, VkLineVB, VkCameraCB;
+
+		// Vulkan pipelines
+		Ref<RHIGraphicsPipeline> VkQuadPipeline, VkCirclePipeline, VkLinePipeline;
+		Ref<RHIShaderModule>     VkQuadVS, VkQuadPS, VkCircleVS, VkCirclePS, VkLineVS, VkLinePS;
+
+		// Descriptor set
+		VkDescriptorSetLayout VkDescLayout = VK_NULL_HANDLE;
+		VkDescriptorSet       VkDescSet    = VK_NULL_HANDLE;
+		VkDescriptorPool      VkDescPool   = VK_NULL_HANDLE;
 	};
 
 	static Renderer2DData s_Data;
@@ -136,14 +156,126 @@ namespace Candy {
 	void Renderer2D::Init()
 	{
 		s_Data.DX12Active = (Renderer::GetAPI() == RendererAPI::API::DX12);
+		s_Data.VkActive    = (Renderer::GetAPI() == RendererAPI::API::Vulkan);
 
-		if (Renderer::GetAPI() == RendererAPI::API::Vulkan)
+		if (s_Data.VkActive)
 		{
-			// Vulkan Renderer2D not yet implemented — allocate CPU buffers only
-			CANDY_CORE_WARN("Renderer2D: Vulkan backend not yet implemented, 2D rendering disabled");
+			CANDY_CORE_INFO("Renderer2D: initializing Vulkan backend (triangle SPIR-V shaders)...");
+
+			auto* gfxCtx = dynamic_cast<VulkanGraphicsContext*>(
+				Application::Get().GetWindow().GetGraphicsContext());
+			if (!gfxCtx) { CANDY_CORE_ERROR("Renderer2D: Vulkan API but no VulkanGraphicsContext"); return; }
+			s_Data.VkDev = gfxCtx->GetDevice();
+
+			auto* dev = s_Data.VkDev;
+			VkDevice vkDev = dev->GetVkDevice();
+
+			// --- CPU-side vertex buffers ---
 			s_Data.QuadVertexBufferBase   = new QuadVertex[s_Data.MaxVertices];
 			s_Data.CircleVertexBufferBase = new CircleVertex[s_Data.MaxVertices];
 			s_Data.LineVertexBufferBase   = new LineVertex[s_Data.MaxVertices];
+
+			// --- GPU vertex buffers (upload heap, CPU-accessible) ---
+			auto makeUploadVB = [&](uint64_t size, const char* name) -> Ref<RHIBuffer> {
+				BufferDesc d; d.Size=size; d.Usage=ResourceUsage::VertexBuffer; d.CPUAccessible=true; d.DebugName=name;
+				return dev->CreateBuffer(d);
+			};
+			s_Data.VkQuadVB   = makeUploadVB(s_Data.MaxVertices * sizeof(QuadVertex),  "Vk2D_QuadVB");
+			s_Data.VkCircleVB = makeUploadVB(s_Data.MaxVertices * sizeof(CircleVertex),"Vk2D_CircleVB");
+			s_Data.VkLineVB   = makeUploadVB(s_Data.MaxVertices * sizeof(LineVertex),  "Vk2D_LineVB");
+
+			// Index buffer
+			{
+				uint32_t* indices = new uint32_t[s_Data.MaxIndices];
+				uint32_t off = 0;
+				for (uint32_t i = 0; i < s_Data.MaxIndices; i += 6)
+				{ indices[i+0]=off; indices[i+1]=off+1; indices[i+2]=off+2; indices[i+3]=off+2; indices[i+4]=off+3; indices[i+5]=off; off+=4; }
+				s_Data.VkQuadIB = dev->CreateBuffer(BufferDesc{
+					s_Data.MaxIndices*sizeof(uint32_t), ResourceUsage::IndexBuffer, false, false, "Vk2D_QuadIB"
+				});
+				delete[] indices;
+			}
+
+			// Camera CB
+			{
+				BufferDesc d; d.Size=256; d.Usage=ResourceUsage::ConstantBuffer; d.CPUAccessible=true; d.DebugName="Vk2D_CameraCB";
+				s_Data.VkCameraCB = dev->CreateBuffer(d);
+			}
+
+			// --- Shaders (use built-in triangle SPIR-V) ---
+			auto& vsSpv = dev->GetTriangleVSSPIRV();
+			auto& psSpv = dev->GetTrianglePSSPIRV();
+			s_Data.VkQuadVS = dev->CreateShaderModule(vsSpv.data(), static_cast<uint32_t>(vsSpv.size()*4), "QuadVS");
+			s_Data.VkQuadPS = dev->CreateShaderModule(psSpv.data(), static_cast<uint32_t>(psSpv.size()*4), "QuadPS");
+			s_Data.VkCircleVS = s_Data.VkQuadVS; s_Data.VkCirclePS = s_Data.VkQuadPS;
+			s_Data.VkLineVS   = s_Data.VkQuadVS; s_Data.VkLinePS   = s_Data.VkQuadPS;
+
+			// --- Descriptor set layout + pool + set ---
+			{
+				VkDescriptorSetLayoutBinding uboBinding = {};
+				uboBinding.binding         = 0;
+				uboBinding.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+				uboBinding.descriptorCount = 1;
+				uboBinding.stageFlags      = VK_SHADER_STAGE_VERTEX_BIT;
+
+				VkDescriptorSetLayoutCreateInfo dsli = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+				dsli.bindingCount = 1;
+				dsli.pBindings    = &uboBinding;
+				dev->fnCreateDescriptorSetLayout(vkDev, &dsli, nullptr, &s_Data.VkDescLayout);
+
+				VkDescriptorPoolSize poolSize = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 };
+				VkDescriptorPoolCreateInfo dpci = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+				dpci.poolSizeCount = 1;
+				dpci.pPoolSizes    = &poolSize;
+				dpci.maxSets       = 1;
+				dev->fnCreateDescriptorPool(vkDev, &dpci, nullptr, &s_Data.VkDescPool);
+
+				VkDescriptorSetAllocateInfo dsai = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+				dsai.descriptorPool     = s_Data.VkDescPool;
+				dsai.descriptorSetCount = 1;
+				dsai.pSetLayouts        = &s_Data.VkDescLayout;
+				dev->fnAllocateDescriptorSets(vkDev, &dsai, &s_Data.VkDescSet);
+			}
+
+			// --- Pipelines ---
+			{
+				GraphicsPipelineDesc pd;
+				pd.Topology=PrimitiveTopology::Triangles; pd.Rasterizer.Cull=CullMode::None; pd.Rasterizer.Fill=FillMode::Solid;
+				pd.DepthStencil.DepthTestEnable=false; pd.DepthStencil.DepthWriteEnable=false;
+				pd.Blend.BlendEnable=true; pd.Blend.SrcColorBlendFactor=BlendState::BlendFactor::SrcAlpha;
+				pd.Blend.DstColorBlendFactor=BlendState::BlendFactor::OneMinusSrcAlpha; pd.Blend.WriteMask=ColorWriteMask::All;
+				pd.RenderTargetFormats={RHIFormat::R8G8B8A8Unorm};
+
+				// Quad
+				{ GraphicsPipelineDesc qd=pd; VertexInputLayout::VertexBinding b; b.Binding=0; b.Stride=sizeof(QuadVertex);
+				  qd.VertexInput.Bindings.push_back(b);
+				  qd.VertexInput.Attributes.push_back({0,0,RHIFormat::R32G32B32Float,0});
+				  qd.VertexInput.Attributes.push_back({1,0,RHIFormat::R32G32B32A32Float,offsetof(QuadVertex,Color)});
+				  s_Data.VkQuadPipeline=dev->CreateGraphicsPipeline(qd,s_Data.VkQuadVS,s_Data.VkQuadPS); }
+
+				// Circle
+				{ GraphicsPipelineDesc cd=pd; VertexInputLayout::VertexBinding b; b.Binding=0; b.Stride=sizeof(CircleVertex);
+				  cd.VertexInput.Bindings.push_back(b);
+				  cd.VertexInput.Attributes.push_back({0,0,RHIFormat::R32G32B32Float,0});
+				  cd.VertexInput.Attributes.push_back({2,0,RHIFormat::R32G32B32A32Float,offsetof(CircleVertex,Color)});
+				  s_Data.VkCirclePipeline=dev->CreateGraphicsPipeline(cd,s_Data.VkCircleVS,s_Data.VkCirclePS); }
+
+				// Line
+				{ GraphicsPipelineDesc ld=pd; ld.Topology=PrimitiveTopology::Lines; VertexInputLayout::VertexBinding b; b.Binding=0; b.Stride=sizeof(LineVertex);
+				  ld.VertexInput.Bindings.push_back(b);
+				  ld.VertexInput.Attributes.push_back({0,0,RHIFormat::R32G32B32Float,0});
+				  ld.VertexInput.Attributes.push_back({1,0,RHIFormat::R32G32B32A32Float,offsetof(LineVertex,Color)});
+				  s_Data.VkLinePipeline=dev->CreateGraphicsPipeline(ld,s_Data.VkLineVS,s_Data.VkLinePS); }
+			}
+
+			s_Data.WhiteTexture = Texture2D::Create(1, 1);
+			uint32_t wtd=0xffffffff; s_Data.WhiteTexture->SetData(&wtd,sizeof(uint32_t));
+			s_Data.TextureSlots[0]=s_Data.WhiteTexture;
+			s_Data.QuadVertexPositions[0]={-0.5f,-0.5f,0.0f,1.0f}; s_Data.QuadVertexPositions[1]={0.5f,-0.5f,0.0f,1.0f};
+			s_Data.QuadVertexPositions[2]={0.5f,0.5f,0.0f,1.0f}; s_Data.QuadVertexPositions[3]={-0.5f,0.5f,0.0f,1.0f};
+			s_Data.CameraUniformBuffer=UniformBuffer::Create(sizeof(Renderer2DData::CameraData),0);
+
+			CANDY_CORE_INFO("Renderer2D: Vulkan backend initialized (colored primitives only)");
 			return;
 		}
 
@@ -517,6 +649,21 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			s_Data.DX12LineVS.reset(); s_Data.DX12LinePS.reset();
 			s_Data.DX12TexturedRootSig.Reset();
 		}
+		if (s_Data.VkActive)
+		{
+			delete[] s_Data.CircleVertexBufferBase;
+			delete[] s_Data.LineVertexBufferBase;
+			s_Data.VkQuadVB.reset(); s_Data.VkQuadIB.reset(); s_Data.VkCircleVB.reset();
+			s_Data.VkLineVB.reset(); s_Data.VkCameraCB.reset();
+			s_Data.VkQuadPipeline.reset(); s_Data.VkCirclePipeline.reset(); s_Data.VkLinePipeline.reset();
+			if (s_Data.VkDev)
+			{
+				VkDevice vd = s_Data.VkDev->GetVkDevice();
+				if (s_Data.VkDescSet)  s_Data.VkDev->fnFreeCommandBuffers(vd, VK_NULL_HANDLE, 0, nullptr); // pool auto-frees sets
+				if (s_Data.VkDescPool) s_Data.VkDev->fnDestroyDescriptorPool(vd, s_Data.VkDescPool, nullptr);
+				if (s_Data.VkDescLayout) s_Data.VkDev->fnDestroyDescriptorSetLayout(vd, s_Data.VkDescLayout, nullptr);
+			}
+		}
 	}
 
 	void Renderer2D::BeginScene(const OrthographicCamera& camera)
@@ -569,9 +716,100 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 	}
 	void Renderer2D::Flush()
 	{
-		// Vulkan: not yet implemented
-		if (Renderer::GetAPI() == RendererAPI::API::Vulkan)
+		if (s_Data.VkActive)
+		{
+			auto* dev = s_Data.VkDev;
+			if (!dev) return;
+
+			// Upload camera CB
+			{
+				auto* vkCB = dynamic_cast<VulkanBuffer*>(s_Data.VkCameraCB.get());
+				if (vkCB) { void* m = vkCB->Map(); memcpy(m, &s_Data.CameraBuffer, sizeof(s_Data.CameraBuffer)); vkCB->Unmap(); }
+			}
+
+			// Update descriptor set
+			{
+				auto* vkCB = dynamic_cast<VulkanBuffer*>(s_Data.VkCameraCB.get());
+				if (vkCB)
+				{
+					VkDescriptorBufferInfo bufInfo = {};
+					bufInfo.buffer = vkCB->GetVkBuffer();
+					bufInfo.offset = 0;
+					bufInfo.range  = VK_WHOLE_SIZE;
+
+					VkWriteDescriptorSet write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+					write.dstSet          = s_Data.VkDescSet;
+					write.dstBinding      = 0;
+					write.descriptorCount = 1;
+					write.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+					write.pBufferInfo     = &bufInfo;
+					dev->fnUpdateDescriptorSets(dev->GetVkDevice(), 1, &write, 0, nullptr);
+				}
+			}
+
+			auto& queue = dev->GetCommandQueue();
+			auto  cmd   = queue.CreateCommandBuffer();
+			if (!cmd) return;
+
+			cmd->Begin();
+
+			RenderPassDesc rpDesc;
+			rpDesc.ColorAttachments.push_back({RHIFormat::R8G8B8A8Unorm, LoadOp::Clear, {0.1f,0.1f,0.15f,1.0f}});
+			cmd->BeginRenderPass(rpDesc);
+			cmd->SetViewport(0,0,1280.f,720.f); cmd->SetScissor(0,0,1280,720);
+
+			VkDevice vd = dev->GetVkDevice();
+
+			auto uploadVkVB = [&](Ref<RHIBuffer>& vb, const void* data, uint32_t size) -> bool {
+				auto* vkBuf = dynamic_cast<VulkanBuffer*>(vb.get());
+				if (vkBuf) { void* m = vkBuf->Map(); memcpy(m, data, size); vkBuf->Unmap(); }
+				return vkBuf != nullptr;
+			};
+
+			// Quad batch
+			if (s_Data.QuadIndexCount)
+			{
+				uint32_t sz = static_cast<uint32_t>((uint8_t*)s_Data.QuadVertexBufferPtr - (uint8_t*)s_Data.QuadVertexBufferBase);
+				uploadVkVB(s_Data.VkQuadVB, s_Data.QuadVertexBufferBase, sz);
+				cmd->SetPipeline(s_Data.VkQuadPipeline);
+				cmd->SetConstantBuffer(0, 0, s_Data.VkCameraCB);
+				cmd->SetVertexBuffer(s_Data.VkQuadVB);
+				cmd->SetIndexBuffer(s_Data.VkQuadIB);
+				cmd->DrawIndexed(s_Data.QuadIndexCount);
+				s_Data.Stats.DrawCalls++;
+			}
+
+			// Circle batch
+			if (s_Data.CircleIndexCount)
+			{
+				uint32_t sz = static_cast<uint32_t>((uint8_t*)s_Data.CircleVertexBufferPtr - (uint8_t*)s_Data.CircleVertexBufferBase);
+				uploadVkVB(s_Data.VkCircleVB, s_Data.CircleVertexBufferBase, sz);
+				cmd->SetPipeline(s_Data.VkCirclePipeline);
+				cmd->SetConstantBuffer(0, 0, s_Data.VkCameraCB);
+				cmd->SetVertexBuffer(s_Data.VkCircleVB);
+				cmd->SetIndexBuffer(s_Data.VkQuadIB);
+				cmd->DrawIndexed(s_Data.CircleIndexCount);
+				s_Data.Stats.DrawCalls++;
+			}
+
+			// Line batch
+			if (s_Data.LineVertexCount)
+			{
+				uint32_t sz = static_cast<uint32_t>((uint8_t*)s_Data.LineVertexBufferPtr - (uint8_t*)s_Data.LineVertexBufferBase);
+				uploadVkVB(s_Data.VkLineVB, s_Data.LineVertexBufferBase, sz);
+				cmd->SetPipeline(s_Data.VkLinePipeline);
+				cmd->SetConstantBuffer(0, 0, s_Data.VkCameraCB);
+				cmd->SetVertexBuffer(s_Data.VkLineVB);
+				cmd->Draw(s_Data.LineVertexCount);
+				s_Data.Stats.DrawCalls++;
+			}
+
+			cmd->EndRenderPass();
+			cmd->End();
+			queue.Submit({cmd.get()});
+			dev->WaitIdle();
 			return;
+		}
 
 		if (s_Data.DX12Active)
 		{
