@@ -93,7 +93,7 @@ float4 main(PSInput input) : SV_TARGET
 			cmdList->Close();
 
 			return Candy::CreateScope<DX12CommandBuffer>(
-				std::move(cmdList), m_CommandAllocator.Get(),
+				std::move(cmdList), m_CommandAllocator.Get(), m_Device,
 				m_CBVSRVUAVHeap, m_SamplerHeap);
 		}
 
@@ -724,6 +724,130 @@ float4 main(PSInput input) : SV_TARGET
 	{
 		uint64_t fenceValue = SignalFence();
 		WaitForFenceValue(fenceValue);
+	}
+
+	// ---- Vertex buffer helpers -----------------------------------------------
+
+	Ref<RHIBuffer> DX12Device::CreateTriangleVertexBuffer()
+	{
+		// Single triangle: 3 vertices, each Position(3 floats) + Color(4 floats)
+		VertexPosColor vertices[] = {
+			{ {  0.0f,  0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } }, // top    — red
+			{ { -0.5f, -0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } }, // left   — green
+			{ {  0.5f, -0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }, // right  — blue
+		};
+
+		return CreateGPUBufferWithData(vertices, sizeof(vertices),
+		                               ResourceUsage::VertexBuffer, "TriangleVB");
+	}
+
+	Ref<RHIBuffer> DX12Device::CreateTriangleIndexBuffer()
+	{
+		uint32_t indices[] = { 0, 1, 2 };
+		return CreateGPUBufferWithData(indices, sizeof(indices),
+		                               ResourceUsage::IndexBuffer, "TriangleIB");
+	}
+
+	Ref<RHIBuffer> DX12Device::CreateVertexBufferWithData(const void* data, uint64_t size,
+	                                                      std::string_view debugName)
+	{
+		return CreateGPUBufferWithData(data, size, ResourceUsage::VertexBuffer, debugName);
+	}
+
+	Ref<RHIBuffer> DX12Device::CreateGPUBufferWithData(const void* data, uint64_t size,
+	                                                   ResourceUsage usage,
+	                                                   std::string_view debugName)
+	{
+		if (!data || size == 0)
+			return nullptr;
+
+		// 1. Create upload (staging) buffer
+		BufferDesc uploadDesc;
+		uploadDesc.Size          = size;
+		uploadDesc.Usage         = ResourceUsage::CopySrc;
+		uploadDesc.CPUAccessible = true;
+		uploadDesc.DebugName     = std::string(debugName) + "_Upload";
+
+		auto uploadBuffer = CreateRef<DX12Buffer>(m_NativeDevice.Get(), uploadDesc);
+		if (!uploadBuffer->GetResource())
+		{
+			CANDY_CORE_ERROR("DX12Device::CreateGPUBufferWithData: upload buffer creation failed");
+			return nullptr;
+		}
+
+		// Map and copy data
+		void* mapped = uploadBuffer->Map();
+		memcpy(mapped, data, static_cast<size_t>(size));
+		uploadBuffer->Unmap();
+
+		// 2. Create default-heap (GPU) buffer
+		BufferDesc gpuDesc;
+		gpuDesc.Size          = size;
+		gpuDesc.Usage         = usage | ResourceUsage::CopyDst;
+		gpuDesc.CPUAccessible = false;
+		gpuDesc.DebugName     = std::string(debugName);
+
+		auto gpuBuffer = CreateRef<DX12Buffer>(m_NativeDevice.Get(), gpuDesc);
+		if (!gpuBuffer->GetResource())
+		{
+			CANDY_CORE_ERROR("DX12Device::CreateGPUBufferWithData: GPU buffer creation failed");
+			return nullptr;
+		}
+
+		// 3. Use a temporary command list to copy upload → GPU
+		ComPtr<ID3D12CommandAllocator> tempAllocator;
+		HRESULT hr = m_NativeDevice->CreateCommandAllocator(
+			D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&tempAllocator));
+		if (FAILED(hr))
+		{
+			CANDY_CORE_ERROR("DX12Device::CreateGPUBufferWithData: temp allocator failed");
+			return nullptr;
+		}
+
+		ComPtr<ID3D12GraphicsCommandList> tempCmdList;
+		hr = m_NativeDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+		                                       tempAllocator.Get(), nullptr,
+		                                       IID_PPV_ARGS(&tempCmdList));
+		if (FAILED(hr))
+		{
+			CANDY_CORE_ERROR("DX12Device::CreateGPUBufferWithData: temp cmd list failed");
+			return nullptr;
+		}
+
+		// Copy
+		tempCmdList->CopyResource(gpuBuffer->GetResource(), uploadBuffer->GetResource());
+
+		// Transition gpu buffer to target usage state
+		D3D12_RESOURCE_STATES targetState = D3D12_RESOURCE_STATE_COMMON;
+		if (HasFlag(usage, ResourceUsage::VertexBuffer))
+			targetState = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+		else if (HasFlag(usage, ResourceUsage::IndexBuffer))
+			targetState = D3D12_RESOURCE_STATE_INDEX_BUFFER;
+		else if (HasFlag(usage, ResourceUsage::ConstantBuffer))
+			targetState = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+
+		if (targetState != D3D12_RESOURCE_STATE_COMMON)
+		{
+			D3D12_RESOURCE_BARRIER barrier = {};
+			barrier.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+			barrier.Transition.pResource   = gpuBuffer->GetResource();
+			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
+			barrier.Transition.StateAfter  = targetState;
+			barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+			tempCmdList->ResourceBarrier(1, &barrier);
+		}
+
+		tempCmdList->Close();
+
+		// Execute and wait
+		ID3D12CommandList* lists[] = { tempCmdList.Get() };
+		GetNativeQueue()->ExecuteCommandLists(1, lists);
+
+		uint64_t fenceVal = SignalFence();
+		WaitForFenceValue(fenceVal);
+
+		gpuBuffer->SetState(targetState);
+		return gpuBuffer;
 	}
 
 } // namespace Candy

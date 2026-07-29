@@ -17,6 +17,7 @@ namespace Candy {
 	public:
 		DX12CommandBuffer(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList,
 		                  ID3D12CommandAllocator* allocator,
+		                  ID3D12Device* device,
 		                  ID3D12DescriptorHeap* cbvSrvUavHeap,
 		                  ID3D12DescriptorHeap* samplerHeap);
 		virtual ~DX12CommandBuffer();
@@ -32,7 +33,6 @@ namespace Candy {
 		void EndRenderPass() override;
 
 		/// Set the swap chain as the current render target.
-		/// Must be called before BeginRenderPass when rendering to a swap chain.
 		void SetSwapChainRenderTarget(DX12SwapChain* swapChain);
 
 		// ---- Pipeline & state ----------------------------------------------
@@ -71,21 +71,23 @@ namespace Candy {
 		[[nodiscard]] ID3D12GraphicsCommandList* GetNativeCommandList() const { return m_CommandList.Get(); }
 
 	private:
+		/// Allocate the next descriptor from the CBV/SRV/UAV heap.
+		D3D12_CPU_DESCRIPTOR_HANDLE AllocateCBVSRVDescriptor();
+
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> m_CommandList;
-		ID3D12CommandAllocator*                            m_Allocator = nullptr;
+		ID3D12CommandAllocator*                            m_Allocator  = nullptr;
+		ID3D12Device*                                      m_Device     = nullptr;
 
 		// Descriptor heaps (non-owning)
 		ID3D12DescriptorHeap* m_CBVSRVUAVHeap = nullptr;
 		ID3D12DescriptorHeap* m_SamplerHeap   = nullptr;
 		uint32_t              m_CBVSRVDescriptorSize = 0;
-		uint32_t              m_SamplerDescriptorSize = 0;
 
 		// Current render target (swap chain)
 		DX12SwapChain* m_CurrentSwapChain = nullptr;
 
-		// Simple descriptor allocation — increments linearly
+		// Simple linear descriptor allocator
 		D3D12_CPU_DESCRIPTOR_HANDLE m_NextCBVSRVHandle = {};
-		D3D12_CPU_DESCRIPTOR_HANDLE m_NextSamplerHandle = {};
 	};
 
 } // namespace Candy

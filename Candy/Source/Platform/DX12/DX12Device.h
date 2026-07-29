@@ -74,6 +74,26 @@ namespace Candy {
 		/// Get the built-in triangle PS bytecode (compiled on first call).
 		const std::vector<uint8_t>& GetTrianglePSBytecode();
 
+		// ---- Triangle vertex data ------------------------------------------
+
+		struct VertexPosColor
+		{
+			float Position[3];
+			float Color[4];
+		};
+
+		/// Create a vertex buffer with a single colored triangle (upload heap).
+		Candy::Ref<RHIBuffer> CreateTriangleVertexBuffer();
+		/// Create an index buffer for the triangle (optional, for DrawIndexed).
+		Candy::Ref<RHIBuffer> CreateTriangleIndexBuffer();
+		/// Create a vertex buffer from arbitrary data (upload heap, CPU-accessible).
+		Candy::Ref<RHIBuffer> CreateVertexBufferWithData(const void* data, uint64_t size,
+		                                                 std::string_view debugName = "");
+		/// Create a default-heap buffer and upload data via a staging buffer.
+		Candy::Ref<RHIBuffer> CreateGPUBufferWithData(const void* data, uint64_t size,
+		                                              ResourceUsage usage,
+		                                              std::string_view debugName = "");
+
 	private:
 		Microsoft::WRL::ComPtr<ID3D12Device>        m_NativeDevice;
 		Microsoft::WRL::ComPtr<IDXGIFactory6>       m_Factory;
