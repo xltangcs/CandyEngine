@@ -13,12 +13,7 @@ struct GLFWwindow;
 struct ImGui_ImplDX12_InitInfo;
 #endif
 #ifdef CANDY_PLATFORM_WINDOWS
-struct ID3D12Device;
-struct ID3D12CommandQueue;
-struct ID3D12DescriptorHeap;
-struct ID3D12CommandAllocator;
-struct ID3D12GraphicsCommandList;
-struct ID3D12Fence;
+#include <d3d12.h>
 #endif
 
 namespace Candy {

@@ -10,6 +10,7 @@ namespace Candy {
 
 	class DX12Device;
 	class DX12SwapChain;
+	class RHISwapChain;
 
 	// =========================================================================
 	// DX12GraphicsContext — owns DX12Device + DX12SwapChain for the main window

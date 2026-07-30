@@ -13,7 +13,7 @@ namespace Candy {
 	static uint32_t FindMemType(VulkanDevice* dev, uint32_t typeFilter, VkMemoryPropertyFlags props)
 	{
 		VkPhysicalDeviceMemoryProperties memProps;
-		vkGetPhysicalDeviceMemoryProperties(dev->GetVkPhysicalDevice(), &memProps);
+		dev->fnGetPhysicalDeviceMemoryProperties(dev->GetVkPhysicalDevice(), &memProps);
 		for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
 			if ((typeFilter & (1 << i)) && (memProps.memoryTypes[i].propertyFlags & props) == props)
 				return i;

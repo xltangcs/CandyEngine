@@ -76,9 +76,9 @@ namespace Candy {
 
 		// Choose surface format
 		uint32_t formatCount;
-		vkGetPhysicalDeviceSurfaceFormatsKHR(physDev, m_Surface, &formatCount, nullptr);
+		m_DevicePtr->fnGetPhysicalDeviceSurfaceFormatsKHR(physDev, m_Surface, &formatCount, nullptr);
 		std::vector<VkSurfaceFormatKHR> formats(formatCount);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(physDev, m_Surface, &formatCount, formats.data());
+		m_DevicePtr->fnGetPhysicalDeviceSurfaceFormatsKHR(physDev, m_Surface, &formatCount, formats.data());
 
 		m_Format = formats[0].format;
 		for (auto& f : formats)
@@ -88,7 +88,7 @@ namespace Candy {
 		}
 
 		VkSurfaceCapabilitiesKHR caps;
-		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physDev, m_Surface, &caps);
+		m_DevicePtr->fnGetPhysicalDeviceSurfaceCapabilitiesKHR(physDev, m_Surface, &caps);
 
 		m_Extent.width  = std::clamp(m_Extent.width,  caps.minImageExtent.width,  caps.maxImageExtent.width);
 		m_Extent.height = std::clamp(m_Extent.height, caps.minImageExtent.height, caps.maxImageExtent.height);

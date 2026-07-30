@@ -9,6 +9,7 @@
 #include "Runtime/Renderer/GraphicsContext.h"
 #include "Runtime/Core/FileSystem.h"
 #include "Runtime/Core/Application.h"
+#include "Runtime/RHI/RHICommandQueue.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -769,7 +770,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			cmd->Begin();
 
 			RenderPassDesc rpDesc;
-			rpDesc.ColorAttachments.push_back({RHIFormat::R8G8B8A8Unorm, LoadOp::Clear, {0.1f,0.1f,0.15f,1.0f}});
+			rpDesc.ColorAttachments.push_back({RHIFormat::R8G8B8A8Unorm, LoadOp::Clear, StoreOp::Store, {0.1f,0.1f,0.15f,1.0f}});
 			cmd->BeginRenderPass(rpDesc);
 			cmd->SetViewport(0,0,1280.f,720.f); cmd->SetScissor(0,0,1280,720);
 

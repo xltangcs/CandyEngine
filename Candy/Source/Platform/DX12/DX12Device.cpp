@@ -11,6 +11,7 @@
 #include "Platform/DX12/DX12SwapChain.h"
 #include "Platform/DX12/DX12PipelineState.h"
 #include "Platform/DX12/DX12Texture.h"
+#include "Runtime/RHI/RHICommandQueue.h"
 #include "Runtime/Core/Log.h"
 
 using Microsoft::WRL::ComPtr;
@@ -874,7 +875,6 @@ float4 main(PSInput input) : SV_TARGET
 		auto pipeline = CreateRef<DX12GraphicsPipeline>(desc);
 		pipeline->SetNativePipeline(std::move(pso), rootSig);
 		return pipeline;
-	}
 	}
 
 	Ref<RHISwapChain> DX12Device::CreateSwapChain(const SwapChainDesc& desc)

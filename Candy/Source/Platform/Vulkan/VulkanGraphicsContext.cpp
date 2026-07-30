@@ -59,7 +59,7 @@ namespace Candy {
 		}
 
 		// VulkanSwapChain* is the concrete type, release from Ref, wrap in unique_ptr
-		m_SwapChain.reset(static_cast<VulkanSwapChain*>(swapChain.release()));
+		m_SwapChain.reset(static_cast<VulkanSwapChain*>(swapChain.get()));
 
 		CANDY_CORE_INFO("VulkanGraphicsContext: initialized ({}x{})", width, height);
 	}

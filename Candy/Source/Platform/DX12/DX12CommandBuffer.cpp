@@ -9,6 +9,8 @@
 #include "Platform/DX12/DX12PipelineState.h"
 #include "Runtime/Core/Log.h"
 
+using Microsoft::WRL::ComPtr;
+
 namespace Candy {
 
 	DX12CommandBuffer::DX12CommandBuffer(ComPtr<ID3D12GraphicsCommandList> cmdList,

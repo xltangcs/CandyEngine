@@ -5,6 +5,8 @@
 #include "Platform/DX12/DX12PipelineState.h"
 #include "Runtime/Core/Log.h"
 
+using Microsoft::WRL::ComPtr;
+
 namespace Candy {
 
 	DX12GraphicsPipeline::DX12GraphicsPipeline(const GraphicsPipelineDesc& desc)

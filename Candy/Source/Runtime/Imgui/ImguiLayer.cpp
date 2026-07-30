@@ -19,6 +19,8 @@
 #define IMGUI_IMPL_VULKAN_NO_PROTOTYPES
 #include <backends/imgui_impl_vulkan.h>
 #include "Platform/DX12/DX12GraphicsContext.h"
+#include "Platform/DX12/DX12Device.h"
+#include "Platform/DX12/DX12SwapChain.h"
 #include "Platform/Vulkan/VulkanGraphicsContext.h"
 #include "Platform/Vulkan/VulkanDevice.h"
 #include "Platform/Vulkan/VulkanSwapChain.h"
@@ -31,6 +33,14 @@
 #endif
 
 namespace Candy {
+
+	// =========================================================================
+	// Construction / destruction
+	// =========================================================================
+
+	ImGuiLayer::ImGuiLayer()
+	{
+	}
 
 	// =========================================================================
 	// Backend detection
@@ -659,12 +669,11 @@ namespace Candy {
 		initInfo.DescriptorPool  = static_cast<VkDescriptorPool>(m_VkDescriptorPool);
 		initInfo.MinImageCount   = 2;
 		initInfo.ImageCount      = 2;
-		initInfo.MSAASamples     = VK_SAMPLE_COUNT_1_BIT;
 		initInfo.PipelineInfoMain.RenderPass = vkSC->GetRenderPass();
 		initInfo.PipelineInfoMain.Subpass = 0;
 
 		// Load Vulkan functions for ImGui
-		ImGui_ImplVulkan_LoadFunctions([](const char* name, void* userData) -> PFN_vkVoidFunction {
+		ImGui_ImplVulkan_LoadFunctions(VK_API_VERSION_1_3, [](const char* name, void* userData) -> PFN_vkVoidFunction {
 			auto* dev = static_cast<VulkanDevice*>(userData);
 			return dev->GetProcAddr(name);
 		}, vkDev);
@@ -696,7 +705,7 @@ namespace Candy {
 	void ImGuiLayer::RenderVulkan(ImDrawData* drawData)
 	{
 		if (!drawData || drawData->CmdListsCount == 0) return;
-		ImGui_ImplVulkan_RenderDrawData(drawData, VK_NULL_HANDLE, false);
+		ImGui_ImplVulkan_RenderDrawData(drawData, VK_NULL_HANDLE, VK_NULL_HANDLE);
 	}
 
 #endif // CANDY_PLATFORM_WINDOWS

@@ -5,7 +5,9 @@
 #ifndef VK_NO_PROTOTYPES
 #define VK_NO_PROTOTYPES
 #endif
+#define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan/vulkan.h>
+#include <vulkan/vulkan_win32.h>
 
 #include <memory>
 #include <vector>
@@ -113,6 +115,10 @@ namespace Candy {
 		PFN_vkCreateSemaphore           fnCreateSemaphore           = nullptr;
 		PFN_vkDestroySemaphore          fnDestroySemaphore          = nullptr;
 		PFN_vkGetBufferMemoryRequirements fnGetBufMemReqs           = nullptr;
+		PFN_vkGetPhysicalDeviceMemoryProperties fnGetPhysicalDeviceMemoryProperties = nullptr;
+		PFN_vkGetPhysicalDeviceSurfaceFormatsKHR fnGetPhysicalDeviceSurfaceFormatsKHR = nullptr;
+		PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR fnGetPhysicalDeviceSurfaceCapabilitiesKHR = nullptr;
+		PFN_vkQueueWaitIdle                               fnQueueWaitIdle                               = nullptr;
 		PFN_vkBeginCommandBuffer        fnBeginCommandBuffer        = nullptr;
 		PFN_vkEndCommandBuffer          fnEndCommandBuffer          = nullptr;
 		PFN_vkQueueSubmit               fnQueueSubmit               = nullptr;

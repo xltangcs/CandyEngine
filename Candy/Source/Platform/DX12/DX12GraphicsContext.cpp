@@ -20,7 +20,7 @@ namespace Candy {
 	DX12GraphicsContext::~DX12GraphicsContext()
 	{
 		CANDY_CORE_INFO("DX12GraphicsContext: shutting down");
-		m_SwapChain.reset();
+		m_SwapChainRef.reset();
 		m_Device.reset();
 	}
 

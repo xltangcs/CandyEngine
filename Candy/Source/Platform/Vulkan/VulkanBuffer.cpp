@@ -79,7 +79,7 @@ namespace Candy {
 		}
 
 		VkMemoryRequirements memReqs;
-		vkGetBufferMemoryRequirements(device->GetVkDevice(), m_Buffer, &memReqs);
+		device->fnGetBufMemReqs(device->GetVkDevice(), m_Buffer, &memReqs);
 
 		VkMemoryAllocateInfo allocInfo = {};
 		allocInfo.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -101,7 +101,7 @@ namespace Candy {
 	uint32_t VulkanBuffer::FindMemoryType(VulkanDevice* device, uint32_t typeFilter, VkMemoryPropertyFlags props)
 	{
 		VkPhysicalDeviceMemoryProperties memProps;
-		vkGetPhysicalDeviceMemoryProperties(device->GetVkPhysicalDevice(), &memProps);
+		device->fnGetPhysicalDeviceMemoryProperties(device->GetVkPhysicalDevice(), &memProps);
 
 		for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
 		{

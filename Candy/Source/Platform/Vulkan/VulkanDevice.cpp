@@ -11,6 +11,7 @@
 #include "Platform/Vulkan/VulkanSwapChain.h"
 #include "Platform/Vulkan/VulkanPipelineState.h"
 #include "Platform/Vulkan/VulkanSPIRV.h"
+#include "Runtime/RHI/RHICommandQueue.h"
 #include "Runtime/Core/Log.h"
 
 #include <algorithm>
@@ -76,8 +77,9 @@ namespace Candy {
 			si.pCommandBuffers    = vkCbs.data();
 
 			VkFence fence = VK_NULL_HANDLE;
-			m_Dev->fnCreateFence(m_Dev->GetVkDevice(), &VkFenceCreateInfo{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO}, nullptr, &fence);
-			vkQueueSubmit(m_Queue, 1, &si, fence);
+			VkFenceCreateInfo fci{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+			m_Dev->fnCreateFence(m_Dev->GetVkDevice(), &fci, nullptr, &fence);
+			m_Dev->fnQueueSubmit(m_Queue, 1, &si, fence);
 			m_Dev->fnWaitForFences(m_Dev->GetVkDevice(), 1, &fence, VK_TRUE, UINT64_MAX);
 			m_Dev->fnDestroyFence(m_Dev->GetVkDevice(), fence, nullptr);
 		}
@@ -91,12 +93,13 @@ namespace Candy {
 			VkPresentInfoKHR pi = {};
 			pi.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 			pi.swapchainCount     = 1;
-			pi.pSwapchains        = &vksc->GetVkSwapchain();
+			VkSwapchainKHR vkSc   = vksc->GetVkSwapchain();
+			pi.pSwapchains        = &vkSc;
 			pi.pImageIndices      = &imgIndex;
 			m_Dev->fnQueuePresentKHR(m_Queue, &pi);
 		}
 
-		void WaitIdle() override { if (m_Queue) vkQueueWaitIdle(m_Queue); }
+		void WaitIdle() override { if (m_Queue) m_Dev->fnQueueWaitIdle(m_Queue); }
 
 		[[nodiscard]] VkQueue           GetQueue()           const { return m_Queue; }
 		[[nodiscard]] VkCommandPool     GetPool()            const { return m_Pool; }
@@ -114,7 +117,7 @@ namespace Candy {
 	// =========================================================================
 
 #define LOAD(fn) fn = reinterpret_cast<decltype(fn)>(GetIPA(#fn))
-#define LOAD_DEV(fn) fn = reinterpret_cast<decltype(fn)>(GetDevProc(#fn))
+#define LOAD_DEV(fn) fn = reinterpret_cast<decltype(fn)>(GetDevProc(m_Device, #fn))
 
 	VulkanDevice::VulkanDevice()
 	{
@@ -123,7 +126,8 @@ namespace Candy {
 		m_FunctionLoader = std::make_unique<VulkanFunctionLoader>();
 		if (!m_FunctionLoader->IsLoaded()) return;
 
-		auto GetIPA = m_FunctionLoader->GetIPA();
+		auto ipaRaw = m_FunctionLoader->GetIPA();
+		auto GetIPA = [&](const char* name) { return ipaRaw(m_Instance, name); };
 
 		// ---- VkInstance ---------------------------------------------------
 
@@ -148,6 +152,10 @@ namespace Candy {
 		}
 
 		// ---- Physical device ------------------------------------------------
+
+		auto vkEnumeratePhysicalDevices = reinterpret_cast<PFN_vkEnumeratePhysicalDevices>(GetIPA("vkEnumeratePhysicalDevices"));
+		auto vkGetPhysicalDeviceProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties>(GetIPA("vkGetPhysicalDeviceProperties"));
+		auto vkGetPhysicalDeviceQueueFamilyProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceQueueFamilyProperties>(GetIPA("vkGetPhysicalDeviceQueueFamilyProperties"));
 
 		uint32_t count = 0;
 		vkEnumeratePhysicalDevices(m_Instance, &count, nullptr);
@@ -219,6 +227,7 @@ namespace Candy {
 		LOAD_DEV(fnCmdBindDescriptorSets);     LOAD_DEV(fnCmdCopyBufferToImage);
 		LOAD_DEV(fnCmdPipelineBarrier);        LOAD_DEV(fnCreateSemaphore);
 		LOAD_DEV(fnDestroySemaphore);          LOAD_DEV(fnGetBufMemReqs);
+		LOAD_DEV(fnQueueWaitIdle);
 		LOAD_DEV(fnBeginCommandBuffer);        LOAD_DEV(fnEndCommandBuffer);
 		LOAD_DEV(fnQueueSubmit);              LOAD_DEV(fnCmdDraw);
 		LOAD_DEV(fnCmdDrawIndexed);           LOAD_DEV(fnCmdBindVertexBuffers);
@@ -233,6 +242,9 @@ namespace Candy {
 		LOAD_DEV(fnAcquireNextImageKHR);
 		LOAD_DEV(fnQueuePresentKHR);
 		LOAD(fnCreateWin32SurfaceKHR); LOAD(fnDestroySurfaceKHR);
+		LOAD(fnGetPhysicalDeviceMemoryProperties);
+		LOAD(fnGetPhysicalDeviceSurfaceFormatsKHR);
+		LOAD(fnGetPhysicalDeviceSurfaceCapabilitiesKHR);
 
 		// ---- Command pool + queue ----------------------------------------
 
@@ -241,6 +253,7 @@ namespace Candy {
 		poolCI.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 		fnCreateCommandPool(m_Device, &poolCI, nullptr, &m_CommandPool);
 
+		auto vkGetDeviceQueue = reinterpret_cast<PFN_vkGetDeviceQueue>(GetDevProc(m_Device, "vkGetDeviceQueue"));
 		vkGetDeviceQueue(m_Device, m_GraphicsQueueFamilyIndex, 0, &m_Queue);
 
 		m_CommandQueue = CreateScope<VulkanCommandQueue>(this, m_Queue, m_GraphicsQueueFamilyIndex, m_CommandPool);
@@ -270,8 +283,22 @@ namespace Candy {
 	VulkanDevice::~VulkanDevice()
 	{
 		WaitIdle();
-		if (m_Device)   { vkDestroyDevice(m_Device, nullptr);   m_Device   = VK_NULL_HANDLE; }
-		if (m_Instance) { vkDestroyInstance(m_Instance, nullptr); m_Instance = VK_NULL_HANDLE; }
+		if (m_FunctionLoader && m_FunctionLoader->IsLoaded())
+		{
+			auto ipa = m_FunctionLoader->GetIPA();
+			if (m_Device)
+			{
+				auto vkDestroyDevice = reinterpret_cast<PFN_vkDestroyDevice>(ipa(m_Instance, "vkDestroyDevice"));
+				if (vkDestroyDevice) vkDestroyDevice(m_Device, nullptr);
+				m_Device = VK_NULL_HANDLE;
+			}
+			if (m_Instance)
+			{
+				auto vkDestroyInstance = reinterpret_cast<PFN_vkDestroyInstance>(ipa(m_Instance, "vkDestroyInstance"));
+				if (vkDestroyInstance) vkDestroyInstance(m_Instance, nullptr);
+				m_Instance = VK_NULL_HANDLE;
+			}
+		}
 	}
 
 	// ---- Built-in SPIR-V ---------------------------------------------------
@@ -298,6 +325,19 @@ namespace Candy {
 		return nullptr;
 	}
 
+	struct VkShaderHolder : RHIShaderModule {
+		VkDevice dev; VkShaderModule mod; ShaderStage stage; std::string name;
+		PFN_vkDestroyShaderModule destroyFn;
+		VkShaderHolder(VkDevice d, VkShaderModule m, ShaderStage s, std::string n, PFN_vkDestroyShaderModule f)
+			: dev(d), mod(m), stage(s), name(n), destroyFn(f) {}
+		~VkShaderHolder() override { if (mod && destroyFn) destroyFn(dev, mod, nullptr); }
+		ShaderStage GetStage() const override { return stage; }
+		const uint32_t* GetBytecode() const override { return nullptr; }
+		uint32_t GetBytecodeSize() const override { return 0; }
+		const std::string& GetDebugName() const override { return name; }
+		VkShaderModule GetModule() const { return mod; }
+	};
+
 	Ref<RHIShaderModule> VulkanDevice::CreateShaderModule(const void* spirv, uint32_t size, const std::string&)
 	{
 		if (!spirv || size == 0) return nullptr;
@@ -308,20 +348,6 @@ namespace Candy {
 
 		VkShaderModule sm;
 		if (fnCreateShaderModule(m_Device, &ci, nullptr, &sm) != VK_SUCCESS) return nullptr;
-
-		// Wrap in simple holder (same pattern as DX12)
-		struct VkShaderHolder : RHIShaderModule {
-			VkDevice dev; VkShaderModule mod; ShaderStage stage; std::string name;
-			PFN_vkDestroyShaderModule destroyFn;
-			VkShaderHolder(VkDevice d, VkShaderModule m, ShaderStage s, std::string n, PFN_vkDestroyShaderModule f)
-				: dev(d), mod(m), stage(s), name(n), destroyFn(f) {}
-			~VkShaderHolder() override { if (mod && destroyFn) destroyFn(dev, mod, nullptr); }
-			ShaderStage GetStage() const override { return stage; }
-			const uint32_t* GetBytecode() const override { return nullptr; }
-			uint32_t GetBytecodeSize() const override { return 0; }
-			const std::string& GetDebugName() const override { return name; }
-			VkShaderModule GetModule() const { return mod; }
-		};
 
 		return CreateRef<VkShaderHolder>(m_Device, sm, ShaderStage::None, std::string(), fnDestroyShaderModule);
 	}
@@ -455,6 +481,14 @@ namespace Candy {
 
 	RHICommandQueue& VulkanDevice::GetCommandQueue() { return *m_CommandQueue; }
 
-	void VulkanDevice::WaitIdle() { if (m_Device) vkDeviceWaitIdle(m_Device); }
+	void VulkanDevice::WaitIdle()
+	{
+		if (m_Device && m_FunctionLoader && m_FunctionLoader->IsLoaded())
+		{
+			auto ipa = m_FunctionLoader->GetIPA();
+			auto vkDeviceWaitIdle = reinterpret_cast<PFN_vkDeviceWaitIdle>(ipa(m_Instance, "vkDeviceWaitIdle"));
+			if (vkDeviceWaitIdle) vkDeviceWaitIdle(m_Device);
+		}
+	}
 
 } // namespace Candy

@@ -6,6 +6,8 @@
 #include "Platform/DX12/DX12Device.h"
 #include "Runtime/Core/Log.h"
 
+using Microsoft::WRL::ComPtr;
+
 namespace Candy {
 
 	static const uint32_t s_MaxFramebufferSize = 8192;
