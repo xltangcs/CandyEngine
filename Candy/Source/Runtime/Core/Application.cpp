@@ -42,13 +42,29 @@ namespace Candy {
 		if (m_IsEditor)
 		{
 			// Editor: mount the real Engine Content directory (hot-reload friendly).
-			std::filesystem::path engineDir = std::filesystem::path("..") / "Candy" / "Content";
-			if (!std::filesystem::exists(engineDir))
-				engineDir = "Content";
-			if (std::filesystem::exists(engineDir))
+			// Try several candidate relative paths so the editor works whether the
+			// process cwd is the workspace root (`Candy/Content`) or under bin/.
+			std::array<const char*, 5> candidates = {
+				"Candy/Content",          // cwd == workspace root (e.g. `E:\CandyEngine`)
+				"../Candy/Content",       // cwd == bin/Debug-windows-x86_64/CandyEditor
+				"../../Candy/Content",
+				"../../../Candy/Content",
+				"Content",                // last-resort fallback beside the exe
+			};
+			std::filesystem::path engineDir;
+			for (const char* c : candidates)
+			{
+				std::filesystem::path p(c);
+				if (std::filesystem::exists(p))
+				{
+					engineDir = p;
+					break;
+				}
+			}
+			if (!engineDir.empty())
 				FileSystem::Get().Mount("Engine", engineDir);
 			else
-				CANDY_CORE_WARN("Engine content not found: {0}", engineDir.string());
+				CANDY_CORE_WARN("Engine content not found in any candidate path");
 		}
 		else
 		{

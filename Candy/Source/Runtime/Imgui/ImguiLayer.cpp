@@ -27,10 +27,8 @@
 #include "Platform/Windows/WindowsWindow.h"
 #endif
 
-#ifndef CANDY_PLATFORM_WINDOWS
 #include <glad/glad.h>
 #include <backends/imgui_impl_opengl3.h>
-#endif
 
 namespace Candy {
 
@@ -88,6 +86,14 @@ namespace Candy {
 		m_IsD3D12   = (Renderer::GetAPI() == RendererAPI::API::D3D12);
 		m_IsVulkan = (Renderer::GetAPI() == RendererAPI::API::Vulkan);
 
+		// Multi-viewport platform rendering is only wired through the
+		// OpenGL/Glfw backend (UpdatePlatformWindowsDefault path).  D3D12 and
+		// Vulkan backends do not yet hook RenderPlatformWindowsDefault, so
+		// leaving the flag enabled would trip the
+		// `Forgot to call UpdatePlatformWindows()` assertion in imgui.cpp.
+		if (m_IsD3D12 || m_IsVulkan)
+			io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
+
 		if (m_IsVulkan)
 		{
 			ImGui_ImplGlfw_InitForVulkan(window, true);
@@ -108,10 +114,8 @@ namespace Candy {
 		}
 		else
 		{
-#ifndef CANDY_PLATFORM_WINDOWS
 			ImGui_ImplGlfw_InitForOpenGL(window, true);
 			ImGui_ImplOpenGL3_Init("#version 410");
-#endif
 		}
 
 		// Create game UI context
@@ -126,9 +130,7 @@ namespace Candy {
 		}
 		else
 		{
-#ifndef CANDY_PLATFORM_WINDOWS
 			ImGui_ImplOpenGL3_Init("#version 410");
-#endif
 		}
 
 		ImGuiIO& gameIO = ImGui::GetIO();
@@ -170,13 +172,11 @@ namespace Candy {
 		}
 		else
 		{
-#ifndef CANDY_PLATFORM_WINDOWS
 			ImGui::SetCurrentContext(m_GameUIContext);
 			ImGui_ImplOpenGL3_Shutdown();
 			ImGui::SetCurrentContext(m_EditorContext);
 			ImGui_ImplOpenGL3_Shutdown();
 			ImGui_ImplGlfw_Shutdown();
-#endif
 		}
 
 		ImGui::DestroyContext(m_GameUIContext);
@@ -218,10 +218,8 @@ namespace Candy {
 		}
 		else
 		{
-#ifndef CANDY_PLATFORM_WINDOWS
 			ImGui_ImplOpenGL3_NewFrame();
 			ImGui_ImplGlfw_NewFrame();
-#endif
 		}
 
 		ImGui::NewFrame();
@@ -251,20 +249,16 @@ namespace Candy {
 		}
 		else
 		{
-#ifndef CANDY_PLATFORM_WINDOWS
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-#endif
 		}
 
 		if (!m_IsD3D12 && (Renderer::GetAPI() != RendererAPI::API::Vulkan)
 		    && (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable))
 		{
-#ifndef CANDY_PLATFORM_WINDOWS
 			GLFWwindow* backup_current_context = glfwGetCurrentContext();
 			ImGui::UpdatePlatformWindows();
 			ImGui::RenderPlatformWindowsDefault();
 			glfwMakeContextCurrent(backup_current_context);
-#endif
 		}
 	}
 
@@ -462,6 +456,15 @@ namespace Candy {
 		*outGPU = gpu;
 	}
 
+	void ImGuiLayer::SRVDeallocator(ImGui_ImplDX12_InitInfo* /*info*/,
+	                                D3D12_CPU_DESCRIPTOR_HANDLE /*cpu*/,
+	                                D3D12_GPU_DESCRIPTOR_HANDLE /*gpu*/)
+	{
+		// ImGui_ImplDX12_InitInfo requires both Alloc and Free callbacks to be
+		// non-null (see assertion in ImGui_ImplDX12_Init).  Our allocator is a
+		// simple linear bump that resets every frame, so nothing to release.
+	}
+
 	void ImGuiLayer::InitD3D12Backend(GLFWwindow* window)
 	{
 		// Get D3D12 device/queue from GraphicsContext
@@ -530,7 +533,7 @@ namespace Candy {
 		initInfo.DSVFormat            = DXGI_FORMAT_UNKNOWN;
 		initInfo.SrvDescriptorHeap    = m_D3D12.SRVHeap;
 		initInfo.SrvDescriptorAllocFn = SRVAllocator;
-		initInfo.SrvDescriptorFreeFn  = nullptr;  // linear allocator, no free needed
+		initInfo.SrvDescriptorFreeFn  = SRVDeallocator;
 		initInfo.UserData             = this;
 
 		if (!ImGui_ImplDX12_Init(&initInfo))

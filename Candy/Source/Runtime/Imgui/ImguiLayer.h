@@ -96,6 +96,9 @@ namespace Candy {
 		static void SRVAllocator(ImGui_ImplDX12_InitInfo* info,
 		                         D3D12_CPU_DESCRIPTOR_HANDLE* outCPU,
 		                         D3D12_GPU_DESCRIPTOR_HANDLE* outGPU);
+		static void SRVDeallocator(ImGui_ImplDX12_InitInfo* info,
+		                           D3D12_CPU_DESCRIPTOR_HANDLE cpu,
+		                           D3D12_GPU_DESCRIPTOR_HANDLE gpu);
 
 		// Vulkan methods
 		void InitVulkanBackend(GLFWwindow* window);
