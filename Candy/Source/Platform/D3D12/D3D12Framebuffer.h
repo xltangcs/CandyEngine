@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Runtime/Renderer/Framebuffer.h"
+#include "Runtime/RHI/RHIFramebuffer.h"
 
 #include <d3d12.h>
 #include <wrl/client.h>
@@ -18,7 +19,7 @@ namespace Candy {
 	// in the device's shared CBV_SRV_UAV heap so ImGui_ImplDX12 can display
 	// the color attachment.
 	// =========================================================================
-	class D3D12Framebuffer : public Framebuffer
+	class D3D12Framebuffer : public Framebuffer, public RHIFramebuffer
 	{
 	public:
 		D3D12Framebuffer(const FramebufferSpecification& spec, D3D12Device* device);
@@ -41,11 +42,18 @@ namespace Candy {
 
 		bool IsSwapChainTarget() const { return m_Specification.SwapChainTarget; }
 
-		// ---- D3D12-specific accessors for command buffer integration ---------
+		// ---- RHIFramebuffer bridge (Runtime code reaches through these) ----
+
+		const FramebufferDesc& GetDesc() const override { return m_RHIDesc; }
+		uint32_t GetWidth()                 const override { return m_Specification.Width;  }
+		uint32_t GetHeight()                const override { return m_Specification.Height; }
+		uint32_t GetColorAttachmentCount()  const override { return static_cast<uint32_t>(m_ColorAttachments.size()); }
+		bool     HasDepthStencil()          const override { return HasDepthAttachment(); }
+
+		// ---- D3D12-specific accessors for command buffer integration --------
 
 		[[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetRTVHandle(uint32_t index = 0) const;
 		[[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle() const;
-		[[nodiscard]] uint32_t GetColorAttachmentCount() const { return static_cast<uint32_t>(m_ColorAttachments.size()); }
 		[[nodiscard]] bool     HasDepthAttachment() const;
 
 		/// Returns the color SRV GPU descriptor handle for ImGui display.
@@ -80,6 +88,9 @@ namespace Candy {
 		// Readback buffer for ReadPixel
 		Microsoft::WRL::ComPtr<ID3D12Resource> m_ReadbackBuffer;
 		uint64_t m_ReadbackBufferSize = 0;
+
+		// RHI bridge description kept in sync inside Invalidate/Resize.
+		FramebufferDesc m_RHIDesc;
 	};
 
 } // namespace Candy

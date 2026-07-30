@@ -101,6 +101,29 @@ namespace Candy {
 			else
 				m_DepthAttachmentSpecification = spec;
 		}
+
+		// Build the RHI bridge description so RHICommandBuffer::SetFramebufferRenderTarget
+		// can run through the same RHI surface on OpenGL as on D3D12 / Vulkan.
+		m_RHIDesc.Width           = m_Specification.Width;
+		m_RHIDesc.Height          = m_Specification.Height;
+		m_RHIDesc.SampleCount     = m_Specification.Samples;
+		m_RHIDesc.SwapChainTarget = m_Specification.SwapChainTarget;
+		m_RHIDesc.HasDepthStencil = (m_DepthAttachmentSpecification.TextureFormat != FramebufferTextureFormat::None);
+		for (const auto& spec : m_ColorAttachmentSpecifications)
+		{
+			FramebufferAttachmentDesc fa;
+			if (spec.TextureFormat == FramebufferTextureFormat::RED_INTEGER)
+			{
+				fa.Format    = RHIFormat::R32Sint;
+				fa.IsInteger = true;
+			}
+			else
+			{
+				fa.Format = RHIFormat::R8G8B8A8Unorm;
+			}
+			m_RHIDesc.ColorAttachments.push_back(fa);
+		}
+
 		Invalidate();
 	}
 
@@ -215,6 +238,8 @@ namespace Candy {
 		}
 		m_Specification.Width = width;
 		m_Specification.Height = height;
+		m_RHIDesc.Width  = width;
+		m_RHIDesc.Height = height;
 
 		if (m_Specification.SwapChainTarget)
 			return;

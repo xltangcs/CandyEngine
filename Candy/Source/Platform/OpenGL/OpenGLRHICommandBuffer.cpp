@@ -2,6 +2,7 @@
 
 #include "Platform/OpenGL/OpenGLRHICommandBuffer.h"
 #include "Platform/OpenGL/OpenGLRHIResources.h"
+#include "Platform/OpenGL/OpenGLFramebuffer.h"
 #include "Runtime/Core/Log.h"
 
 #include <glad/glad.h>
@@ -199,6 +200,13 @@ namespace Candy {
 
 	void OpenGLRHICommandBuffer::SetFramebufferRenderTarget(const Ref<RHIFramebuffer>& framebuffer)
 	{
+		// Legacy-bridge path: EditorLayer hands in an OpenGLFramebuffer that
+		// multi-inherits RHIFramebuffer; expose its native FBO id.
+		if (auto* oglFb = dynamic_cast<OpenGLFramebuffer*>(framebuffer.get()))
+		{
+			m_Framebuffer = oglFb->GetNativeFBO();
+			return;
+		}
 		auto* gl = dynamic_cast<OpenGLRHIFramebuffer*>(framebuffer.get());
 		m_Framebuffer = gl ? gl->GetFBO() : 0;
 	}

@@ -138,8 +138,8 @@ namespace Candy {
 		// Textured root signature (shared by quad pipeline)
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> D3D12TexturedRootSig;
 
-		// Active render target for D3D12 flushing
-		D3D12Framebuffer* D3D12ActiveFramebuffer = nullptr;
+		// Active render target for D3D12/OpenGL/Vulkan flushing (RHI-bridged).
+		Ref<RHIFramebuffer> ActiveRenderTarget;
 
 		// ---- Vulkan backend data ----
 		bool VkActive = false;
@@ -957,9 +957,9 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			auto* d3d12cb = static_cast<D3D12CommandBuffer*>(cmd.get());
 
 			// Set render target
-			if (s_Data.D3D12ActiveFramebuffer)
+			if (s_Data.ActiveRenderTarget)
 			{
-				d3d12cb->SetFramebufferRenderTarget(s_Data.D3D12ActiveFramebuffer);
+				d3d12cb->SetFramebufferRenderTarget(s_Data.ActiveRenderTarget);
 			}
 			else
 			{
@@ -983,8 +983,8 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 				colorAttachment.ClearColor[3] = 1.0f;
 				rpDesc.ColorAttachments.push_back(colorAttachment);
 
-				// Entity ID attachment
-				if (s_Data.D3D12ActiveFramebuffer && s_Data.D3D12ActiveFramebuffer->GetColorAttachmentCount() > 1)
+			// Entity ID attachment
+			if (s_Data.ActiveRenderTarget && s_Data.ActiveRenderTarget->GetColorAttachmentCount() > 1)
 				{
 					RenderPassColorAttachment idAttachment;
 					idAttachment.Format = RHIFormat::R32Sint;
@@ -1000,10 +1000,10 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 
 			// Viewport + scissor
 			uint32_t vpW = 1280, vpH = 720;
-			if (s_Data.D3D12ActiveFramebuffer)
+			if (s_Data.ActiveRenderTarget)
 			{
-				vpW = s_Data.D3D12ActiveFramebuffer->GetSpecification().Width;
-				vpH = s_Data.D3D12ActiveFramebuffer->GetSpecification().Height;
+				vpW = s_Data.ActiveRenderTarget->GetWidth();
+				vpH = s_Data.ActiveRenderTarget->GetHeight();
 			}
 			cmd->SetViewport(0, 0, static_cast<float>(vpW), static_cast<float>(vpH));
 			cmd->SetScissor(0, 0, vpW, vpH);
@@ -1142,7 +1142,21 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			auto  cmd   = queue.CreateCommandBuffer(); // Scope<RHICommandBuffer>
 			auto* gl    = static_cast<OpenGLRHICommandBuffer*>(cmd.get());
 
-			gl->SetSwapChainRenderTarget(RHIContext::GetSwapChain());
+			// Pick the render target — EditorLayer hands in a viewport
+			// OpenGLFramebuffer via SetActiveRenderTarget; fall back to the
+			// swap chain (default framebuffer) when rendering the title-bar area.
+			uint32_t vpW = 1280, vpH = 720;
+			if (s_Data.ActiveRenderTarget)
+			{
+				gl->SetFramebufferRenderTarget(s_Data.ActiveRenderTarget);
+				vpW = s_Data.ActiveRenderTarget->GetWidth();
+				vpH = s_Data.ActiveRenderTarget->GetHeight();
+			}
+			else
+			{
+				gl->SetSwapChainRenderTarget(RHIContext::GetSwapChain());
+			}
+
 			gl->Begin();
 
 			RenderPassDesc rpDesc;
@@ -1157,8 +1171,8 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 				rpDesc.ColorAttachments.push_back(colorAttachment);
 			}
 			gl->BeginRenderPass(rpDesc);
-			gl->SetViewport(0.0f, 0.0f, 1280.0f, 720.0f);
-			gl->SetScissor(0, 0, 1280, 720);
+			gl->SetViewport(0.0f, 0.0f, static_cast<float>(vpW), static_cast<float>(vpH));
+			gl->SetScissor(0, 0, vpW, vpH);
 
 			// Upload camera CB
 			if (auto* cb = dynamic_cast<OpenGLRHIBuffer*>(s_Data.OL_CameraCB.get()))
@@ -1469,9 +1483,9 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 		return s_Data.Stats;
 	}
 
-	void Renderer2D::SetD3D12ActiveFramebuffer(D3D12Framebuffer* fb)
+	void Renderer2D::SetActiveRenderTarget(const Ref<RHIFramebuffer>& fb)
 	{
-		s_Data.D3D12ActiveFramebuffer = fb;
+		s_Data.ActiveRenderTarget = fb;
 	}
 }
 

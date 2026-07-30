@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Runtime/RHI/RHICommandBuffer.h"
+#include "Runtime/RHI/RHIFramebuffer.h"
 
 #include <d3d12.h>
 #include <wrl/client.h>
@@ -37,7 +38,7 @@ namespace Candy {
 		void SetSwapChainRenderTarget(D3D12SwapChain* swapChain);
 
 		/// Set a framebuffer as the current render target (for off-screen rendering).
-		void SetFramebufferRenderTarget(D3D12Framebuffer* framebuffer);
+		void SetFramebufferRenderTarget(const Ref<RHIFramebuffer>& framebuffer);
 
 		// ---- Pipeline & state ----------------------------------------------
 

@@ -131,12 +131,11 @@ namespace Candy {
 		const auto& spec = m_Framebuffer->GetSpecification();
 		Candy::RenderCommand::SetViewport(0, 0, spec.Width, spec.Height);
 
-		// D3D12: set active framebuffer so Renderer2D::Flush knows where to render
-		if (Candy::Renderer::GetAPI() == Candy::RendererAPI::API::D3D12)
-		{
-			auto* d3d12FB = dynamic_cast<Candy::D3D12Framebuffer*>(m_Framebuffer.get());
-			Candy::Renderer2D::SetD3D12ActiveFramebuffer(d3d12FB);
-		}
+		// Bind the viewport framebuffer as the Renderer2D active render target.
+		// Both OpenGLFramebuffer and D3D12Framebuffer multi-inherit RHIFramebuffer
+		// so the cast is valid across all backends.
+		Candy::Renderer2D::SetActiveRenderTarget(
+			std::dynamic_pointer_cast<Candy::RHIFramebuffer>(m_Framebuffer));
 
 		// Clear color+depth FIRST, then clear entity-ID attachment to -1.
 		// Order matters: glClear wipes all draw buffers (including RED_INTEGER) with the
@@ -851,12 +850,9 @@ namespace Candy {
 		RenderCommand::SetClearColor({ 0.0f, 0.0f, 0.0f, 1.0f });
 		RenderCommand::Clear();
 
-		// D3D12: target camera preview framebuffer
-		if (Candy::Renderer::GetAPI() == Candy::RendererAPI::API::D3D12)
-		{
-			auto* d3d12FB = dynamic_cast<Candy::D3D12Framebuffer*>(m_CameraPreviewFramebuffer.get());
-			Candy::Renderer2D::SetD3D12ActiveFramebuffer(d3d12FB);
-		}
+		// Bind the camera-preview framebuffer for this pass.
+		Candy::Renderer2D::SetActiveRenderTarget(
+			std::dynamic_pointer_cast<Candy::RHIFramebuffer>(m_CameraPreviewFramebuffer));
 
 		m_ActiveScene->RenderSceneFromCamera(cameraComp, cameraTransform.GetTransform());
 
@@ -865,12 +861,9 @@ namespace Candy {
 		const auto& mainSpec = m_Framebuffer->GetSpecification();
 		RenderCommand::SetViewport(0, 0, mainSpec.Width, mainSpec.Height);
 
-		// D3D12: restore main framebuffer as active target
-		if (Candy::Renderer::GetAPI() == Candy::RendererAPI::API::D3D12)
-		{
-			auto* d3d12FB = dynamic_cast<Candy::D3D12Framebuffer*>(m_Framebuffer.get());
-			Candy::Renderer2D::SetD3D12ActiveFramebuffer(d3d12FB);
-		}
+		// Restore main viewport framebuffer as the active render target.
+		Candy::Renderer2D::SetActiveRenderTarget(
+			std::dynamic_pointer_cast<Candy::RHIFramebuffer>(m_Framebuffer));
 
 		// Restore camera viewport to main viewport size
 		sceneCamera.SetViewportSize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
