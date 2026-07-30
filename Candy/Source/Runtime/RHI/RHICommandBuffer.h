@@ -41,7 +41,7 @@ namespace Candy {
 
 		virtual void SetScissor(int32_t x, int32_t y, uint32_t width, uint32_t height) = 0;
 
-		// ---- Resource binding (slot-based, like DX12 root params) ----------
+		// ---- Resource binding (slot-based, like D3D12 root params) ----------
 
 		virtual void SetVertexBuffer(const Ref<RHIBuffer>& buffer, uint32_t slot = 0, uint64_t offset = 0) = 0;
 		virtual void SetIndexBuffer(const Ref<RHIBuffer>& buffer, IndexFormat format = IndexFormat::UInt32, uint64_t offset = 0) = 0;

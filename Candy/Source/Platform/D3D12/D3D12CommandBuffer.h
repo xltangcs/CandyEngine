@@ -7,21 +7,21 @@
 
 namespace Candy {
 
-	class DX12SwapChain;
-	class DX12Framebuffer;
+	class D3D12SwapChain;
+	class D3D12Framebuffer;
 
 	// =========================================================================
-	// DX12CommandBuffer — wraps ID3D12GraphicsCommandList recording
+	// D3D12CommandBuffer — wraps ID3D12GraphicsCommandList recording
 	// =========================================================================
-	class DX12CommandBuffer : public RHICommandBuffer
+	class D3D12CommandBuffer : public RHICommandBuffer
 	{
 	public:
-		DX12CommandBuffer(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList,
+		D3D12CommandBuffer(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmdList,
 		                  ID3D12CommandAllocator* allocator,
 		                  ID3D12Device* device,
 		                  ID3D12DescriptorHeap* cbvSrvUavHeap,
 		                  ID3D12DescriptorHeap* samplerHeap);
-		virtual ~DX12CommandBuffer();
+		virtual ~D3D12CommandBuffer();
 
 		// ---- Lifetime ------------------------------------------------------
 
@@ -34,10 +34,10 @@ namespace Candy {
 		void EndRenderPass() override;
 
 		/// Set the swap chain as the current render target.
-		void SetSwapChainRenderTarget(DX12SwapChain* swapChain);
+		void SetSwapChainRenderTarget(D3D12SwapChain* swapChain);
 
 		/// Set a framebuffer as the current render target (for off-screen rendering).
-		void SetFramebufferRenderTarget(DX12Framebuffer* framebuffer);
+		void SetFramebufferRenderTarget(D3D12Framebuffer* framebuffer);
 
 		// ---- Pipeline & state ----------------------------------------------
 
@@ -70,7 +70,7 @@ namespace Candy {
 		                 int32_t  vertexOffset  = 0,
 		                 uint32_t firstInstance = 0) override;
 
-		// ---- DX12-specific ------------------------------------------------
+		// ---- D3D12-specific ------------------------------------------------
 
 		[[nodiscard]] ID3D12GraphicsCommandList* GetNativeCommandList() const { return m_CommandList.Get(); }
 
@@ -88,8 +88,8 @@ namespace Candy {
 		uint32_t              m_CBVSRVDescriptorSize = 0;
 
 		// Current render target
-		DX12SwapChain*   m_CurrentSwapChain   = nullptr;
-		DX12Framebuffer* m_CurrentFramebuffer = nullptr;
+		D3D12SwapChain*   m_CurrentSwapChain   = nullptr;
+		D3D12Framebuffer* m_CurrentFramebuffer = nullptr;
 
 		// Simple linear descriptor allocator
 		D3D12_CPU_DESCRIPTOR_HANDLE m_NextCBVSRVHandle = {};

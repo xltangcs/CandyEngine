@@ -8,21 +8,21 @@
 
 namespace Candy {
 
-	class DX12Device;
+	class D3D12Device;
 
 	// =========================================================================
-	// DX12Framebuffer — off-screen render target for viewport / PIP
+	// D3D12Framebuffer — off-screen render target for viewport / PIP
 	//
 	// Creates committed resources for color (RGBA8 + RED_INTEGER) and depth
 	// (D24S8) attachments.  Manages RTV/DSV descriptor heaps and creates SRVs
 	// in the device's shared CBV_SRV_UAV heap so ImGui_ImplDX12 can display
 	// the color attachment.
 	// =========================================================================
-	class DX12Framebuffer : public Framebuffer
+	class D3D12Framebuffer : public Framebuffer
 	{
 	public:
-		DX12Framebuffer(const FramebufferSpecification& spec, DX12Device* device);
-		virtual ~DX12Framebuffer();
+		D3D12Framebuffer(const FramebufferSpecification& spec, D3D12Device* device);
+		virtual ~D3D12Framebuffer();
 
 		void Bind() override;
 		void Unbind() override;
@@ -41,7 +41,7 @@ namespace Candy {
 
 		bool IsSwapChainTarget() const { return m_Specification.SwapChainTarget; }
 
-		// ---- DX12-specific accessors for command buffer integration ---------
+		// ---- D3D12-specific accessors for command buffer integration ---------
 
 		[[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetRTVHandle(uint32_t index = 0) const;
 		[[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle() const;
@@ -59,7 +59,7 @@ namespace Candy {
 		DXGI_FORMAT MapFormat(FramebufferTextureFormat format) const;
 
 		FramebufferSpecification m_Specification;
-		DX12Device*              m_Device = nullptr;
+		D3D12Device*              m_Device = nullptr;
 
 		// Attachment resources
 		std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> m_ColorAttachments;

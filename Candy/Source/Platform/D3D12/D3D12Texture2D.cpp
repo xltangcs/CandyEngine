@@ -2,9 +2,9 @@
 #include <Windows.h>
 #include <d3d12.h>
 
-#include "Platform/DX12/DX12Texture2D.h"
-#include "Platform/DX12/DX12Texture.h"
-#include "Platform/DX12/DX12Device.h"
+#include "Platform/D3D12/D3D12Texture2D.h"
+#include "Platform/D3D12/D3D12Texture.h"
+#include "Platform/D3D12/D3D12Device.h"
 #include "Runtime/Core/FileSystem.h"
 #include "Runtime/Core/Log.h"
 
@@ -21,7 +21,7 @@ namespace Candy {
 	static uint32_t AllocateSRVSlot()
 	{
 		uint32_t slot = s_NextSRVSlot.fetch_add(1);
-		CANDY_CORE_ASSERT(slot < 256, "DX12Texture2D: SRV descriptor heap exhausted!");
+		CANDY_CORE_ASSERT(slot < 256, "D3D12Texture2D: SRV descriptor heap exhausted!");
 		return slot;
 	}
 
@@ -29,7 +29,7 @@ namespace Candy {
 	// Constructor: empty texture (e.g. white 1x1 pixel for Renderer2D)
 	// =========================================================================
 
-	DX12Texture2D::DX12Texture2D(DX12Device* device, uint32_t width, uint32_t height)
+	D3D12Texture2D::D3D12Texture2D(D3D12Device* device, uint32_t width, uint32_t height)
 		: m_Device(device), m_Width(width), m_Height(height)
 	{
 		TextureDesc desc;
@@ -37,9 +37,9 @@ namespace Candy {
 		desc.Height = height;
 		desc.Format = RHIFormat::R8G8B8A8Unorm;
 		desc.Usage  = ResourceUsage::ShaderRead | ResourceUsage::CopyDst;
-		desc.DebugName = "DX12Texture2D_" + std::to_string(width) + "x" + std::to_string(height);
+		desc.DebugName = "D3D12Texture2D_" + std::to_string(width) + "x" + std::to_string(height);
 
-		m_RHI = std::make_unique<DX12Texture>(device->GetNativeDevice(), desc);
+		m_RHI = std::make_unique<D3D12Texture>(device->GetNativeDevice(), desc);
 		if (m_RHI->GetResource())
 		{
 			AllocateSRV();
@@ -51,7 +51,7 @@ namespace Candy {
 	// Constructor: load from file
 	// =========================================================================
 
-	DX12Texture2D::DX12Texture2D(DX12Device* device, const std::string& path)
+	D3D12Texture2D::D3D12Texture2D(D3D12Device* device, const std::string& path)
 		: m_Device(device), m_Path(path)
 	{
 		// Read file (supports VFS)
@@ -77,7 +77,7 @@ namespace Candy {
 
 		if (!data)
 		{
-			CANDY_CORE_ERROR("DX12Texture2D: failed to load '{}'", path);
+			CANDY_CORE_ERROR("D3D12Texture2D: failed to load '{}'", path);
 			return;
 		}
 
@@ -92,11 +92,11 @@ namespace Candy {
 		desc.MipLevels = 1;
 		desc.DebugName = path;
 
-		m_RHI = std::make_unique<DX12Texture>(device->GetNativeDevice(), desc);
+		m_RHI = std::make_unique<D3D12Texture>(device->GetNativeDevice(), desc);
 		if (!m_RHI->GetResource())
 		{
 			stbi_image_free(data);
-			CANDY_CORE_ERROR("DX12Texture2D: resource creation failed for '{}'", path);
+			CANDY_CORE_ERROR("D3D12Texture2D: resource creation failed for '{}'", path);
 			return;
 		}
 
@@ -108,10 +108,10 @@ namespace Candy {
 		AllocateSRV();
 		m_IsLoaded = true;
 
-		CANDY_CORE_INFO("DX12Texture2D: loaded '{}' ({}x{})", path, m_Width, m_Height);
+		CANDY_CORE_INFO("D3D12Texture2D: loaded '{}' ({}x{})", path, m_Width, m_Height);
 	}
 
-	DX12Texture2D::~DX12Texture2D()
+	D3D12Texture2D::~D3D12Texture2D()
 	{
 		m_RHI.reset();
 	}
@@ -120,7 +120,7 @@ namespace Candy {
 	// SRV allocation — write SRV descriptor into device CBV_SRV_UAV heap
 	// =========================================================================
 
-	void DX12Texture2D::AllocateSRV()
+	void D3D12Texture2D::AllocateSRV()
 	{
 		if (!m_Device || !m_RHI)
 			return;
@@ -142,7 +142,7 @@ namespace Candy {
 	// SetData — update texture data
 	// =========================================================================
 
-	void DX12Texture2D::SetData(void* data, uint32_t size)
+	void D3D12Texture2D::SetData(void* data, uint32_t size)
 	{
 		if (!m_RHI || !data)
 			return;
@@ -156,9 +156,9 @@ namespace Candy {
 	// Bind — set texture on a slot (for Renderer2D batch)
 	// =========================================================================
 
-	void DX12Texture2D::Bind(uint32_t slot) const
+	void D3D12Texture2D::Bind(uint32_t slot) const
 	{
-		// In DX12, texture binding happens via descriptor tables set in
+		// In D3D12, texture binding happens via descriptor tables set in
 		// the command buffer (SetTexture).  This is a no-op at the engine
 		// level — the actual binding is done in Renderer2D::Flush().
 	}

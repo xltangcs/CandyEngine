@@ -59,12 +59,12 @@ namespace Candy {
 		void LoadFontsFromVfs(ImGuiIO& targetIO);
 
 		// Backend detection
-		bool IsDX12Backend() const;
+		bool IsD3D12Backend() const;
 
 #ifdef CANDY_PLATFORM_WINDOWS
-		// ---- DX12 ImGui backend state -------------------------------------
+		// ---- D3D12 ImGui backend state -------------------------------------
 
-		struct DX12ImGuiState
+		struct D3D12ImGuiState
 		{
 			ID3D12Device*              Device      = nullptr;
 			ID3D12CommandQueue*        Queue       = nullptr;
@@ -83,16 +83,16 @@ namespace Candy {
 			// Store previous context for context switching
 			ImGuiContext* GameUIContext = nullptr;
 		};
-		DX12ImGuiState m_DX12;
-		bool m_IsDX12 = false;
+		D3D12ImGuiState m_D3D12;
+		bool m_IsD3D12 = false;
 		bool m_IsVulkan = false;
 
-		// DX12 methods
-		void InitDX12Backend(GLFWwindow* window);
-		void ShutdownDX12Backend();
-		void NewFrameDX12();
-		void RenderDX12(ImDrawData* drawData);
-		void CreateDX12FontTexture();
+		// D3D12 methods
+		void InitD3D12Backend(GLFWwindow* window);
+		void ShutdownD3D12Backend();
+		void NewFrameD3D12();
+		void RenderD3D12(ImDrawData* drawData);
+		void CreateD3D12FontTexture();
 		static void SRVAllocator(ImGui_ImplDX12_InitInfo* info,
 		                         D3D12_CPU_DESCRIPTOR_HANDLE* outCPU,
 		                         D3D12_GPU_DESCRIPTOR_HANDLE* outGPU);

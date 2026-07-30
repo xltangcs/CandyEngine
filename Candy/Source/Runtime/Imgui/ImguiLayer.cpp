@@ -18,9 +18,9 @@
 #include <backends/imgui_impl_dx12.h>
 #define IMGUI_IMPL_VULKAN_NO_PROTOTYPES
 #include <backends/imgui_impl_vulkan.h>
-#include "Platform/DX12/DX12GraphicsContext.h"
-#include "Platform/DX12/DX12Device.h"
-#include "Platform/DX12/DX12SwapChain.h"
+#include "Platform/D3D12/D3D12GraphicsContext.h"
+#include "Platform/D3D12/D3D12Device.h"
+#include "Platform/D3D12/D3D12SwapChain.h"
 #include "Platform/Vulkan/VulkanGraphicsContext.h"
 #include "Platform/Vulkan/VulkanDevice.h"
 #include "Platform/Vulkan/VulkanSwapChain.h"
@@ -46,9 +46,9 @@ namespace Candy {
 	// Backend detection
 	// =========================================================================
 
-	bool ImGuiLayer::IsDX12Backend() const
+	bool ImGuiLayer::IsD3D12Backend() const
 	{
-		return m_IsDX12;
+		return m_IsD3D12;
 	}
 
 	// =========================================================================
@@ -85,7 +85,7 @@ namespace Candy {
 		GLFWwindow* window = static_cast<GLFWwindow*>(app.GetWindow().GetNativeWindow());
 
 		// Detect backend
-		m_IsDX12   = (Renderer::GetAPI() == RendererAPI::API::DX12);
+		m_IsD3D12   = (Renderer::GetAPI() == RendererAPI::API::D3D12);
 		m_IsVulkan = (Renderer::GetAPI() == RendererAPI::API::Vulkan);
 
 		if (m_IsVulkan)
@@ -94,16 +94,16 @@ namespace Candy {
 			InitVulkanBackend(window);
 			CANDY_CORE_INFO("ImGuiLayer: Vulkan backend initialized");
 		}
-		else if (m_IsDX12)
+		else if (m_IsD3D12)
 		{
 #ifdef CANDY_PLATFORM_WINDOWS
 			// GLFW platform backend (no OpenGL context)
 			ImGui_ImplGlfw_InitForOther(window, true);
 
-			// DX12 renderer backend
-			InitDX12Backend(window);
+			// D3D12 renderer backend
+			InitD3D12Backend(window);
 
-			CANDY_CORE_INFO("ImGuiLayer: DX12 backend initialized");
+			CANDY_CORE_INFO("ImGuiLayer: D3D12 backend initialized");
 #endif
 		}
 		else
@@ -118,10 +118,10 @@ namespace Candy {
 		m_GameUIContext = ImGui::CreateContext();
 		ImGui::SetCurrentContext(m_GameUIContext);
 
-		if (m_IsDX12)
+		if (m_IsD3D12)
 		{
 #ifdef CANDY_PLATFORM_WINDOWS
-			m_DX12.GameUIContext = m_GameUIContext;
+			m_D3D12.GameUIContext = m_GameUIContext;
 #endif
 		}
 		else
@@ -157,7 +157,7 @@ namespace Candy {
 			ShutdownVulkanBackend();
 #endif
 		}
-		else if (m_IsDX12)
+		else if (m_IsD3D12)
 		{
 #ifdef CANDY_PLATFORM_WINDOWS
 			ImGui::SetCurrentContext(m_GameUIContext);
@@ -165,7 +165,7 @@ namespace Candy {
 			ImGui::SetCurrentContext(m_EditorContext);
 			ImGui_ImplDX12_Shutdown();
 			ImGui_ImplGlfw_Shutdown();
-			ShutdownDX12Backend();
+			ShutdownD3D12Backend();
 #endif
 		}
 		else
@@ -210,10 +210,10 @@ namespace Candy {
 		{
 			NewFrameVulkan();
 		}
-		else if (m_IsDX12)
+		else if (m_IsD3D12)
 		{
 #ifdef CANDY_PLATFORM_WINDOWS
-			NewFrameDX12();
+			NewFrameD3D12();
 #endif
 		}
 		else
@@ -243,10 +243,10 @@ namespace Candy {
 		{
 			RenderVulkan(ImGui::GetDrawData());
 		}
-		else if (m_IsDX12)
+		else if (m_IsD3D12)
 		{
 #ifdef CANDY_PLATFORM_WINDOWS
-			RenderDX12(ImGui::GetDrawData());
+			RenderD3D12(ImGui::GetDrawData());
 #endif
 		}
 		else
@@ -256,7 +256,7 @@ namespace Candy {
 #endif
 		}
 
-		if (!m_IsDX12 && (Renderer::GetAPI() != RendererAPI::API::Vulkan)
+		if (!m_IsD3D12 && (Renderer::GetAPI() != RendererAPI::API::Vulkan)
 		    && (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable))
 		{
 #ifndef CANDY_PLATFORM_WINDOWS
@@ -282,7 +282,7 @@ namespace Candy {
 		io.MousePos = ImVec2(mouseX, mouseY);
 		io.MouseDown[0] = mouseDown;
 
-		if (m_IsDX12)
+		if (m_IsD3D12)
 		{
 #ifdef CANDY_PLATFORM_WINDOWS
 			ImGui_ImplDX12_NewFrame();
@@ -303,10 +303,10 @@ namespace Candy {
 		ImGui::SetCurrentContext(m_GameUIContext);
 		ImGui::Render();
 
-		if (m_IsDX12)
+		if (m_IsD3D12)
 		{
 #ifdef CANDY_PLATFORM_WINDOWS
-			RenderDX12(ImGui::GetDrawData());
+			RenderD3D12(ImGui::GetDrawData());
 #endif
 		}
 		else
@@ -437,7 +437,7 @@ namespace Candy {
 	}
 
 	// =========================================================================
-	// DX12 Backend Implementation (Windows only)
+	// D3D12 Backend Implementation (Windows only)
 	// =========================================================================
 
 #ifdef CANDY_PLATFORM_WINDOWS
@@ -447,7 +447,7 @@ namespace Candy {
 	                              D3D12_GPU_DESCRIPTOR_HANDLE* outGPU)
 	{
 		auto* self = static_cast<ImGuiLayer*>(info->UserData);
-		auto& s = self->m_DX12;
+		auto& s = self->m_D3D12;
 
 		// Linear allocation from the SRV heap (simple, resets each frame)
 		D3D12_CPU_DESCRIPTOR_HANDLE cpu = s.SRVHeap->GetCPUDescriptorHandleForHeapStart();
@@ -462,15 +462,15 @@ namespace Candy {
 		*outGPU = gpu;
 	}
 
-	void ImGuiLayer::InitDX12Backend(GLFWwindow* window)
+	void ImGuiLayer::InitD3D12Backend(GLFWwindow* window)
 	{
-		// Get DX12 device/queue from GraphicsContext
+		// Get D3D12 device/queue from GraphicsContext
 		auto* win = static_cast<WindowsWindow*>(&Application::Get().GetWindow());
-		auto* gfxCtx = static_cast<DX12GraphicsContext*>(
+		auto* gfxCtx = static_cast<D3D12GraphicsContext*>(
 			win->GetGraphicsContext());
 
-		m_DX12.Device = gfxCtx->GetDevice()->GetNativeDevice();
-		m_DX12.Queue  = gfxCtx->GetDevice()->GetNativeQueue();
+		m_D3D12.Device = gfxCtx->GetDevice()->GetNativeDevice();
+		m_D3D12.Queue  = gfxCtx->GetDevice()->GetNativeQueue();
 
 		// Create SRV descriptor heap for ImGui textures
 		{
@@ -479,56 +479,56 @@ namespace Candy {
 			heapDesc.NumDescriptors = 16;
 			heapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 
-			HRESULT hr = m_DX12.Device->CreateDescriptorHeap(
-				&heapDesc, IID_PPV_ARGS(&m_DX12.SRVHeap));
+			HRESULT hr = m_D3D12.Device->CreateDescriptorHeap(
+				&heapDesc, IID_PPV_ARGS(&m_D3D12.SRVHeap));
 			if (FAILED(hr))
 			{
-				CANDY_CORE_ERROR("ImGuiLayer::InitDX12Backend: SRV heap creation failed");
+				CANDY_CORE_ERROR("ImGuiLayer::InitD3D12Backend: SRV heap creation failed");
 				return;
 			}
 
-			m_DX12.SRVDescSize = m_DX12.Device->GetDescriptorHandleIncrementSize(
+			m_D3D12.SRVDescSize = m_D3D12.Device->GetDescriptorHandleIncrementSize(
 				D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		}
 
 		// Create per-frame resources (2 frames for double-buffering)
 		for (int i = 0; i < 2; ++i)
 		{
-			HRESULT hr = m_DX12.Device->CreateCommandAllocator(
+			HRESULT hr = m_D3D12.Device->CreateCommandAllocator(
 				D3D12_COMMAND_LIST_TYPE_DIRECT,
-				IID_PPV_ARGS(&m_DX12.FrameAllocators[i]));
+				IID_PPV_ARGS(&m_D3D12.FrameAllocators[i]));
 			if (FAILED(hr))
 			{
 				CANDY_CORE_ERROR("ImGuiLayer: CreateCommandAllocator[{0}] failed", i);
 				return;
 			}
 
-			hr = m_DX12.Device->CreateCommandList(
+			hr = m_D3D12.Device->CreateCommandList(
 				0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-				m_DX12.FrameAllocators[i], nullptr,
-				IID_PPV_ARGS(&m_DX12.FrameCmdLists[i]));
+				m_D3D12.FrameAllocators[i], nullptr,
+				IID_PPV_ARGS(&m_D3D12.FrameCmdLists[i]));
 			if (FAILED(hr))
 			{
 				CANDY_CORE_ERROR("ImGuiLayer: CreateCommandList[{0}] failed", i);
 				return;
 			}
 
-			m_DX12.FrameCmdLists[i]->Close();
+			m_D3D12.FrameCmdLists[i]->Close();
 		}
 
 		// Fence for synchronization
-		m_DX12.Device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
-		                           IID_PPV_ARGS(&m_DX12.Fence));
-		m_DX12.FenceEvent = CreateEventA(nullptr, FALSE, FALSE, nullptr);
+		m_D3D12.Device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
+		                           IID_PPV_ARGS(&m_D3D12.Fence));
+		m_D3D12.FenceEvent = CreateEventA(nullptr, FALSE, FALSE, nullptr);
 
-		// Initialize ImGui DX12 backend
+		// Initialize ImGui D3D12 backend
 		ImGui_ImplDX12_InitInfo initInfo = {};
-		initInfo.Device               = m_DX12.Device;
-		initInfo.CommandQueue          = m_DX12.Queue;
+		initInfo.Device               = m_D3D12.Device;
+		initInfo.CommandQueue          = m_D3D12.Queue;
 		initInfo.NumFramesInFlight     = 2;
 		initInfo.RTVFormat            = DXGI_FORMAT_B8G8R8A8_UNORM;
 		initInfo.DSVFormat            = DXGI_FORMAT_UNKNOWN;
-		initInfo.SrvDescriptorHeap    = m_DX12.SRVHeap;
+		initInfo.SrvDescriptorHeap    = m_D3D12.SRVHeap;
 		initInfo.SrvDescriptorAllocFn = SRVAllocator;
 		initInfo.SrvDescriptorFreeFn  = nullptr;  // linear allocator, no free needed
 		initInfo.UserData             = this;
@@ -539,80 +539,80 @@ namespace Candy {
 		}
 	}
 
-	void ImGuiLayer::ShutdownDX12Backend()
+	void ImGuiLayer::ShutdownD3D12Backend()
 	{
 		// Wait for GPU to finish
-		if (m_DX12.Fence && m_DX12.Queue)
+		if (m_D3D12.Fence && m_D3D12.Queue)
 		{
-			m_DX12.FenceValue++;
-			m_DX12.Queue->Signal(m_DX12.Fence, m_DX12.FenceValue);
-			if (m_DX12.Fence->GetCompletedValue() < m_DX12.FenceValue)
+			m_D3D12.FenceValue++;
+			m_D3D12.Queue->Signal(m_D3D12.Fence, m_D3D12.FenceValue);
+			if (m_D3D12.Fence->GetCompletedValue() < m_D3D12.FenceValue)
 			{
-				m_DX12.Fence->SetEventOnCompletion(m_DX12.FenceValue, m_DX12.FenceEvent);
-				WaitForSingleObject(m_DX12.FenceEvent, INFINITE);
+				m_D3D12.Fence->SetEventOnCompletion(m_D3D12.FenceValue, m_D3D12.FenceEvent);
+				WaitForSingleObject(m_D3D12.FenceEvent, INFINITE);
 			}
 		}
 
 		for (int i = 0; i < 2; ++i)
 		{
-			if (m_DX12.FrameCmdLists[i])   m_DX12.FrameCmdLists[i]->Release();
-			if (m_DX12.FrameAllocators[i]) m_DX12.FrameAllocators[i]->Release();
+			if (m_D3D12.FrameCmdLists[i])   m_D3D12.FrameCmdLists[i]->Release();
+			if (m_D3D12.FrameAllocators[i]) m_D3D12.FrameAllocators[i]->Release();
 		}
-		if (m_DX12.SRVHeap) m_DX12.SRVHeap->Release();
-		if (m_DX12.Fence)   m_DX12.Fence->Release();
+		if (m_D3D12.SRVHeap) m_D3D12.SRVHeap->Release();
+		if (m_D3D12.Fence)   m_D3D12.Fence->Release();
 
-		if (m_DX12.FenceEvent)
+		if (m_D3D12.FenceEvent)
 		{
-			CloseHandle(m_DX12.FenceEvent);
-			m_DX12.FenceEvent = nullptr;
+			CloseHandle(m_D3D12.FenceEvent);
+			m_D3D12.FenceEvent = nullptr;
 		}
 
-		memset(&m_DX12, 0, sizeof(m_DX12));
+		memset(&m_D3D12, 0, sizeof(m_D3D12));
 	}
 
-	void ImGuiLayer::NewFrameDX12()
+	void ImGuiLayer::NewFrameD3D12()
 	{
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
 	}
 
-	void ImGuiLayer::RenderDX12(ImDrawData* drawData)
+	void ImGuiLayer::RenderD3D12(ImDrawData* drawData)
 	{
 		if (!drawData || drawData->CmdListsCount == 0)
 			return;
 
-		uint32_t fi = m_DX12.FrameIndex;
+		uint32_t fi = m_D3D12.FrameIndex;
 
 		// Wait for previous frame to complete
-		if (m_DX12.Fence->GetCompletedValue() < m_DX12.FenceValue)
+		if (m_D3D12.Fence->GetCompletedValue() < m_D3D12.FenceValue)
 		{
-			m_DX12.Fence->SetEventOnCompletion(m_DX12.FenceValue, m_DX12.FenceEvent);
-			WaitForSingleObject(m_DX12.FenceEvent, INFINITE);
+			m_D3D12.Fence->SetEventOnCompletion(m_D3D12.FenceValue, m_D3D12.FenceEvent);
+			WaitForSingleObject(m_D3D12.FenceEvent, INFINITE);
 		}
 
 		// Reset allocator and command list
-		m_DX12.FrameAllocators[fi]->Reset();
-		m_DX12.FrameCmdLists[fi]->Reset(m_DX12.FrameAllocators[fi], nullptr);
+		m_D3D12.FrameAllocators[fi]->Reset();
+		m_D3D12.FrameCmdLists[fi]->Reset(m_D3D12.FrameAllocators[fi], nullptr);
 
 		// Set descriptor heaps
-		ID3D12DescriptorHeap* heaps[] = { m_DX12.SRVHeap };
-		m_DX12.FrameCmdLists[fi]->SetDescriptorHeaps(1, heaps);
+		ID3D12DescriptorHeap* heaps[] = { m_D3D12.SRVHeap };
+		m_D3D12.FrameCmdLists[fi]->SetDescriptorHeaps(1, heaps);
 
 		// Render ImGui draw data
-		ImGui_ImplDX12_RenderDrawData(drawData, m_DX12.FrameCmdLists[fi]);
+		ImGui_ImplDX12_RenderDrawData(drawData, m_D3D12.FrameCmdLists[fi]);
 
-		m_DX12.FrameCmdLists[fi]->Close();
+		m_D3D12.FrameCmdLists[fi]->Close();
 
 		// Submit
-		ID3D12CommandList* lists[] = { m_DX12.FrameCmdLists[fi] };
-		m_DX12.Queue->ExecuteCommandLists(1, lists);
+		ID3D12CommandList* lists[] = { m_D3D12.FrameCmdLists[fi] };
+		m_D3D12.Queue->ExecuteCommandLists(1, lists);
 
 		// Signal fence for this frame
-		m_DX12.FenceValue++;
-		m_DX12.Queue->Signal(m_DX12.Fence, m_DX12.FenceValue);
+		m_D3D12.FenceValue++;
+		m_D3D12.Queue->Signal(m_D3D12.Fence, m_D3D12.FenceValue);
 
-		// Present the DX12 swap chain
-		auto* gfxCtx = static_cast<DX12GraphicsContext*>(
+		// Present the D3D12 swap chain
+		auto* gfxCtx = static_cast<D3D12GraphicsContext*>(
 			static_cast<WindowsWindow*>(&Application::Get().GetWindow())
 				->GetGraphicsContext());
 
@@ -624,10 +624,10 @@ namespace Candy {
 		}
 
 		// Advance frame index (double-buffered)
-		m_DX12.FrameIndex = (fi + 1) % 2;
+		m_D3D12.FrameIndex = (fi + 1) % 2;
 
 		// Reset SRV descriptor allocator
-		m_DX12.SRVHeapUsed = 0;
+		m_D3D12.SRVHeapUsed = 0;
 	}
 
 	// =========================================================================

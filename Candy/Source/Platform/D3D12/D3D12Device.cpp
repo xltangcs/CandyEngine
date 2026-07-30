@@ -5,12 +5,12 @@
 #include <dxgi1_6.h>
 #include <wrl/client.h>
 
-#include "Platform/DX12/DX12Device.h"
-#include "Platform/DX12/DX12Buffer.h"
-#include "Platform/DX12/DX12CommandBuffer.h"
-#include "Platform/DX12/DX12SwapChain.h"
-#include "Platform/DX12/DX12PipelineState.h"
-#include "Platform/DX12/DX12Texture.h"
+#include "Platform/D3D12/D3D12Device.h"
+#include "Platform/D3D12/D3D12Buffer.h"
+#include "Platform/D3D12/D3D12CommandBuffer.h"
+#include "Platform/D3D12/D3D12SwapChain.h"
+#include "Platform/D3D12/D3D12PipelineState.h"
+#include "Platform/D3D12/D3D12Texture.h"
 #include "Runtime/RHI/RHICommandQueue.h"
 #include "Runtime/Core/Log.h"
 
@@ -62,12 +62,12 @@ float4 main(PSInput input) : SV_TARGET
 )";
 
 	// =========================================================================
-	// DX12CommandQueue
+	// D3D12CommandQueue
 	// =========================================================================
-	class DX12CommandQueue : public RHICommandQueue
+	class D3D12CommandQueue : public RHICommandQueue
 	{
 	public:
-		DX12CommandQueue(ID3D12Device* device, ComPtr<ID3D12CommandQueue> queue,
+		D3D12CommandQueue(ID3D12Device* device, ComPtr<ID3D12CommandQueue> queue,
 		                 ID3D12DescriptorHeap* cbvSrvUavHeap,
 		                 ID3D12DescriptorHeap* samplerHeap)
 			: m_Device(device), m_Queue(std::move(queue))
@@ -76,7 +76,7 @@ float4 main(PSInput input) : SV_TARGET
 			HRESULT hr = device->CreateCommandAllocator(
 				D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_CommandAllocator));
 			if (FAILED(hr))
-				CANDY_CORE_ERROR("DX12CommandQueue: CreateCommandAllocator failed");
+				CANDY_CORE_ERROR("D3D12CommandQueue: CreateCommandAllocator failed");
 		}
 
 		Scope<RHICommandBuffer> CreateCommandBuffer() override
@@ -89,13 +89,13 @@ float4 main(PSInput input) : SV_TARGET
 
 			if (FAILED(hr))
 			{
-				CANDY_CORE_ERROR("DX12CommandQueue: CreateCommandList failed");
+				CANDY_CORE_ERROR("D3D12CommandQueue: CreateCommandList failed");
 				return nullptr;
 			}
 
 			cmdList->Close();
 
-			return Candy::CreateScope<DX12CommandBuffer>(
+			return Candy::CreateScope<D3D12CommandBuffer>(
 				std::move(cmdList), m_CommandAllocator.Get(), m_Device,
 				m_CBVSRVUAVHeap, m_SamplerHeap);
 		}
@@ -106,8 +106,8 @@ float4 main(PSInput input) : SV_TARGET
 			nativeLists.reserve(commandBuffers.size());
 			for (auto* cb : commandBuffers)
 			{
-				auto* dx12cb = static_cast<DX12CommandBuffer*>(cb);
-				if (auto* list = dx12cb->GetNativeCommandList())
+				auto* d3d12cb = static_cast<D3D12CommandBuffer*>(cb);
+				if (auto* list = d3d12cb->GetNativeCommandList())
 					nativeLists.push_back(list);
 			}
 			if (!nativeLists.empty())
@@ -116,26 +116,26 @@ float4 main(PSInput input) : SV_TARGET
 
 		void Present(const Ref<RHISwapChain>& swapChain) override
 		{
-			auto* dx12sc = dynamic_cast<DX12SwapChain*>(swapChain.get());
-			if (!dx12sc)
+			auto* d3d12sc = dynamic_cast<D3D12SwapChain*>(swapChain.get());
+			if (!d3d12sc)
 			{
-				CANDY_CORE_ERROR("DX12CommandQueue::Present: not a DX12SwapChain");
+				CANDY_CORE_ERROR("D3D12CommandQueue::Present: not a D3D12SwapChain");
 				return;
 			}
 
-			UINT syncInterval = dx12sc->GetDesc().VSync ? 1u : 0u;
-			UINT presentFlags = dx12sc->GetDesc().VSync ? 0u : DXGI_PRESENT_ALLOW_TEARING;
+			UINT syncInterval = d3d12sc->GetDesc().VSync ? 1u : 0u;
+			UINT presentFlags = d3d12sc->GetDesc().VSync ? 0u : DXGI_PRESENT_ALLOW_TEARING;
 
-			if (auto* sc = dx12sc->GetSwapChain())
+			if (auto* sc = d3d12sc->GetSwapChain())
 			{
 				sc->Present(syncInterval, presentFlags);
-				dx12sc->AdvanceFrame();
+				d3d12sc->AdvanceFrame();
 			}
 		}
 
 		void WaitIdle() override
 		{
-			CANDY_CORE_WARN("TODO: DX12CommandQueue::WaitIdle — use DX12Device::WaitIdle");
+			CANDY_CORE_WARN("TODO: D3D12CommandQueue::WaitIdle — use D3D12Device::WaitIdle");
 		}
 
 		[[nodiscard]] ID3D12CommandQueue*   GetNativeQueue()   const { return m_Queue.Get(); }
@@ -155,19 +155,19 @@ float4 main(PSInput input) : SV_TARGET
 	};
 
 	// =========================================================================
-	// DX12Device — Constructor
+	// D3D12Device — Constructor
 	// =========================================================================
 
-	DX12Device::DX12Device()
+	D3D12Device::D3D12Device()
 	{
-		CANDY_CORE_INFO("DX12Device: initializing...");
+		CANDY_CORE_INFO("D3D12Device: initializing...");
 
 #if defined(CANDY_DEBUG)
 		ComPtr<ID3D12Debug> debugController;
 		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 		{
 			debugController->EnableDebugLayer();
-			CANDY_CORE_INFO("DX12Device: debug layer enabled");
+			CANDY_CORE_INFO("D3D12Device: debug layer enabled");
 		}
 #endif
 
@@ -185,7 +185,7 @@ float4 main(PSInput input) : SV_TARGET
 
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12Device: failed to create DXGI factory");
+			CANDY_CORE_ERROR("D3D12Device: failed to create DXGI factory");
 			return;
 		}
 
@@ -205,7 +205,7 @@ float4 main(PSInput input) : SV_TARGET
 			{
 				std::wstring wideName(desc.Description);
 				std::string name(wideName.begin(), wideName.end());
-				CANDY_CORE_INFO("DX12Device: selected adapter '{}'", name);
+				CANDY_CORE_INFO("D3D12Device: selected adapter '{}'", name);
 				break;
 			}
 			adapter.Reset();
@@ -213,13 +213,13 @@ float4 main(PSInput input) : SV_TARGET
 
 		if (!adapter)
 		{
-			CANDY_CORE_WARN("DX12Device: no high-performance adapter, fallback to first");
+			CANDY_CORE_WARN("D3D12Device: no high-performance adapter, fallback to first");
 			m_Factory->EnumAdapters1(0, &adapter);
 		}
 
 		if (!adapter)
 		{
-			CANDY_CORE_ERROR("DX12Device: no D3D12-capable adapter found");
+			CANDY_CORE_ERROR("D3D12Device: no D3D12-capable adapter found");
 			return;
 		}
 
@@ -228,7 +228,7 @@ float4 main(PSInput input) : SV_TARGET
 		                       IID_PPV_ARGS(&m_NativeDevice));
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12Device: D3D12CreateDevice failed");
+			CANDY_CORE_ERROR("D3D12Device: D3D12CreateDevice failed");
 			return;
 		}
 
@@ -242,7 +242,7 @@ float4 main(PSInput input) : SV_TARGET
 
 			hr = m_NativeDevice->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_CBVSRVUAVHeap));
 			if (FAILED(hr))
-				CANDY_CORE_ERROR("DX12Device: CBV_SRV_UAV heap creation failed");
+				CANDY_CORE_ERROR("D3D12Device: CBV_SRV_UAV heap creation failed");
 			else
 				m_CBVSRVUAVDescriptorSize = m_NativeDevice->GetDescriptorHandleIncrementSize(
 					D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -257,7 +257,7 @@ float4 main(PSInput input) : SV_TARGET
 
 			hr = m_NativeDevice->CreateDescriptorHeap(&samplerHeapDesc, IID_PPV_ARGS(&m_SamplerHeap));
 			if (FAILED(hr))
-				CANDY_CORE_ERROR("DX12Device: Sampler heap creation failed");
+				CANDY_CORE_ERROR("D3D12Device: Sampler heap creation failed");
 			else
 				m_SamplerDescriptorSize = m_NativeDevice->GetDescriptorHandleIncrementSize(
 					D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
@@ -273,11 +273,11 @@ float4 main(PSInput input) : SV_TARGET
 		hr = m_NativeDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue));
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12Device: command queue creation failed");
+			CANDY_CORE_ERROR("D3D12Device: command queue creation failed");
 			return;
 		}
 
-		m_CommandQueue = CreateScope<DX12CommandQueue>(
+		m_CommandQueue = CreateScope<D3D12CommandQueue>(
 			m_NativeDevice.Get(), std::move(commandQueue),
 			m_CBVSRVUAVHeap.Get(), m_SamplerHeap.Get());
 
@@ -285,39 +285,39 @@ float4 main(PSInput input) : SV_TARGET
 		hr = m_NativeDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_Fence));
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12Device: fence creation failed");
+			CANDY_CORE_ERROR("D3D12Device: fence creation failed");
 			return;
 		}
 
 		m_FenceEvent = CreateEventA(nullptr, FALSE, FALSE, nullptr);
 
-		CANDY_CORE_INFO("DX12Device: initialization complete");
+		CANDY_CORE_INFO("D3D12Device: initialization complete");
 	}
 
-	DX12Device::~DX12Device()
+	D3D12Device::~D3D12Device()
 	{
 		WaitIdle();
 		if (m_FenceEvent) CloseHandle(m_FenceEvent);
-		CANDY_CORE_INFO("DX12Device: shutdown complete");
+		CANDY_CORE_INFO("D3D12Device: shutdown complete");
 	}
 
 	// ---- Native accessors ---------------------------------------------------
 
-	ID3D12CommandQueue* DX12Device::GetNativeQueue() const
+	ID3D12CommandQueue* D3D12Device::GetNativeQueue() const
 	{
-		auto* q = static_cast<DX12CommandQueue*>(m_CommandQueue.get());
+		auto* q = static_cast<D3D12CommandQueue*>(m_CommandQueue.get());
 		return q ? q->GetNativeQueue() : nullptr;
 	}
 
-	uint64_t DX12Device::SignalFence()
+	uint64_t D3D12Device::SignalFence()
 	{
 		++m_FenceValue;
-		auto* q = static_cast<DX12CommandQueue*>(m_CommandQueue.get());
+		auto* q = static_cast<D3D12CommandQueue*>(m_CommandQueue.get());
 		if (q) q->Signal(m_Fence.Get(), m_FenceValue);
 		return m_FenceValue;
 	}
 
-	void DX12Device::WaitForFenceValue(uint64_t value)
+	void D3D12Device::WaitForFenceValue(uint64_t value)
 	{
 		if (m_Fence->GetCompletedValue() < value)
 		{
@@ -328,7 +328,7 @@ float4 main(PSInput input) : SV_TARGET
 
 	// ---- Shader compilation -------------------------------------------------
 
-	ComPtr<ID3DBlob> DX12Device::CompileHLSL(
+	ComPtr<ID3DBlob> D3D12Device::CompileHLSL(
 		const char* source, const char* entryPoint,
 		const char* target, const std::string& debugName)
 	{
@@ -352,24 +352,24 @@ float4 main(PSInput input) : SV_TARGET
 		{
 			if (errors)
 			{
-				CANDY_CORE_ERROR("DX12Device: HLSL compile error in '{}' ({}):\n{}",
+				CANDY_CORE_ERROR("D3D12Device: HLSL compile error in '{}' ({}):\n{}",
 				                 debugName, entryPoint,
 				                 static_cast<const char*>(errors->GetBufferPointer()));
 			}
 			else
 			{
-				CANDY_CORE_ERROR("DX12Device: HLSL compile failed for '{}' ({})",
+				CANDY_CORE_ERROR("D3D12Device: HLSL compile failed for '{}' ({})",
 				                 debugName, entryPoint);
 			}
 			return nullptr;
 		}
 
-		CANDY_CORE_INFO("DX12Device: compiled '{}' ({}) — {} bytes",
+		CANDY_CORE_INFO("D3D12Device: compiled '{}' ({}) — {} bytes",
 		                debugName, target, bytecode->GetBufferSize());
 		return bytecode;
 	}
 
-	const std::vector<uint8_t>& DX12Device::GetTriangleVSBytecode()
+	const std::vector<uint8_t>& D3D12Device::GetTriangleVSBytecode()
 	{
 		if (m_TriangleVS.empty())
 		{
@@ -382,7 +382,7 @@ float4 main(PSInput input) : SV_TARGET
 		return m_TriangleVS;
 	}
 
-	const std::vector<uint8_t>& DX12Device::GetTrianglePSBytecode()
+	const std::vector<uint8_t>& D3D12Device::GetTrianglePSBytecode()
 	{
 		if (m_TrianglePS.empty())
 		{
@@ -397,7 +397,7 @@ float4 main(PSInput input) : SV_TARGET
 
 	// ---- Root signature -----------------------------------------------------
 
-	ComPtr<ID3D12RootSignature> DX12Device::CreateMinimalRootSignature()
+	ComPtr<ID3D12RootSignature> D3D12Device::CreateMinimalRootSignature()
 	{
 		// Root parameter 0: CBV (b0) — transform / per-draw constants
 		D3D12_ROOT_PARAMETER rootParams[2] = {};
@@ -454,7 +454,7 @@ float4 main(PSInput input) : SV_TARGET
 		if (FAILED(hr))
 		{
 			if (error)
-				CANDY_CORE_ERROR("DX12Device: RootSignature serialize error:\n{}",
+				CANDY_CORE_ERROR("D3D12Device: RootSignature serialize error:\n{}",
 				                 static_cast<const char*>(error->GetBufferPointer()));
 			return nullptr;
 		}
@@ -466,14 +466,14 @@ float4 main(PSInput input) : SV_TARGET
 
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12Device: CreateRootSignature failed");
+			CANDY_CORE_ERROR("D3D12Device: CreateRootSignature failed");
 			return nullptr;
 		}
 
 		return rootSig;
 	}
 
-	ComPtr<ID3D12RootSignature> DX12Device::CreateTexturedRootSignature()
+	ComPtr<ID3D12RootSignature> D3D12Device::CreateTexturedRootSignature()
 	{
 		// Parameter 0: CBV (b0)
 		// Parameter 1: descriptor table with 32 SRVs (t0-t31)
@@ -528,7 +528,7 @@ float4 main(PSInput input) : SV_TARGET
 		if (FAILED(hr))
 		{
 			if (error)
-				CANDY_CORE_ERROR("DX12Device: TexturedRootSignature error:\n{}",
+				CANDY_CORE_ERROR("D3D12Device: TexturedRootSignature error:\n{}",
 				                 static_cast<const char*>(error->GetBufferPointer()));
 			return nullptr;
 		}
@@ -540,7 +540,7 @@ float4 main(PSInput input) : SV_TARGET
 
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12Device: CreateTexturedRootSignature failed");
+			CANDY_CORE_ERROR("D3D12Device: CreateTexturedRootSignature failed");
 			return nullptr;
 		}
 
@@ -549,34 +549,34 @@ float4 main(PSInput input) : SV_TARGET
 
 	// ---- Resource creation ---------------------------------------------------
 
-	Ref<RHIBuffer> DX12Device::CreateBuffer(const BufferDesc& desc)
+	Ref<RHIBuffer> D3D12Device::CreateBuffer(const BufferDesc& desc)
 	{
-		return CreateRef<DX12Buffer>(m_NativeDevice.Get(), desc);
+		return CreateRef<D3D12Buffer>(m_NativeDevice.Get(), desc);
 	}
 
-	Ref<RHITexture> DX12Device::CreateTexture(const TextureDesc& desc)
+	Ref<RHITexture> D3D12Device::CreateTexture(const TextureDesc& desc)
 	{
-		return CreateRef<DX12Texture>(m_NativeDevice.Get(), desc);
+		return CreateRef<D3D12Texture>(m_NativeDevice.Get(), desc);
 	}
 
-	Ref<RHISampler> DX12Device::CreateSampler(const SamplerDesc& desc)
+	Ref<RHISampler> D3D12Device::CreateSampler(const SamplerDesc& desc)
 	{
-		return CreateRef<DX12Sampler>(m_NativeDevice.Get(), m_SamplerHeap.Get(),
+		return CreateRef<D3D12Sampler>(m_NativeDevice.Get(), m_SamplerHeap.Get(),
 		                              m_SamplerDescriptorSize, desc);
 	}
 
-	Ref<RHIShaderModule> DX12Device::CreateShaderModule(const void* bytecode, uint32_t byteSize, const std::string& debugName)
+	Ref<RHIShaderModule> D3D12Device::CreateShaderModule(const void* bytecode, uint32_t byteSize, const std::string& debugName)
 	{
 		// Store the bytecode for pipeline creation — the actual shader module
-		// is not a D3D12 runtime object; DX12 pipelines consume bytecode directly.
+		// is not a D3D12 runtime object; D3D12 pipelines consume bytecode directly.
 		// We wrap it in a simple blob holder.
-		struct DX12ShaderModule : public RHIShaderModule
+		struct D3D12ShaderModule : public RHIShaderModule
 		{
 			std::vector<uint8_t> Bytecode;
 			ShaderStage          Stage = ShaderStage::None;
 			std::string          Name;
 
-			DX12ShaderModule(const void* data, uint32_t size, ShaderStage stage, std::string_view name)
+			D3D12ShaderModule(const void* data, uint32_t size, ShaderStage stage, std::string_view name)
 				: Stage(stage), Name(name)
 			{
 				auto* ptr = static_cast<const uint8_t*>(data);
@@ -597,14 +597,14 @@ float4 main(PSInput input) : SV_TARGET
 
 		if (!bytecode || byteSize == 0)
 		{
-			CANDY_CORE_ERROR("DX12Device::CreateShaderModule: null bytecode");
+			CANDY_CORE_ERROR("D3D12Device::CreateShaderModule: null bytecode");
 			return nullptr;
 		}
 
-		return CreateRef<DX12ShaderModule>(bytecode, byteSize, ShaderStage::None, debugName);
+		return CreateRef<D3D12ShaderModule>(bytecode, byteSize, ShaderStage::None, debugName);
 	}
 
-	Ref<RHIGraphicsPipeline> DX12Device::CreateGraphicsPipeline(
+	Ref<RHIGraphicsPipeline> D3D12Device::CreateGraphicsPipeline(
 		const GraphicsPipelineDesc& desc,
 		const Ref<RHIShaderModule>& vs,
 		const Ref<RHIShaderModule>& fs)
@@ -657,7 +657,7 @@ float4 main(PSInput input) : SV_TARGET
 		auto rootSig = CreateMinimalRootSignature();
 		if (!rootSig)
 		{
-			CANDY_CORE_ERROR("DX12Device::CreateGraphicsPipeline: root signature failed");
+			CANDY_CORE_ERROR("D3D12Device::CreateGraphicsPipeline: root signature failed");
 			return nullptr;
 		}
 
@@ -767,29 +767,29 @@ float4 main(PSInput input) : SV_TARGET
 		HRESULT hr = m_NativeDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pso));
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12Device::CreateGraphicsPipeline: CreateGraphicsPipelineState failed");
+			CANDY_CORE_ERROR("D3D12Device::CreateGraphicsPipeline: CreateGraphicsPipelineState failed");
 			return nullptr;
 		}
 
-		auto pipeline = CreateRef<DX12GraphicsPipeline>(desc);
+		auto pipeline = CreateRef<D3D12GraphicsPipeline>(desc);
 		pipeline->SetNativePipeline(std::move(pso), std::move(rootSig));
 
 		GetPipelineCache().Insert(desc, pipeline);
 
-		CANDY_CORE_INFO("DX12Device::CreateGraphicsPipeline: pipeline created ({} attributes, {} RT format(s))",
+		CANDY_CORE_INFO("D3D12Device::CreateGraphicsPipeline: pipeline created ({} attributes, {} RT format(s))",
 		                desc.VertexInput.Attributes.size(), desc.RenderTargetFormats.size());
 
 		return pipeline;
 	}
 
-	Ref<RHIGraphicsPipeline> DX12Device::CreateGraphicsPipelineWithRootSig(
+	Ref<RHIGraphicsPipeline> D3D12Device::CreateGraphicsPipelineWithRootSig(
 		const GraphicsPipelineDesc& desc,
 		const Ref<RHIShaderModule>& vs, const Ref<RHIShaderModule>& fs,
 		ID3D12RootSignature* rootSig)
 	{
 		if (!rootSig)
 		{
-			CANDY_CORE_ERROR("DX12Device::CreateGraphicsPipelineWithRootSig: null root signature");
+			CANDY_CORE_ERROR("D3D12Device::CreateGraphicsPipelineWithRootSig: null root signature");
 			return nullptr;
 		}
 
@@ -868,30 +868,30 @@ float4 main(PSInput input) : SV_TARGET
 		HRESULT hr = m_NativeDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pso));
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12Device::CreateGraphicsPipelineWithRootSig: CreateGraphicsPipelineState failed");
+			CANDY_CORE_ERROR("D3D12Device::CreateGraphicsPipelineWithRootSig: CreateGraphicsPipelineState failed");
 			return nullptr;
 		}
 
-		auto pipeline = CreateRef<DX12GraphicsPipeline>(desc);
+		auto pipeline = CreateRef<D3D12GraphicsPipeline>(desc);
 		pipeline->SetNativePipeline(std::move(pso), rootSig);
 		return pipeline;
 	}
 
-	Ref<RHISwapChain> DX12Device::CreateSwapChain(const SwapChainDesc& desc)
+	Ref<RHISwapChain> D3D12Device::CreateSwapChain(const SwapChainDesc& desc)
 	{
-		return CreateRef<DX12SwapChain>(
+		return CreateRef<D3D12SwapChain>(
 			m_NativeDevice.Get(), m_Factory.Get(),
 			GetNativeQueue(), desc);
 	}
 
 	// ---- Command submission -------------------------------------------------
 
-	RHICommandQueue& DX12Device::GetCommandQueue()
+	RHICommandQueue& D3D12Device::GetCommandQueue()
 	{
 		return *m_CommandQueue;
 	}
 
-	void DX12Device::WaitIdle()
+	void D3D12Device::WaitIdle()
 	{
 		uint64_t fenceValue = SignalFence();
 		WaitForFenceValue(fenceValue);
@@ -899,7 +899,7 @@ float4 main(PSInput input) : SV_TARGET
 
 	// ---- Vertex buffer helpers -----------------------------------------------
 
-	Ref<RHIBuffer> DX12Device::CreateTriangleVertexBuffer()
+	Ref<RHIBuffer> D3D12Device::CreateTriangleVertexBuffer()
 	{
 		// Single triangle: 3 vertices, each Position(3 floats) + Color(4 floats)
 		VertexPosColor vertices[] = {
@@ -912,20 +912,20 @@ float4 main(PSInput input) : SV_TARGET
 		                               ResourceUsage::VertexBuffer, "TriangleVB");
 	}
 
-	Ref<RHIBuffer> DX12Device::CreateTriangleIndexBuffer()
+	Ref<RHIBuffer> D3D12Device::CreateTriangleIndexBuffer()
 	{
 		uint32_t indices[] = { 0, 1, 2 };
 		return CreateGPUBufferWithData(indices, sizeof(indices),
 		                               ResourceUsage::IndexBuffer, "TriangleIB");
 	}
 
-	Ref<RHIBuffer> DX12Device::CreateVertexBufferWithData(const void* data, uint64_t size,
+	Ref<RHIBuffer> D3D12Device::CreateVertexBufferWithData(const void* data, uint64_t size,
 	                                                      std::string_view debugName)
 	{
 		return CreateGPUBufferWithData(data, size, ResourceUsage::VertexBuffer, debugName);
 	}
 
-	Ref<RHIBuffer> DX12Device::CreateGPUBufferWithData(const void* data, uint64_t size,
+	Ref<RHIBuffer> D3D12Device::CreateGPUBufferWithData(const void* data, uint64_t size,
 	                                                   ResourceUsage usage,
 	                                                   std::string_view debugName)
 	{
@@ -939,10 +939,10 @@ float4 main(PSInput input) : SV_TARGET
 		uploadDesc.CPUAccessible = true;
 		uploadDesc.DebugName     = std::string(debugName) + "_Upload";
 
-		auto uploadBuffer = CreateRef<DX12Buffer>(m_NativeDevice.Get(), uploadDesc);
+		auto uploadBuffer = CreateRef<D3D12Buffer>(m_NativeDevice.Get(), uploadDesc);
 		if (!uploadBuffer->GetResource())
 		{
-			CANDY_CORE_ERROR("DX12Device::CreateGPUBufferWithData: upload buffer creation failed");
+			CANDY_CORE_ERROR("D3D12Device::CreateGPUBufferWithData: upload buffer creation failed");
 			return nullptr;
 		}
 
@@ -958,10 +958,10 @@ float4 main(PSInput input) : SV_TARGET
 		gpuDesc.CPUAccessible = false;
 		gpuDesc.DebugName     = std::string(debugName);
 
-		auto gpuBuffer = CreateRef<DX12Buffer>(m_NativeDevice.Get(), gpuDesc);
+		auto gpuBuffer = CreateRef<D3D12Buffer>(m_NativeDevice.Get(), gpuDesc);
 		if (!gpuBuffer->GetResource())
 		{
-			CANDY_CORE_ERROR("DX12Device::CreateGPUBufferWithData: GPU buffer creation failed");
+			CANDY_CORE_ERROR("D3D12Device::CreateGPUBufferWithData: GPU buffer creation failed");
 			return nullptr;
 		}
 
@@ -971,7 +971,7 @@ float4 main(PSInput input) : SV_TARGET
 			D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&tempAllocator));
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12Device::CreateGPUBufferWithData: temp allocator failed");
+			CANDY_CORE_ERROR("D3D12Device::CreateGPUBufferWithData: temp allocator failed");
 			return nullptr;
 		}
 
@@ -981,7 +981,7 @@ float4 main(PSInput input) : SV_TARGET
 		                                       IID_PPV_ARGS(&tempCmdList));
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12Device::CreateGPUBufferWithData: temp cmd list failed");
+			CANDY_CORE_ERROR("D3D12Device::CreateGPUBufferWithData: temp cmd list failed");
 			return nullptr;
 		}
 
@@ -1021,7 +1021,7 @@ float4 main(PSInput input) : SV_TARGET
 		return gpuBuffer;
 	}
 
-	Ref<RHIBuffer> DX12Device::CreateIdentityMVPBuffer()
+	Ref<RHIBuffer> D3D12Device::CreateIdentityMVPBuffer()
 	{
 		// 4x4 row-major identity matrix (64 bytes)
 		float identity[16] = {

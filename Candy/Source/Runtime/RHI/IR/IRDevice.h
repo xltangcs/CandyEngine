@@ -12,7 +12,7 @@
 namespace Candy::IR {
 
 	// =========================================================================
-	// IRDevice — common base class for VulkanDevice and DX12Device
+	// IRDevice — common base class for VulkanDevice and D3D12Device
 	//
 	// Aggregates all IR helper subsystems and provides shared logic that
 	// both backends need: resource tracking, PSO caching, descriptor set

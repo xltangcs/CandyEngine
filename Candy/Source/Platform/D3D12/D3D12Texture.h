@@ -8,13 +8,13 @@
 namespace Candy {
 
 	// =========================================================================
-	// DX12Texture — wraps ID3D12Resource for a 2D texture
+	// D3D12Texture — wraps ID3D12Resource for a 2D texture
 	// =========================================================================
-	class DX12Texture : public RHITexture
+	class D3D12Texture : public RHITexture
 	{
 	public:
-		DX12Texture(ID3D12Device* device, const TextureDesc& desc);
-		virtual ~DX12Texture();
+		D3D12Texture(ID3D12Device* device, const TextureDesc& desc);
+		virtual ~D3D12Texture();
 
 		const TextureDesc& GetDesc() const override { return m_Desc; }
 
@@ -36,14 +36,14 @@ namespace Candy {
 	};
 
 	// =========================================================================
-	// DX12Sampler — wraps a sampler descriptor in the device sampler heap
+	// D3D12Sampler — wraps a sampler descriptor in the device sampler heap
 	// =========================================================================
-	class DX12Sampler : public RHISampler
+	class D3D12Sampler : public RHISampler
 	{
 	public:
-		DX12Sampler(ID3D12Device* device, ID3D12DescriptorHeap* samplerHeap,
+		D3D12Sampler(ID3D12Device* device, ID3D12DescriptorHeap* samplerHeap,
 		            uint32_t descriptorSize, const SamplerDesc& desc);
-		virtual ~DX12Sampler();
+		virtual ~D3D12Sampler();
 
 		const SamplerDesc& GetDesc() const override { return m_Desc; }
 

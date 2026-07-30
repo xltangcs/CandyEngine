@@ -2,8 +2,8 @@
 #include <Windows.h>
 #include <d3d12.h>
 
-#include "Platform/DX12/DX12Framebuffer.h"
-#include "Platform/DX12/DX12Device.h"
+#include "Platform/D3D12/D3D12Framebuffer.h"
+#include "Platform/D3D12/D3D12Device.h"
 #include "Runtime/Core/Log.h"
 
 using Microsoft::WRL::ComPtr;
@@ -29,7 +29,7 @@ namespace Candy {
 	// Constructor / Destructor
 	// =========================================================================
 
-	DX12Framebuffer::DX12Framebuffer(const FramebufferSpecification& spec, DX12Device* device)
+	D3D12Framebuffer::D3D12Framebuffer(const FramebufferSpecification& spec, D3D12Device* device)
 		: m_Specification(spec), m_Device(device)
 	{
 		for (auto& attachmentSpec : m_Specification.Attachments.Attachments)
@@ -42,7 +42,7 @@ namespace Candy {
 		Invalidate();
 	}
 
-	DX12Framebuffer::~DX12Framebuffer()
+	D3D12Framebuffer::~D3D12Framebuffer()
 	{
 		if (m_Specification.SwapChainTarget)
 			return;
@@ -54,14 +54,14 @@ namespace Candy {
 		m_ColorSRVGPUHandles.clear();
 		m_ReadbackBuffer.Reset();
 
-		CANDY_CORE_INFO("DX12Framebuffer: destroyed");
+		CANDY_CORE_INFO("D3D12Framebuffer: destroyed");
 	}
 
 	// =========================================================================
 	// Format mapping
 	// =========================================================================
 
-	DXGI_FORMAT DX12Framebuffer::MapFormat(FramebufferTextureFormat format) const
+	DXGI_FORMAT D3D12Framebuffer::MapFormat(FramebufferTextureFormat format) const
 	{
 		switch (format)
 		{
@@ -76,7 +76,7 @@ namespace Candy {
 	// Invalidate — (re)create all resources
 	// =========================================================================
 
-	void DX12Framebuffer::Invalidate()
+	void D3D12Framebuffer::Invalidate()
 	{
 		if (m_Specification.SwapChainTarget)
 		{
@@ -91,7 +91,7 @@ namespace Candy {
 		ID3D12Device* nativeDevice = m_Device ? m_Device->GetNativeDevice() : nullptr;
 		if (!nativeDevice)
 		{
-			CANDY_CORE_ERROR("DX12Framebuffer::Invalidate: null device");
+			CANDY_CORE_ERROR("D3D12Framebuffer::Invalidate: null device");
 			return;
 		}
 
@@ -117,7 +117,7 @@ namespace Candy {
 			HRESULT hr = nativeDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_RTVHeap));
 			if (FAILED(hr))
 			{
-				CANDY_CORE_ERROR("DX12Framebuffer: RTV heap creation failed");
+				CANDY_CORE_ERROR("D3D12Framebuffer: RTV heap creation failed");
 				return;
 			}
 			m_RTVDescriptorSize = nativeDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -135,7 +135,7 @@ namespace Candy {
 			HRESULT hr = nativeDevice->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_DSVHeap));
 			if (FAILED(hr))
 			{
-				CANDY_CORE_ERROR("DX12Framebuffer: DSV heap creation failed");
+				CANDY_CORE_ERROR("D3D12Framebuffer: DSV heap creation failed");
 				return;
 			}
 			m_DSVDescriptorSize = nativeDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
@@ -152,12 +152,12 @@ namespace Candy {
 		if (m_DepthAttachmentSpec.TextureFormat != FramebufferTextureFormat::None)
 			CreateDepthTexture();
 
-		CANDY_CORE_INFO("DX12Framebuffer: created {}x{} with {} color + {} depth attachments",
+		CANDY_CORE_INFO("D3D12Framebuffer: created {}x{} with {} color + {} depth attachments",
 		                width, height, colorCount,
 		                (m_DepthAttachmentSpec.TextureFormat != FramebufferTextureFormat::None) ? 1 : 0);
 	}
 
-	void DX12Framebuffer::CreateColorTexture(uint32_t index, FramebufferTextureFormat format)
+	void D3D12Framebuffer::CreateColorTexture(uint32_t index, FramebufferTextureFormat format)
 	{
 		ID3D12Device* nativeDevice = m_Device->GetNativeDevice();
 		uint32_t width  = m_Specification.Width;
@@ -195,7 +195,7 @@ namespace Candy {
 
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12Framebuffer: color attachment {} creation failed", index);
+			CANDY_CORE_ERROR("D3D12Framebuffer: color attachment {} creation failed", index);
 			return;
 		}
 
@@ -230,7 +230,7 @@ namespace Candy {
 		}
 	}
 
-	void DX12Framebuffer::CreateDepthTexture()
+	void D3D12Framebuffer::CreateDepthTexture()
 	{
 		ID3D12Device* nativeDevice = m_Device->GetNativeDevice();
 		uint32_t width  = m_Specification.Width;
@@ -263,7 +263,7 @@ namespace Candy {
 
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12Framebuffer: depth attachment creation failed");
+			CANDY_CORE_ERROR("D3D12Framebuffer: depth attachment creation failed");
 			return;
 		}
 
@@ -278,32 +278,32 @@ namespace Candy {
 	}
 
 	// =========================================================================
-	// Bind / Unbind — integrate with DX12 render pass
+	// Bind / Unbind — integrate with D3D12 render pass
 	// =========================================================================
 
-	void DX12Framebuffer::Bind()
+	void D3D12Framebuffer::Bind()
 	{
-		// In DX12, "bind" means setting this framebuffer as the active render
+		// In D3D12, "bind" means setting this framebuffer as the active render
 		// target for subsequent render pass recording.  The actual render target
 		// binding happens in BeginRenderPass when this framebuffer is passed.
 		// For now this is a no-op; the EditorLayer's rendering flow will be
 		// updated to pass the framebuffer to the command buffer's BeginRenderPass.
 	}
 
-	void DX12Framebuffer::Unbind()
+	void D3D12Framebuffer::Unbind()
 	{
-		// No-op in DX12 — render pass ends via EndRenderPass.
+		// No-op in D3D12 — render pass ends via EndRenderPass.
 	}
 
 	// =========================================================================
 	// Resize
 	// =========================================================================
 
-	void DX12Framebuffer::Resize(uint32_t width, uint32_t height)
+	void D3D12Framebuffer::Resize(uint32_t width, uint32_t height)
 	{
 		if (width == 0 || height == 0 || width > s_MaxFramebufferSize || height > s_MaxFramebufferSize)
 		{
-			CANDY_CORE_WARN("DX12Framebuffer: invalid resize dimensions {}x{}", width, height);
+			CANDY_CORE_WARN("D3D12Framebuffer: invalid resize dimensions {}x{}", width, height);
 			return;
 		}
 
@@ -314,14 +314,14 @@ namespace Candy {
 			return;
 
 		Invalidate();
-		CANDY_CORE_INFO("DX12Framebuffer: resized to {}x{}", width, height);
+		CANDY_CORE_INFO("D3D12Framebuffer: resized to {}x{}", width, height);
 	}
 
 	// =========================================================================
 	// ReadPixel — entity picking via readback
 	// =========================================================================
 
-	int DX12Framebuffer::ReadPixel(uint32_t attachmentIndex, int x, int y)
+	int D3D12Framebuffer::ReadPixel(uint32_t attachmentIndex, int x, int y)
 	{
 		CANDY_CORE_ASSERT(!m_Specification.SwapChainTarget);
 		CANDY_CORE_ASSERT(attachmentIndex < m_ColorAttachments.size());
@@ -368,7 +368,7 @@ namespace Candy {
 
 			if (FAILED(hr))
 			{
-				CANDY_CORE_ERROR("DX12Framebuffer::ReadPixel: readback buffer creation failed");
+				CANDY_CORE_ERROR("D3D12Framebuffer::ReadPixel: readback buffer creation failed");
 				return -1;
 			}
 			m_ReadbackBufferSize = bufferSize;
@@ -444,7 +444,7 @@ namespace Candy {
 	// ClearAttachment — clear a single color attachment
 	// =========================================================================
 
-	void DX12Framebuffer::ClearAttachment(uint32_t attachmentIndex, int value)
+	void D3D12Framebuffer::ClearAttachment(uint32_t attachmentIndex, int value)
 	{
 		CANDY_CORE_ASSERT(!m_Specification.SwapChainTarget);
 		CANDY_CORE_ASSERT(attachmentIndex < m_ColorAttachments.size());
@@ -481,12 +481,12 @@ namespace Candy {
 	// Accessors
 	// =========================================================================
 
-	uint32_t DX12Framebuffer::GetColorAttachmentRendererID(uint32_t index) const
+	uint32_t D3D12Framebuffer::GetColorAttachmentRendererID(uint32_t index) const
 	{
 		return static_cast<uint32_t>(GetColorAttachmentGPUHandle(index) & 0xFFFFFFFFull);
 	}
 
-	uint64_t DX12Framebuffer::GetColorAttachmentGPUHandle(uint32_t index) const
+	uint64_t D3D12Framebuffer::GetColorAttachmentGPUHandle(uint32_t index) const
 	{
 		if (m_Specification.SwapChainTarget)
 			return 0;
@@ -495,30 +495,30 @@ namespace Candy {
 			return 0;
 
 		// Return full 64-bit GPU descriptor handle .ptr
-		// In DX12 ImGui::Image path, this is cast to (ImTextureID)(uint64_t)ptr
+		// In D3D12 ImGui::Image path, this is cast to (ImTextureID)(uint64_t)ptr
 		return m_ColorSRVGPUHandles[index].ptr;
 	}
 
-	D3D12_CPU_DESCRIPTOR_HANDLE DX12Framebuffer::GetRTVHandle(uint32_t index) const
+	D3D12_CPU_DESCRIPTOR_HANDLE D3D12Framebuffer::GetRTVHandle(uint32_t index) const
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE handle = m_RTVHeap->GetCPUDescriptorHandleForHeapStart();
 		handle.ptr += static_cast<SIZE_T>(index) * m_RTVDescriptorSize;
 		return handle;
 	}
 
-	D3D12_CPU_DESCRIPTOR_HANDLE DX12Framebuffer::GetDSVHandle() const
+	D3D12_CPU_DESCRIPTOR_HANDLE D3D12Framebuffer::GetDSVHandle() const
 	{
 		if (!m_DSVHeap)
 			return {};
 		return m_DSVHeap->GetCPUDescriptorHandleForHeapStart();
 	}
 
-	bool DX12Framebuffer::HasDepthAttachment() const
+	bool D3D12Framebuffer::HasDepthAttachment() const
 	{
 		return m_DepthAttachmentSpec.TextureFormat != FramebufferTextureFormat::None;
 	}
 
-	D3D12_GPU_DESCRIPTOR_HANDLE DX12Framebuffer::GetColorSRVGPUHandle(uint32_t index) const
+	D3D12_GPU_DESCRIPTOR_HANDLE D3D12Framebuffer::GetColorSRVGPUHandle(uint32_t index) const
 	{
 		if (index < m_ColorSRVGPUHandles.size())
 			return m_ColorSRVGPUHandles[index];

@@ -3,43 +3,43 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 
-#include "Platform/DX12/DX12GraphicsContext.h"
-#include "Platform/DX12/DX12Device.h"
-#include "Platform/DX12/DX12SwapChain.h"
+#include "Platform/D3D12/D3D12GraphicsContext.h"
+#include "Platform/D3D12/D3D12Device.h"
+#include "Platform/D3D12/D3D12SwapChain.h"
 #include "Runtime/Core/Log.h"
 #include "Runtime/RHI/RHISwapChain.h"
 
 namespace Candy {
 
-	DX12GraphicsContext::DX12GraphicsContext(const WindowHandle& handle)
+	D3D12GraphicsContext::D3D12GraphicsContext(const WindowHandle& handle)
 		: m_Window(static_cast<GLFWwindow*>(handle.Native))
 	{
-		CANDY_CORE_ASSERT(m_Window, "DX12GraphicsContext: null window handle");
+		CANDY_CORE_ASSERT(m_Window, "D3D12GraphicsContext: null window handle");
 	}
 
-	DX12GraphicsContext::~DX12GraphicsContext()
+	D3D12GraphicsContext::~D3D12GraphicsContext()
 	{
-		CANDY_CORE_INFO("DX12GraphicsContext: shutting down");
+		CANDY_CORE_INFO("D3D12GraphicsContext: shutting down");
 		m_SwapChainRef.reset();
 		m_Device.reset();
 	}
 
-	void DX12GraphicsContext::Init()
+	void D3D12GraphicsContext::Init()
 	{
-		CANDY_CORE_INFO("DX12GraphicsContext: initializing...");
+		CANDY_CORE_INFO("D3D12GraphicsContext: initializing...");
 
-		// Create DX12 device
-		m_Device = std::make_unique<DX12Device>();
+		// Create D3D12 device
+		m_Device = std::make_unique<D3D12Device>();
 		if (!m_Device->GetNativeDevice())
 		{
-			CANDY_CORE_ERROR("DX12GraphicsContext: DX12Device creation failed");
+			CANDY_CORE_ERROR("D3D12GraphicsContext: D3D12Device creation failed");
 			return;
 		}
 
 		HWND hwnd = glfwGetWin32Window(m_Window);
 		if (!hwnd)
 		{
-			CANDY_CORE_ERROR("DX12GraphicsContext: failed to get HWND from GLFW window");
+			CANDY_CORE_ERROR("D3D12GraphicsContext: failed to get HWND from GLFW window");
 			return;
 		}
 
@@ -57,21 +57,21 @@ namespace Candy {
 		auto sc = m_Device->CreateSwapChain(scDesc);
 		if (!sc)
 		{
-			CANDY_CORE_ERROR("DX12GraphicsContext: SwapChain creation failed");
+			CANDY_CORE_ERROR("D3D12GraphicsContext: SwapChain creation failed");
 			return;
 		}
 
 		// Store swap chain as Ref<> (shared_ptr), cast as needed
 		m_SwapChainRef = sc;
 
-		CANDY_CORE_INFO("DX12GraphicsContext: initialized ({}x{})", width, height);
+		CANDY_CORE_INFO("D3D12GraphicsContext: initialized ({}x{})", width, height);
 	}
 
-	void DX12GraphicsContext::SwapBuffers()
+	void D3D12GraphicsContext::SwapBuffers()
 	{
-		// DX12 presents explicitly via the command queue during the render
+		// D3D12 presents explicitly via the command queue during the render
 		// pass.  This hook is a no-op; the platform window's OnUpdate calls
-		// SwapBuffers after all layers have finished rendering, but in DX12
+		// SwapBuffers after all layers have finished rendering, but in D3D12
 		// mode the presentation has already happened.
 	}
 

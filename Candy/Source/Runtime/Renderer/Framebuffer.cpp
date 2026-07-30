@@ -6,8 +6,8 @@
 #include "Runtime/Core/Application.h"
 #include "Platform/OpenGL/OpenGLFramebuffer.h"
 #include <Windows.h>
-#include "Platform/DX12/DX12Framebuffer.h"
-#include "Platform/DX12/DX12GraphicsContext.h"
+#include "Platform/D3D12/D3D12Framebuffer.h"
+#include "Platform/D3D12/D3D12GraphicsContext.h"
 #include "Platform/Vulkan/VulkanFramebuffer.h"
 #include "Platform/Vulkan/VulkanGraphicsContext.h"
 
@@ -19,15 +19,15 @@ namespace Candy {
 		{
 		case RendererAPI::API::None:    CANDY_CORE_ASSERT(false, "RendererAPI::None is currently not supported!"); return nullptr;
 		case RendererAPI::API::OpenGL:  return CreateRef<OpenGLFramebuffer>(spec);
-		case RendererAPI::API::DX12:
+		case RendererAPI::API::D3D12:
 		{
-			// DX12Framebuffer needs the DX12Device for resource creation.
+			// D3D12Framebuffer needs the D3D12Device for resource creation.
 			// Try to get it from the active GraphicsContext.
 			auto* ctx = Application::Get().GetWindow().GetGraphicsContext();
-			auto* dx12Ctx = dynamic_cast<DX12GraphicsContext*>(ctx);
-			if (dx12Ctx)
-				return CreateRef<DX12Framebuffer>(spec, dx12Ctx->GetDevice());
-			CANDY_CORE_ERROR("Framebuffer::Create: DX12 API selected but no DX12GraphicsContext found");
+			auto* d3d12Ctx = dynamic_cast<D3D12GraphicsContext*>(ctx);
+			if (d3d12Ctx)
+				return CreateRef<D3D12Framebuffer>(spec, d3d12Ctx->GetDevice());
+			CANDY_CORE_ERROR("Framebuffer::Create: D3D12 API selected but no D3D12GraphicsContext found");
 			return nullptr;
 		}
 		case RendererAPI::API::Vulkan:

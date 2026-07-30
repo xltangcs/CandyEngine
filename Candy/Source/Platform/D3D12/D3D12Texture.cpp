@@ -2,7 +2,7 @@
 #include <Windows.h>
 #include <d3d12.h>
 
-#include "Platform/DX12/DX12Texture.h"
+#include "Platform/D3D12/D3D12Texture.h"
 #include "Runtime/Core/Log.h"
 
 namespace Candy {
@@ -56,16 +56,16 @@ namespace Candy {
 	}
 
 	// =========================================================================
-	// DX12Texture
+	// D3D12Texture
 	// =========================================================================
 
-	DX12Texture::DX12Texture(ID3D12Device* device, const TextureDesc& desc)
+	D3D12Texture::D3D12Texture(ID3D12Device* device, const TextureDesc& desc)
 		: m_Desc(desc), m_Device(device)
 	{
 		DXGI_FORMAT dxgiFormat = MapRHIFormatToDXGI(desc.Format);
 		if (dxgiFormat == DXGI_FORMAT_UNKNOWN)
 		{
-			CANDY_CORE_ERROR("DX12Texture: unsupported format");
+			CANDY_CORE_ERROR("D3D12Texture: unsupported format");
 			return;
 		}
 
@@ -109,23 +109,23 @@ namespace Candy {
 
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12Texture: CreateCommittedResource failed for {}x{} texture",
+			CANDY_CORE_ERROR("D3D12Texture: CreateCommittedResource failed for {}x{} texture",
 			                 desc.Width, desc.Height);
 			return;
 		}
 
 		m_State = D3D12_RESOURCE_STATE_COMMON;
 
-		CANDY_CORE_INFO("DX12Texture: created {}x{} (format: {}, mips: {})",
+		CANDY_CORE_INFO("D3D12Texture: created {}x{} (format: {}, mips: {})",
 		                desc.Width, desc.Height, static_cast<int>(desc.Format), desc.MipLevels);
 	}
 
-	DX12Texture::~DX12Texture()
+	D3D12Texture::~D3D12Texture()
 	{
 		m_Resource.Reset();
 	}
 
-	void DX12Texture::SetData(const void* data, uint32_t rowPitch, uint32_t slicePitch)
+	void D3D12Texture::SetData(const void* data, uint32_t rowPitch, uint32_t slicePitch)
 	{
 		if (!data || !m_Resource || !m_Device)
 			return;
@@ -161,7 +161,7 @@ namespace Candy {
 
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12Texture::SetData: upload buffer creation failed");
+			CANDY_CORE_ERROR("D3D12Texture::SetData: upload buffer creation failed");
 			return;
 		}
 
@@ -232,7 +232,7 @@ namespace Candy {
 		m_State = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 	}
 
-	void DX12Texture::CreateSRV(ID3D12DescriptorHeap* heap, uint32_t slotIndex, uint32_t descriptorSize) const
+	void D3D12Texture::CreateSRV(ID3D12DescriptorHeap* heap, uint32_t slotIndex, uint32_t descriptorSize) const
 	{
 		if (!m_Resource || !m_Device || !heap)
 			return;
@@ -251,10 +251,10 @@ namespace Candy {
 	}
 
 	// =========================================================================
-	// DX12Sampler
+	// D3D12Sampler
 	// =========================================================================
 
-	DX12Sampler::DX12Sampler(ID3D12Device* device, ID3D12DescriptorHeap* samplerHeap,
+	D3D12Sampler::D3D12Sampler(ID3D12Device* device, ID3D12DescriptorHeap* samplerHeap,
 	                         uint32_t descriptorSize, const SamplerDesc& desc)
 		: m_Desc(desc), m_Device(device), m_SamplerHeap(samplerHeap)
 	{
@@ -280,6 +280,6 @@ namespace Candy {
 		device->CreateSampler(&samplerDesc, m_CPUHandle);
 	}
 
-	DX12Sampler::~DX12Sampler() = default;
+	D3D12Sampler::~D3D12Sampler() = default;
 
 } // namespace Candy

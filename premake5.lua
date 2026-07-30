@@ -46,7 +46,7 @@ else
 	print("  Vulkan (bundled headers in ThirdParty/Vulkan)")
 end
 
--- DX12: Windows SDK provides headers and libs automatically
+-- D3D12: Windows SDK provides headers and libs automatically
 
 
 group "Dependencies"

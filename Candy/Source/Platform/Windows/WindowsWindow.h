@@ -30,7 +30,7 @@ namespace Candy {
 
 		void* GetNativeWindowHandle() const override;
 
-		/// Returns the graphics context for backend-specific access (DX12/Vulkan).
+		/// Returns the graphics context for backend-specific access (D3D12/Vulkan).
 		GraphicsContext* GetGraphicsContext() override { return m_Context.get(); }
 
 	private:

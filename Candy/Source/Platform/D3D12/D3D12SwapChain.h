@@ -11,17 +11,17 @@
 namespace Candy {
 
 	// =========================================================================
-	// DX12SwapChain — Direct3D 12 swap chain
+	// D3D12SwapChain — Direct3D 12 swap chain
 	//
 	// Owns IDXGISwapChain3, back-buffer ID3D12Resources, and RTV descriptor
-	// heap.  Created by DX12Device::CreateSwapChain().
+	// heap.  Created by D3D12Device::CreateSwapChain().
 	// =========================================================================
-	class DX12SwapChain : public RHISwapChain
+	class D3D12SwapChain : public RHISwapChain
 	{
 	public:
-		DX12SwapChain(ID3D12Device* device, IDXGIFactory6* factory,
+		D3D12SwapChain(ID3D12Device* device, IDXGIFactory6* factory,
 		              ID3D12CommandQueue* queue, const SwapChainDesc& desc);
-		virtual ~DX12SwapChain();
+		virtual ~D3D12SwapChain();
 
 		const SwapChainDesc& GetDesc() const override;
 
@@ -32,7 +32,7 @@ namespace Candy {
 		uint32_t GetWidth()  const override;
 		uint32_t GetHeight() const override;
 
-		// ---- DX12-specific accessors --------------------------------------
+		// ---- D3D12-specific accessors --------------------------------------
 
 		[[nodiscard]] ID3D12Resource* GetCurrentBackBufferResource() const;
 		[[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentRTVHandle() const;

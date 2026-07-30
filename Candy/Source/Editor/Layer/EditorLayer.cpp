@@ -26,7 +26,7 @@
 #include <cstdlib>
 
 #include "Runtime/Core/FileSystem.h"
-#include "Platform/DX12/DX12Framebuffer.h"
+#include "Platform/D3D12/D3D12Framebuffer.h"
 
 namespace Candy {
 
@@ -131,17 +131,17 @@ namespace Candy {
 		const auto& spec = m_Framebuffer->GetSpecification();
 		Candy::RenderCommand::SetViewport(0, 0, spec.Width, spec.Height);
 
-		// DX12: set active framebuffer so Renderer2D::Flush knows where to render
-		if (Candy::Renderer::GetAPI() == Candy::RendererAPI::API::DX12)
+		// D3D12: set active framebuffer so Renderer2D::Flush knows where to render
+		if (Candy::Renderer::GetAPI() == Candy::RendererAPI::API::D3D12)
 		{
-			auto* dx12FB = dynamic_cast<Candy::DX12Framebuffer*>(m_Framebuffer.get());
-			Candy::Renderer2D::SetDX12ActiveFramebuffer(dx12FB);
+			auto* d3d12FB = dynamic_cast<Candy::D3D12Framebuffer*>(m_Framebuffer.get());
+			Candy::Renderer2D::SetD3D12ActiveFramebuffer(d3d12FB);
 		}
 
 		// Clear color+depth FIRST, then clear entity-ID attachment to -1.
 		// Order matters: glClear wipes all draw buffers (including RED_INTEGER) with the
 		// float clear color, which would overwrite -1 with 0 and break entity picking.
-		// Note: In DX12, clearing happens inside Renderer2D::Flush via BeginRenderPass(Clear)
+		// Note: In D3D12, clearing happens inside Renderer2D::Flush via BeginRenderPass(Clear)
 		//       and ClearAttachment creates a temp command buffer for the entity-ID RTV.
 		Candy::RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1 });
 		Candy::RenderCommand::Clear();
@@ -851,11 +851,11 @@ namespace Candy {
 		RenderCommand::SetClearColor({ 0.0f, 0.0f, 0.0f, 1.0f });
 		RenderCommand::Clear();
 
-		// DX12: target camera preview framebuffer
-		if (Candy::Renderer::GetAPI() == Candy::RendererAPI::API::DX12)
+		// D3D12: target camera preview framebuffer
+		if (Candy::Renderer::GetAPI() == Candy::RendererAPI::API::D3D12)
 		{
-			auto* dx12FB = dynamic_cast<Candy::DX12Framebuffer*>(m_CameraPreviewFramebuffer.get());
-			Candy::Renderer2D::SetDX12ActiveFramebuffer(dx12FB);
+			auto* d3d12FB = dynamic_cast<Candy::D3D12Framebuffer*>(m_CameraPreviewFramebuffer.get());
+			Candy::Renderer2D::SetD3D12ActiveFramebuffer(d3d12FB);
 		}
 
 		m_ActiveScene->RenderSceneFromCamera(cameraComp, cameraTransform.GetTransform());
@@ -865,11 +865,11 @@ namespace Candy {
 		const auto& mainSpec = m_Framebuffer->GetSpecification();
 		RenderCommand::SetViewport(0, 0, mainSpec.Width, mainSpec.Height);
 
-		// DX12: restore main framebuffer as active target
-		if (Candy::Renderer::GetAPI() == Candy::RendererAPI::API::DX12)
+		// D3D12: restore main framebuffer as active target
+		if (Candy::Renderer::GetAPI() == Candy::RendererAPI::API::D3D12)
 		{
-			auto* dx12FB = dynamic_cast<Candy::DX12Framebuffer*>(m_Framebuffer.get());
-			Candy::Renderer2D::SetDX12ActiveFramebuffer(dx12FB);
+			auto* d3d12FB = dynamic_cast<Candy::D3D12Framebuffer*>(m_Framebuffer.get());
+			Candy::Renderer2D::SetD3D12ActiveFramebuffer(d3d12FB);
 		}
 
 		// Restore camera viewport to main viewport size

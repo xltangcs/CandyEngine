@@ -13,7 +13,7 @@ namespace Candy {
 		{
 		case RendererAPI::API::None:    CANDY_CORE_ASSERT(false, "RendererAPI::None is currently not supported!"); return nullptr;
 		case RendererAPI::API::OpenGL:  return CreateRef<OpenGLShader>(filepath);
-		case RendererAPI::API::DX12:    // DX12 uses inline HLSL compilation (see Renderer2D)
+		case RendererAPI::API::D3D12:    // D3D12 uses inline HLSL compilation (see Renderer2D)
 		case RendererAPI::API::Vulkan:  return nullptr;
 		}
 
@@ -27,7 +27,7 @@ namespace Candy {
 		{
 			case RendererAPI::API::None:    CANDY_CORE_ASSERT(false, "RendererAPI::None is currently not supported!"); return nullptr;
 			case RendererAPI::API::OpenGL:  return CreateRef<OpenGLShader>(name, vertexSrc, fragmentSrc);
-			case RendererAPI::API::DX12:
+			case RendererAPI::API::D3D12:
 			case RendererAPI::API::Vulkan:  return nullptr;
 		}
 		CANDY_CORE_ASSERT(false, "Unknown RendererAPI!");
@@ -40,7 +40,7 @@ namespace Candy {
 		{
 			case RendererAPI::API::None:    CANDY_CORE_ASSERT(false, "RendererAPI::None is currently not supported!"); return nullptr;
 			case RendererAPI::API::OpenGL:  return CreateRef<OpenGLShader>(name, source);
-			case RendererAPI::API::DX12:
+			case RendererAPI::API::D3D12:
 			case RendererAPI::API::Vulkan:  return nullptr;
 		}
 		CANDY_CORE_ASSERT(false, "Unknown RendererAPI!");

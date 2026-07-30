@@ -14,7 +14,7 @@ namespace Candy {
 		virtual uint32_t GetRendererID() const = 0;
 
 		/// Returns 64-bit renderer/GPU handle for ImGui::Image().
-		/// In OpenGL: zero-extended GLuint. In DX12: D3D12_GPU_DESCRIPTOR_HANDLE.ptr.
+		/// In OpenGL: zero-extended GLuint. In D3D12: D3D12_GPU_DESCRIPTOR_HANDLE.ptr.
 		virtual uint64_t GetRendererID64() const = 0;
 
 		virtual void SetData(void* data, uint32_t size) = 0;

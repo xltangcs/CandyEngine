@@ -13,15 +13,15 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-// DX12 backend includes
-#include "Platform/DX12/DX12Device.h"
-#include "Platform/DX12/DX12GraphicsContext.h"
-#include "Platform/DX12/DX12Buffer.h"
-#include "Platform/DX12/DX12PipelineState.h"
-#include "Platform/DX12/DX12Framebuffer.h"
-#include "Platform/DX12/DX12CommandBuffer.h"
-#include "Platform/DX12/DX12Texture2D.h"
-#include "Platform/DX12/DX12Texture.h"
+// D3D12 backend includes
+#include "Platform/D3D12/D3D12Device.h"
+#include "Platform/D3D12/D3D12GraphicsContext.h"
+#include "Platform/D3D12/D3D12Buffer.h"
+#include "Platform/D3D12/D3D12PipelineState.h"
+#include "Platform/D3D12/D3D12Framebuffer.h"
+#include "Platform/D3D12/D3D12CommandBuffer.h"
+#include "Platform/D3D12/D3D12Texture2D.h"
+#include "Platform/D3D12/D3D12Texture.h"
 #include "Platform/Vulkan/VulkanDevice.h"
 #include "Platform/Vulkan/VulkanGraphicsContext.h"
 #include "Platform/Vulkan/VulkanBuffer.h"
@@ -108,32 +108,32 @@ namespace Candy {
 		CameraData CameraBuffer;
 		Ref<UniformBuffer> CameraUniformBuffer;
 
-		// ---- DX12 backend data ----
-		bool DX12Active = false;
-		DX12Device* DX12Dev = nullptr;
+		// ---- D3D12 backend data ----
+		bool D3D12Active = false;
+		D3D12Device* D3D12Dev = nullptr;
 
 		// Vertex buffers (upload heap)
-		Ref<RHIBuffer> DX12QuadVB;
-		Ref<RHIBuffer> DX12QuadIB;
-		Ref<RHIBuffer> DX12CircleVB;
-		Ref<RHIBuffer> DX12LineVB;
-		Ref<RHIBuffer> DX12CameraCB; // constant buffer for ViewProjection
+		Ref<RHIBuffer> D3D12QuadVB;
+		Ref<RHIBuffer> D3D12QuadIB;
+		Ref<RHIBuffer> D3D12CircleVB;
+		Ref<RHIBuffer> D3D12LineVB;
+		Ref<RHIBuffer> D3D12CameraCB; // constant buffer for ViewProjection
 
 		// Pipelines
-		Ref<RHIGraphicsPipeline> DX12QuadPipeline;
-		Ref<RHIGraphicsPipeline> DX12CirclePipeline;
-		Ref<RHIGraphicsPipeline> DX12LinePipeline;
+		Ref<RHIGraphicsPipeline> D3D12QuadPipeline;
+		Ref<RHIGraphicsPipeline> D3D12CirclePipeline;
+		Ref<RHIGraphicsPipeline> D3D12LinePipeline;
 
 		// Shader modules
-		Ref<RHIShaderModule> DX12QuadVS, DX12QuadPS;
-		Ref<RHIShaderModule> DX12CircleVS, DX12CirclePS;
-		Ref<RHIShaderModule> DX12LineVS, DX12LinePS;
+		Ref<RHIShaderModule> D3D12QuadVS, D3D12QuadPS;
+		Ref<RHIShaderModule> D3D12CircleVS, D3D12CirclePS;
+		Ref<RHIShaderModule> D3D12LineVS, D3D12LinePS;
 
 		// Textured root signature (shared by quad pipeline)
-		Microsoft::WRL::ComPtr<ID3D12RootSignature> DX12TexturedRootSig;
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> D3D12TexturedRootSig;
 
-		// Active render target for DX12 flushing
-		DX12Framebuffer* DX12ActiveFramebuffer = nullptr;
+		// Active render target for D3D12 flushing
+		D3D12Framebuffer* D3D12ActiveFramebuffer = nullptr;
 
 		// ---- Vulkan backend data ----
 		bool VkActive = false;
@@ -156,7 +156,7 @@ namespace Candy {
 
 	void Renderer2D::Init()
 	{
-		s_Data.DX12Active = (Renderer::GetAPI() == RendererAPI::API::DX12);
+		s_Data.D3D12Active = (Renderer::GetAPI() == RendererAPI::API::D3D12);
 		s_Data.VkActive    = (Renderer::GetAPI() == RendererAPI::API::Vulkan);
 
 		if (s_Data.VkActive)
@@ -295,20 +295,20 @@ namespace Candy {
 			return;
 		}
 
-		if (s_Data.DX12Active)
+		if (s_Data.D3D12Active)
 		{
-			CANDY_CORE_INFO("Renderer2D: initializing DX12 backend...");
+			CANDY_CORE_INFO("Renderer2D: initializing D3D12 backend...");
 
-			// Get DX12Device
-			auto* gfxCtx = dynamic_cast<DX12GraphicsContext*>(
+			// Get D3D12Device
+			auto* gfxCtx = dynamic_cast<D3D12GraphicsContext*>(
 				Application::Get().GetWindow().GetGraphicsContext());
 			if (!gfxCtx)
 			{
-				CANDY_CORE_ERROR("Renderer2D: DX12 API selected but no DX12GraphicsContext");
-				s_Data.DX12Active = false;
+				CANDY_CORE_ERROR("Renderer2D: D3D12 API selected but no D3D12GraphicsContext");
+				s_Data.D3D12Active = false;
 				return;
 			}
-			s_Data.DX12Dev = gfxCtx->GetDevice();
+			s_Data.D3D12Dev = gfxCtx->GetDevice();
 
 			// --- CPU-side vertex buffers (same as OpenGL path, needed for batching) ---
 			s_Data.QuadVertexBufferBase   = new QuadVertex[s_Data.MaxVertices];
@@ -316,14 +316,14 @@ namespace Candy {
 			s_Data.LineVertexBufferBase   = new LineVertex[s_Data.MaxVertices];
 
 			// --- GPU vertex buffers (upload heap, CPU-writable) ---
-			auto* dev = s_Data.DX12Dev;
+			auto* dev = s_Data.D3D12Dev;
 			{
 				BufferDesc vbDesc;
 				vbDesc.Size          = s_Data.MaxVertices * sizeof(QuadVertex);
 				vbDesc.Usage         = ResourceUsage::VertexBuffer | ResourceUsage::CopyDst;
 				vbDesc.CPUAccessible = true;
 				vbDesc.DebugName     = "Renderer2D_QuadVB";
-				s_Data.DX12QuadVB = dev->CreateBuffer(vbDesc);
+				s_Data.D3D12QuadVB = dev->CreateBuffer(vbDesc);
 			}
 			{
 				BufferDesc vbDesc;
@@ -331,7 +331,7 @@ namespace Candy {
 				vbDesc.Usage         = ResourceUsage::VertexBuffer | ResourceUsage::CopyDst;
 				vbDesc.CPUAccessible = true;
 				vbDesc.DebugName     = "Renderer2D_CircleVB";
-				s_Data.DX12CircleVB = dev->CreateBuffer(vbDesc);
+				s_Data.D3D12CircleVB = dev->CreateBuffer(vbDesc);
 			}
 			{
 				BufferDesc vbDesc;
@@ -339,7 +339,7 @@ namespace Candy {
 				vbDesc.Usage         = ResourceUsage::VertexBuffer | ResourceUsage::CopyDst;
 				vbDesc.CPUAccessible = true;
 				vbDesc.DebugName     = "Renderer2D_LineVB";
-				s_Data.DX12LineVB = dev->CreateBuffer(vbDesc);
+				s_Data.D3D12LineVB = dev->CreateBuffer(vbDesc);
 			}
 
 			// --- Index buffer (same pattern for quad + circle) ---
@@ -356,7 +356,7 @@ namespace Candy {
 					quadIndices[i + 5] = offset + 0;
 					offset += 4;
 				}
-				s_Data.DX12QuadIB = dev->CreateGPUBufferWithData(
+				s_Data.D3D12QuadIB = dev->CreateGPUBufferWithData(
 					quadIndices, s_Data.MaxIndices * sizeof(uint32_t),
 					ResourceUsage::IndexBuffer, "Renderer2D_QuadIB");
 				delete[] quadIndices;
@@ -369,7 +369,7 @@ namespace Candy {
 				cbDesc.Usage         = ResourceUsage::ConstantBuffer;
 				cbDesc.CPUAccessible = true;
 				cbDesc.DebugName     = "Renderer2D_CameraCB";
-				s_Data.DX12CameraCB = dev->CreateBuffer(cbDesc);
+				s_Data.D3D12CameraCB = dev->CreateBuffer(cbDesc);
 			}
 
 			// --- Compile HLSL shaders ---
@@ -386,7 +386,7 @@ VSOutput VSMain(VSInput i) { VSOutput o; o.Position = mul(u_ViewProjection, floa
 )";
 				auto blob = dev->CompileHLSL(quadVSSrc, "VSMain", "vs_5_0", "Renderer2D_QuadVS");
 				if (blob)
-					s_Data.DX12QuadVS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "QuadVS");
+					s_Data.D3D12QuadVS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "QuadVS");
 
 				static const char* quadPSSrc = R"(
 Texture2D u_Textures[32] : register(t0);
@@ -397,7 +397,7 @@ PSOutput PSMain(PSInput i) { float2 uv = i.TexCoord * i.TilingFactor; int idx = 
 )";
 				auto psBlob = dev->CompileHLSL(quadPSSrc, "PSMain", "ps_5_0", "Renderer2D_QuadPS");
 				if (psBlob)
-					s_Data.DX12QuadPS = dev->CreateShaderModule(psBlob->GetBufferPointer(), static_cast<uint32_t>(psBlob->GetBufferSize()), "QuadPS");
+					s_Data.D3D12QuadPS = dev->CreateShaderModule(psBlob->GetBufferPointer(), static_cast<uint32_t>(psBlob->GetBufferSize()), "QuadPS");
 			}
 
 			// Circle
@@ -416,7 +416,7 @@ VSOutput VSMain(VSInput i) { VSOutput o; o.Position=mul(u_ViewProjection,float4(
 )";
 				auto blob = dev->CompileHLSL(circleVSSrc, "VSMain", "vs_5_0", "Renderer2D_CircleVS");
 				if (blob)
-					s_Data.DX12CircleVS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "CircleVS");
+					s_Data.D3D12CircleVS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "CircleVS");
 			}
 			{
 				static const char* circlePSSrc = R"(
@@ -426,7 +426,7 @@ PSOutput PSMain(PSInput i) { float d=1.0-length(i.LocalPosition); float c=smooth
 )";
 				auto blob = dev->CompileHLSL(circlePSSrc, "PSMain", "ps_5_0", "Renderer2D_CirclePS");
 				if (blob)
-					s_Data.DX12CirclePS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "CirclePS");
+					s_Data.D3D12CirclePS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "CirclePS");
 			}
 
 			// Line
@@ -439,7 +439,7 @@ VSOutput VSMain(VSInput i) { VSOutput o; o.Position=mul(u_ViewProjection,float4(
 )";
 				auto blob = dev->CompileHLSL(lineVSSrc, "VSMain", "vs_5_0", "Renderer2D_LineVS");
 				if (blob)
-					s_Data.DX12LineVS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "LineVS");
+					s_Data.D3D12LineVS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "LineVS");
 			}
 			{
 				static const char* linePSSrc = R"(
@@ -449,11 +449,11 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 )";
 				auto blob = dev->CompileHLSL(linePSSrc, "PSMain", "ps_5_0", "Renderer2D_LinePS");
 				if (blob)
-					s_Data.DX12LinePS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "LinePS");
+					s_Data.D3D12LinePS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "LinePS");
 			}
 
 			// --- Create textured root signature (shared by quad) ---
-			s_Data.DX12TexturedRootSig = dev->CreateTexturedRootSignature();
+			s_Data.D3D12TexturedRootSig = dev->CreateTexturedRootSignature();
 
 			// --- Create pipelines ---
 			{
@@ -484,16 +484,16 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 					qd.VertexInput.Attributes.push_back({ 4, 0, RHIFormat::R32Float,          offsetof(QuadVertex, TilingFactor) });  // TilingFactor
 					qd.VertexInput.Attributes.push_back({ 5, 0, RHIFormat::R32Sint,           offsetof(QuadVertex, EntityID) });      // EntityID
 
-					if (s_Data.DX12TexturedRootSig)
+					if (s_Data.D3D12TexturedRootSig)
 					{
 						// Create pipeline directly with textured root signature
-						s_Data.DX12QuadPipeline = dev->CreateGraphicsPipelineWithRootSig(
-							qd, s_Data.DX12QuadVS, s_Data.DX12QuadPS,
-							s_Data.DX12TexturedRootSig.Get());
+						s_Data.D3D12QuadPipeline = dev->CreateGraphicsPipelineWithRootSig(
+							qd, s_Data.D3D12QuadVS, s_Data.D3D12QuadPS,
+							s_Data.D3D12TexturedRootSig.Get());
 					}
 					else
 					{
-						s_Data.DX12QuadPipeline = dev->CreateGraphicsPipeline(qd, s_Data.DX12QuadVS, s_Data.DX12QuadPS);
+						s_Data.D3D12QuadPipeline = dev->CreateGraphicsPipeline(qd, s_Data.D3D12QuadVS, s_Data.D3D12QuadPS);
 					}
 				}
 
@@ -512,7 +512,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 					cd.VertexInput.Attributes.push_back({ 4, 0, RHIFormat::R32Float,          offsetof(CircleVertex, Fade) });
 					cd.VertexInput.Attributes.push_back({ 5, 0, RHIFormat::R32Sint,           offsetof(CircleVertex, EntityID) });
 
-					s_Data.DX12CirclePipeline = dev->CreateGraphicsPipeline(cd, s_Data.DX12CircleVS, s_Data.DX12CirclePS);
+					s_Data.D3D12CirclePipeline = dev->CreateGraphicsPipeline(cd, s_Data.D3D12CircleVS, s_Data.D3D12CirclePS);
 				}
 
 				// Line pipeline
@@ -529,7 +529,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 					ld.VertexInput.Attributes.push_back({ 1, 0, RHIFormat::R32G32B32A32Float, offsetof(LineVertex, Color) });
 					ld.VertexInput.Attributes.push_back({ 2, 0, RHIFormat::R32Sint,           offsetof(LineVertex, EntityID) });
 
-					s_Data.DX12LinePipeline = dev->CreateGraphicsPipeline(ld, s_Data.DX12LineVS, s_Data.DX12LinePS);
+					s_Data.D3D12LinePipeline = dev->CreateGraphicsPipeline(ld, s_Data.D3D12LineVS, s_Data.D3D12LinePS);
 				}
 			}
 
@@ -544,10 +544,10 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			s_Data.QuadVertexPositions[2] = {  0.5f,  0.5f, 0.0f, 1.0f };
 			s_Data.QuadVertexPositions[3] = { -0.5f,  0.5f, 0.0f, 1.0f };
 
-			// Set up dummy uniform buffer (not used for DX12, camera set via CB)
+			// Set up dummy uniform buffer (not used for D3D12, camera set via CB)
 			s_Data.CameraUniformBuffer = UniformBuffer::Create(sizeof(Renderer2DData::CameraData), 0);
 
-			CANDY_CORE_INFO("Renderer2D: DX12 backend initialized");
+			CANDY_CORE_INFO("Renderer2D: D3D12 backend initialized");
 			return;
 		}
 
@@ -648,22 +648,22 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 	void Renderer2D::Shutdown()
 	{
 		delete[] s_Data.QuadVertexBufferBase;
-		if (s_Data.DX12Active)
+		if (s_Data.D3D12Active)
 		{
 			delete[] s_Data.CircleVertexBufferBase;
 			delete[] s_Data.LineVertexBufferBase;
-			s_Data.DX12QuadVB.reset();
-			s_Data.DX12QuadIB.reset();
-			s_Data.DX12CircleVB.reset();
-			s_Data.DX12LineVB.reset();
-			s_Data.DX12CameraCB.reset();
-			s_Data.DX12QuadPipeline.reset();
-			s_Data.DX12CirclePipeline.reset();
-			s_Data.DX12LinePipeline.reset();
-			s_Data.DX12QuadVS.reset(); s_Data.DX12QuadPS.reset();
-			s_Data.DX12CircleVS.reset(); s_Data.DX12CirclePS.reset();
-			s_Data.DX12LineVS.reset(); s_Data.DX12LinePS.reset();
-			s_Data.DX12TexturedRootSig.Reset();
+			s_Data.D3D12QuadVB.reset();
+			s_Data.D3D12QuadIB.reset();
+			s_Data.D3D12CircleVB.reset();
+			s_Data.D3D12LineVB.reset();
+			s_Data.D3D12CameraCB.reset();
+			s_Data.D3D12QuadPipeline.reset();
+			s_Data.D3D12CirclePipeline.reset();
+			s_Data.D3D12LinePipeline.reset();
+			s_Data.D3D12QuadVS.reset(); s_Data.D3D12QuadPS.reset();
+			s_Data.D3D12CircleVS.reset(); s_Data.D3D12CirclePS.reset();
+			s_Data.D3D12LineVS.reset(); s_Data.D3D12LinePS.reset();
+			s_Data.D3D12TexturedRootSig.Reset();
 		}
 		if (s_Data.VkActive)
 		{
@@ -708,7 +708,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 
 	void Renderer2D::EndScene()
 	{
-		if (!s_Data.DX12Active)
+		if (!s_Data.D3D12Active)
 		{
 			uint32_t dataSize = (uint32_t)((uint8_t*)s_Data.QuadVertexBufferPtr - (uint8_t*)s_Data.QuadVertexBufferBase);
 			s_Data.QuadVertexBuffer->SetData(s_Data.QuadVertexBufferBase, dataSize);
@@ -827,42 +827,42 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			return;
 		}
 
-		if (s_Data.DX12Active)
+		if (s_Data.D3D12Active)
 		{
 			// =====================================================
-			// DX12 path — upload vertex data + record draws
+			// D3D12 path — upload vertex data + record draws
 			// =====================================================
-			auto* dev = s_Data.DX12Dev;
+			auto* dev = s_Data.D3D12Dev;
 			if (!dev) return;
 
 			// Upload camera constant buffer
 			{
-				auto* dx12CB = dynamic_cast<DX12Buffer*>(s_Data.DX12CameraCB.get());
-				if (dx12CB && dx12CB->GetResource())
+				auto* d3d12CB = dynamic_cast<D3D12Buffer*>(s_Data.D3D12CameraCB.get());
+				if (d3d12CB && d3d12CB->GetResource())
 				{
-					void* mapped = dx12CB->Map();
+					void* mapped = d3d12CB->Map();
 					memcpy(mapped, &s_Data.CameraBuffer, sizeof(s_Data.CameraBuffer));
-					dx12CB->Unmap();
+					d3d12CB->Unmap();
 				}
 			}
 
 			auto& queue = dev->GetCommandQueue();
 			auto  cmd   = queue.CreateCommandBuffer();
 			if (!cmd) return;
-			auto* dx12cb = static_cast<DX12CommandBuffer*>(cmd.get());
+			auto* d3d12cb = static_cast<D3D12CommandBuffer*>(cmd.get());
 
 			// Set render target
-			if (s_Data.DX12ActiveFramebuffer)
+			if (s_Data.D3D12ActiveFramebuffer)
 			{
-				dx12cb->SetFramebufferRenderTarget(s_Data.DX12ActiveFramebuffer);
+				d3d12cb->SetFramebufferRenderTarget(s_Data.D3D12ActiveFramebuffer);
 			}
 			else
 			{
 				// Fallback to swap chain (for non-viewport rendering)
-				auto* gfxCtx = dynamic_cast<DX12GraphicsContext*>(
+				auto* gfxCtx = dynamic_cast<D3D12GraphicsContext*>(
 					Application::Get().GetWindow().GetGraphicsContext());
 				if (gfxCtx)
-					dx12cb->SetSwapChainRenderTarget(gfxCtx->GetSwapChain());
+					d3d12cb->SetSwapChainRenderTarget(gfxCtx->GetSwapChain());
 			}
 
 			cmd->Begin();
@@ -879,7 +879,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 				rpDesc.ColorAttachments.push_back(colorAttachment);
 
 				// Entity ID attachment
-				if (s_Data.DX12ActiveFramebuffer && s_Data.DX12ActiveFramebuffer->GetColorAttachmentCount() > 1)
+				if (s_Data.D3D12ActiveFramebuffer && s_Data.D3D12ActiveFramebuffer->GetColorAttachmentCount() > 1)
 				{
 					RenderPassColorAttachment idAttachment;
 					idAttachment.Format = RHIFormat::R32Sint;
@@ -895,38 +895,38 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 
 			// Viewport + scissor
 			uint32_t vpW = 1280, vpH = 720;
-			if (s_Data.DX12ActiveFramebuffer)
+			if (s_Data.D3D12ActiveFramebuffer)
 			{
-				vpW = s_Data.DX12ActiveFramebuffer->GetSpecification().Width;
-				vpH = s_Data.DX12ActiveFramebuffer->GetSpecification().Height;
+				vpW = s_Data.D3D12ActiveFramebuffer->GetSpecification().Width;
+				vpH = s_Data.D3D12ActiveFramebuffer->GetSpecification().Height;
 			}
 			cmd->SetViewport(0, 0, static_cast<float>(vpW), static_cast<float>(vpH));
 			cmd->SetScissor(0, 0, vpW, vpH);
 
 			// --- Quad batch (textured) ---
-			if (s_Data.QuadIndexCount && s_Data.DX12QuadPipeline)
+			if (s_Data.QuadIndexCount && s_Data.D3D12QuadPipeline)
 			{
 				uint32_t dataSize = static_cast<uint32_t>(
 					reinterpret_cast<uint8_t*>(s_Data.QuadVertexBufferPtr) -
 					reinterpret_cast<uint8_t*>(s_Data.QuadVertexBufferBase));
 
-				auto* dx12VB = dynamic_cast<DX12Buffer*>(s_Data.DX12QuadVB.get());
-				if (dx12VB)
+				auto* d3d12VB = dynamic_cast<D3D12Buffer*>(s_Data.D3D12QuadVB.get());
+				if (d3d12VB)
 				{
-					void* mapped = dx12VB->Map();
+					void* mapped = d3d12VB->Map();
 					memcpy(mapped, s_Data.QuadVertexBufferBase, dataSize);
-					dx12VB->Unmap();
+					d3d12VB->Unmap();
 				}
 
-				cmd->SetPipeline(s_Data.DX12QuadPipeline);
-				cmd->SetConstantBuffer(0, 0, s_Data.DX12CameraCB);
-				cmd->SetVertexBuffer(s_Data.DX12QuadVB);
-				cmd->SetIndexBuffer(s_Data.DX12QuadIB);
+				cmd->SetPipeline(s_Data.D3D12QuadPipeline);
+				cmd->SetConstantBuffer(0, 0, s_Data.D3D12CameraCB);
+				cmd->SetVertexBuffer(s_Data.D3D12QuadVB);
+				cmd->SetIndexBuffer(s_Data.D3D12QuadIB);
 
 				// --- Bind textures via descriptor table ---
 				ID3D12DescriptorHeap* srvHeap = dev->GetCBVSRVUAVHeap();
 				uint32_t descSize = dev->GetCBVSRVDescriptorSize();
-				if (srvHeap && s_Data.DX12TexturedRootSig)
+				if (srvHeap && s_Data.D3D12TexturedRootSig)
 				{
 					// Allocate 32 SRV slots at descriptor range start (slot 0)
 					constexpr uint32_t kBaseSlot = 0;
@@ -939,20 +939,20 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 						D3D12_CPU_DESCRIPTOR_HANDLE dstCPU = cpuBase;
 						dstCPU.ptr += static_cast<SIZE_T>(i) * descSize;
 
-						auto* dx12Tex = dynamic_cast<DX12Texture2D*>(s_Data.TextureSlots[i].get());
-						if (dx12Tex && dx12Tex->GetRHI() && dx12Tex->GetRHI()->GetResource())
+						auto* d3d12Tex = dynamic_cast<D3D12Texture2D*>(s_Data.TextureSlots[i].get());
+						if (d3d12Tex && d3d12Tex->GetRHI() && d3d12Tex->GetRHI()->GetResource())
 						{
 							// Copy SRV descriptor from the texture's slot
 							D3D12_CPU_DESCRIPTOR_HANDLE srcCPU = srvHeap->GetCPUDescriptorHandleForHeapStart();
-							srcCPU.ptr += static_cast<SIZE_T>(dx12Tex->GetRHI() ? 160 : 0) * descSize;
+							srcCPU.ptr += static_cast<SIZE_T>(d3d12Tex->GetRHI() ? 160 : 0) * descSize;
 
 							// Rather than copy, just re-create the SRV at the target slot
-							dx12Tex->GetRHI()->CreateSRV(srvHeap, kBaseSlot + i, descSize);
+							d3d12Tex->GetRHI()->CreateSRV(srvHeap, kBaseSlot + i, descSize);
 						}
 						else
 						{
 							// White texture fallback: use the first Texture2D (slot 0)
-							auto* whiteTex = dynamic_cast<DX12Texture2D*>(s_Data.TextureSlots[0].get());
+							auto* whiteTex = dynamic_cast<D3D12Texture2D*>(s_Data.TextureSlots[0].get());
 							if (whiteTex && whiteTex->GetRHI())
 								whiteTex->GetRHI()->CreateSRV(srvHeap, kBaseSlot + i, descSize);
 						}
@@ -961,7 +961,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 					// Bind descriptor table (root parameter 1)
 					D3D12_GPU_DESCRIPTOR_HANDLE gpuTable = srvHeap->GetGPUDescriptorHandleForHeapStart();
 					gpuTable.ptr += static_cast<SIZE_T>(kBaseSlot) * descSize;
-					dx12cb->GetNativeCommandList()->SetGraphicsRootDescriptorTable(1, gpuTable);
+					d3d12cb->GetNativeCommandList()->SetGraphicsRootDescriptorTable(1, gpuTable);
 				}
 
 				cmd->DrawIndexed(s_Data.QuadIndexCount);
@@ -969,46 +969,46 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			}
 
 			// --- Circle batch ---
-			if (s_Data.CircleIndexCount && s_Data.DX12CirclePipeline)
+			if (s_Data.CircleIndexCount && s_Data.D3D12CirclePipeline)
 			{
 				uint32_t dataSize = static_cast<uint32_t>(
 					reinterpret_cast<uint8_t*>(s_Data.CircleVertexBufferPtr) -
 					reinterpret_cast<uint8_t*>(s_Data.CircleVertexBufferBase));
 
-				auto* dx12VB = dynamic_cast<DX12Buffer*>(s_Data.DX12CircleVB.get());
-				if (dx12VB)
+				auto* d3d12VB = dynamic_cast<D3D12Buffer*>(s_Data.D3D12CircleVB.get());
+				if (d3d12VB)
 				{
-					void* mapped = dx12VB->Map();
+					void* mapped = d3d12VB->Map();
 					memcpy(mapped, s_Data.CircleVertexBufferBase, dataSize);
-					dx12VB->Unmap();
+					d3d12VB->Unmap();
 				}
 
-				cmd->SetPipeline(s_Data.DX12CirclePipeline);
-				cmd->SetConstantBuffer(0, 0, s_Data.DX12CameraCB);
-				cmd->SetVertexBuffer(s_Data.DX12CircleVB);
-				cmd->SetIndexBuffer(s_Data.DX12QuadIB); // reuse quad IB
+				cmd->SetPipeline(s_Data.D3D12CirclePipeline);
+				cmd->SetConstantBuffer(0, 0, s_Data.D3D12CameraCB);
+				cmd->SetVertexBuffer(s_Data.D3D12CircleVB);
+				cmd->SetIndexBuffer(s_Data.D3D12QuadIB); // reuse quad IB
 				cmd->DrawIndexed(s_Data.CircleIndexCount);
 				s_Data.Stats.DrawCalls++;
 			}
 
 			// --- Line batch ---
-			if (s_Data.LineVertexCount && s_Data.DX12LinePipeline)
+			if (s_Data.LineVertexCount && s_Data.D3D12LinePipeline)
 			{
 				uint32_t dataSize = static_cast<uint32_t>(
 					reinterpret_cast<uint8_t*>(s_Data.LineVertexBufferPtr) -
 					reinterpret_cast<uint8_t*>(s_Data.LineVertexBufferBase));
 
-				auto* dx12VB = dynamic_cast<DX12Buffer*>(s_Data.DX12LineVB.get());
-				if (dx12VB)
+				auto* d3d12VB = dynamic_cast<D3D12Buffer*>(s_Data.D3D12LineVB.get());
+				if (d3d12VB)
 				{
-					void* mapped = dx12VB->Map();
+					void* mapped = d3d12VB->Map();
 					memcpy(mapped, s_Data.LineVertexBufferBase, dataSize);
-					dx12VB->Unmap();
+					d3d12VB->Unmap();
 				}
 
-				cmd->SetPipeline(s_Data.DX12LinePipeline);
-				cmd->SetConstantBuffer(0, 0, s_Data.DX12CameraCB);
-				cmd->SetVertexBuffer(s_Data.DX12LineVB);
+				cmd->SetPipeline(s_Data.D3D12LinePipeline);
+				cmd->SetConstantBuffer(0, 0, s_Data.D3D12CameraCB);
+				cmd->SetVertexBuffer(s_Data.D3D12LineVB);
 				cmd->Draw(s_Data.LineVertexCount);
 				s_Data.Stats.DrawCalls++;
 			}
@@ -1282,9 +1282,9 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 		return s_Data.Stats;
 	}
 
-	void Renderer2D::SetDX12ActiveFramebuffer(DX12Framebuffer* fb)
+	void Renderer2D::SetD3D12ActiveFramebuffer(D3D12Framebuffer* fb)
 	{
-		s_Data.DX12ActiveFramebuffer = fb;
+		s_Data.D3D12ActiveFramebuffer = fb;
 	}
 }
 

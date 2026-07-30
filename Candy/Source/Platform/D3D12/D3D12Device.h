@@ -11,16 +11,16 @@
 namespace Candy {
 
 	// =========================================================================
-	// DX12Device — Direct3D 12 backend
+	// D3D12Device — Direct3D 12 backend
 	//
 	// Owns ID3D12Device, IDXGIFactory6, command queue, fence, descriptor heaps,
 	// and a built-in shader cache for inline HLSL compilation.
 	// =========================================================================
-	class DX12Device : public IR::IRDevice
+	class D3D12Device : public IR::IRDevice
 	{
 	public:
-		DX12Device();
-		virtual ~DX12Device();
+		D3D12Device();
+		virtual ~D3D12Device();
 
 		// ---- Resource creation ----------------------------------------------
 
@@ -48,7 +48,7 @@ namespace Candy {
 
 		void WaitIdle() override;
 
-		// ---- DX12-specific native accessors --------------------------------
+		// ---- D3D12-specific native accessors --------------------------------
 
 		[[nodiscard]] ID3D12Device*        GetNativeDevice()       const { return m_NativeDevice.Get(); }
 		[[nodiscard]] IDXGIFactory6*       GetNativeFactory()      const { return m_Factory.Get(); }

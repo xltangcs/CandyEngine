@@ -8,17 +8,17 @@
 namespace Candy {
 
 	// =========================================================================
-	// DX12GraphicsPipeline — wraps ID3D12PipelineState + ID3D12RootSignature
+	// D3D12GraphicsPipeline — wraps ID3D12PipelineState + ID3D12RootSignature
 	// =========================================================================
-	class DX12GraphicsPipeline : public RHIGraphicsPipeline
+	class D3D12GraphicsPipeline : public RHIGraphicsPipeline
 	{
 	public:
-		DX12GraphicsPipeline(const GraphicsPipelineDesc& desc);
-		virtual ~DX12GraphicsPipeline();
+		D3D12GraphicsPipeline(const GraphicsPipelineDesc& desc);
+		virtual ~D3D12GraphicsPipeline();
 
 		[[nodiscard]] const GraphicsPipelineDesc& GetDesc() const { return m_Desc; }
 
-		// ---- Set by DX12Device after creation ------------------------------
+		// ---- Set by D3D12Device after creation ------------------------------
 
 		void SetNativePipeline(Microsoft::WRL::ComPtr<ID3D12PipelineState> pso,
 		                       Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig);

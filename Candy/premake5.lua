@@ -86,7 +86,7 @@ project "Candy"
 	filter "files:ThirdParty/miniaudio/**.cpp"
 	flags { "NoPCH" }
 
-	-- DX12/Vulkan files use CandyPCH.h which includes <Windows.h> with NOMINMAX.
+	-- D3D12/Vulkan files use CandyPCH.h which includes <Windows.h> with NOMINMAX.
 	-- NoPCH removed — let the PCH injection provide Base.h/Log.h/Ref<> etc.
 
 	filter "system:windows"

@@ -4,7 +4,7 @@
 // IR — Intermediate Representation layer aggregate header
 //
 // The IR layer sits between the RHI abstract interface and concrete
-// graphics backends (Vulkan, DX12).  It provides shared infrastructure:
+// graphics backends (Vulkan, D3D12).  It provides shared infrastructure:
 // resource tracking, PSO caching, descriptor set management, command
 // validation, memory sub-allocation, and shader caching.
 // =========================================================================

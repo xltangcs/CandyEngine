@@ -50,7 +50,7 @@ namespace Candy {
 			glfwSetErrorCallback(GLFWErrorCallback);
 		}
 
-		// For DX12/Vulkan, tell GLFW not to create an OpenGL context
+		// For D3D12/Vulkan, tell GLFW not to create an OpenGL context
 		if (Renderer::GetAPI() != RendererAPI::API::OpenGL)
 			glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		#if defined(CANDY_DEBUG)

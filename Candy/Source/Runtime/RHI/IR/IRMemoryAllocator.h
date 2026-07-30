@@ -15,9 +15,9 @@ namespace Candy::IR {
 	// the allocator acquires large GPU memory blocks and sub-allocates from
 	// them, drastically reducing driver overhead.
 	//
-	// Backends (Vulkan / DX12) fill in the actual memory handles:
+	// Backends (Vulkan / D3D12) fill in the actual memory handles:
 	//   Vulkan → VkDeviceMemory
-	//   DX12   → ID3D12Heap*
+	//   D3D12   → ID3D12Heap*
 	// =========================================================================
 	class IRMemoryAllocator
 	{

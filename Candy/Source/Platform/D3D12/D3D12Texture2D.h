@@ -7,23 +7,23 @@
 
 namespace Candy {
 
-	class DX12Device;
-	class DX12Texture;
+	class D3D12Device;
+	class D3D12Texture;
 
 	// =========================================================================
-	// DX12Texture2D — implements Texture2D backed by DX12Texture (RHI)
+	// D3D12Texture2D — implements Texture2D backed by D3D12Texture (RHI)
 	//
 	// Stores an SRV GPU descriptor handle for ImGui display via GetRendererID64.
-	// Texture data is uploaded via DX12Texture::SetData.
+	// Texture data is uploaded via D3D12Texture::SetData.
 	// =========================================================================
-	class DX12Texture2D : public Texture2D
+	class D3D12Texture2D : public Texture2D
 	{
 	public:
 		/// Create empty texture (width x height, RGBA8).
-		DX12Texture2D(DX12Device* device, uint32_t width, uint32_t height);
+		D3D12Texture2D(D3D12Device* device, uint32_t width, uint32_t height);
 		/// Load from file.
-		DX12Texture2D(DX12Device* device, const std::string& path);
-		virtual ~DX12Texture2D();
+		D3D12Texture2D(D3D12Device* device, const std::string& path);
+		virtual ~D3D12Texture2D();
 
 		uint32_t GetWidth()  const override { return m_Width; }
 		uint32_t GetHeight() const override { return m_Height; }
@@ -39,19 +39,19 @@ namespace Candy {
 
 		bool operator==(const Texture& other) const override
 		{
-			return m_SRVGPUHandle.ptr == static_cast<const DX12Texture2D&>(other).m_SRVGPUHandle.ptr;
+			return m_SRVGPUHandle.ptr == static_cast<const D3D12Texture2D&>(other).m_SRVGPUHandle.ptr;
 		}
 
-		[[nodiscard]] DX12Texture*       GetRHI()       { return m_RHI.get(); }
-		[[nodiscard]] const DX12Texture* GetRHI() const { return m_RHI.get(); }
+		[[nodiscard]] D3D12Texture*       GetRHI()       { return m_RHI.get(); }
+		[[nodiscard]] const D3D12Texture* GetRHI() const { return m_RHI.get(); }
 
 		[[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetSRVGPUHandle() const { return m_SRVGPUHandle; }
 
 	private:
 		void AllocateSRV();
 
-		DX12Device*                           m_Device = nullptr;
-		std::unique_ptr<DX12Texture>          m_RHI;
+		D3D12Device*                           m_Device = nullptr;
+		std::unique_ptr<D3D12Texture>          m_RHI;
 		D3D12_GPU_DESCRIPTOR_HANDLE           m_SRVGPUHandle = {};
 		std::string                           m_Path;
 		bool                                  m_IsLoaded = false;

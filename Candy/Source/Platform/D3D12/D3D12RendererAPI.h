@@ -4,22 +4,22 @@
 
 namespace Candy {
 
-	class DX12Device;
+	class D3D12Device;
 	class RHICommandBuffer;
 	class RHISwapChain;
 
 	// =========================================================================
-	// DX12RendererAPI — implements RendererAPI for the Direct3D 12 backend
+	// D3D12RendererAPI — implements RendererAPI for the Direct3D 12 backend
 	//
-	// Unlike OpenGL which has global state, DX12 requires an explicit command
+	// Unlike OpenGL which has global state, D3D12 requires an explicit command
 	// buffer for recording.  Call SetCommandBuffer() before each frame to
 	// provide the current buffer.  Without a command buffer, Clear()/Draw*()
 	// will be no-ops with a warning.
 	// =========================================================================
-	class DX12RendererAPI : public RendererAPI
+	class D3D12RendererAPI : public RendererAPI
 	{
 	public:
-		DX12RendererAPI() = default;
+		D3D12RendererAPI() = default;
 
 		void Init(const PipelineStateDescription& defaultState) override;
 		void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
@@ -32,8 +32,8 @@ namespace Candy {
 		void SetLineWidth(float width) override;
 		void SetDefaultPipelineState(const PipelineStateDescription& state) override;
 
-		/// Must be called once to link this API to a DX12 device.
-		void SetDevice(DX12Device* device) { m_Device = device; }
+		/// Must be called once to link this API to a D3D12 device.
+		void SetDevice(D3D12Device* device) { m_Device = device; }
 
 		/// Set the current command buffer for recording draw calls.
 		void SetCommandBuffer(RHICommandBuffer* cmdBuffer) { m_CmdBuffer = cmdBuffer; }
@@ -42,7 +42,7 @@ namespace Candy {
 		void SetSwapChain(RHISwapChain* swapChain) { m_SwapChain = swapChain; }
 
 	private:
-		DX12Device*       m_Device     = nullptr;
+		D3D12Device*       m_Device     = nullptr;
 		RHICommandBuffer* m_CmdBuffer  = nullptr;
 		RHISwapChain*     m_SwapChain  = nullptr;
 

@@ -3,16 +3,16 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 
-#include "Platform/DX12/DX12SwapChain.h"
+#include "Platform/D3D12/D3D12SwapChain.h"
 #include "Runtime/Core/Log.h"
 
 namespace Candy {
 
-	DX12SwapChain::DX12SwapChain(ID3D12Device* device, IDXGIFactory6* factory,
+	D3D12SwapChain::D3D12SwapChain(ID3D12Device* device, IDXGIFactory6* factory,
 	                             ID3D12CommandQueue* queue, const SwapChainDesc& desc)
 		: m_Desc(desc), m_Device(device), m_Factory(factory), m_Queue(queue)
 	{
-		CANDY_CORE_INFO("DX12SwapChain: creating {}x{} (buffer count: {}, vsync: {})",
+		CANDY_CORE_INFO("D3D12SwapChain: creating {}x{} (buffer count: {}, vsync: {})",
 		                desc.Width, desc.Height, desc.BufferCount, desc.VSync);
 
 		// Determine swap chain format
@@ -26,7 +26,7 @@ namespace Candy {
 		HWND hwnd = static_cast<HWND>(desc.Window.Native);
 		if (!hwnd)
 		{
-			CANDY_CORE_ERROR("DX12SwapChain: invalid window handle");
+			CANDY_CORE_ERROR("D3D12SwapChain: invalid window handle");
 			return;
 		}
 
@@ -50,7 +50,7 @@ namespace Candy {
 
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12SwapChain: CreateSwapChainForHwnd failed (HRESULT: {:#x})",
+			CANDY_CORE_ERROR("D3D12SwapChain: CreateSwapChainForHwnd failed (HRESULT: {:#x})",
 			                 static_cast<uint32_t>(hr));
 			return;
 		}
@@ -58,7 +58,7 @@ namespace Candy {
 		hr = swapChain1.As(&m_SwapChain);
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12SwapChain: QueryInterface IDXGISwapChain3 failed");
+			CANDY_CORE_ERROR("D3D12SwapChain: QueryInterface IDXGISwapChain3 failed");
 			return;
 		}
 
@@ -72,7 +72,7 @@ namespace Candy {
 		hr = device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_RTVHeap));
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12SwapChain: CreateDescriptorHeap (RTV) failed");
+			CANDY_CORE_ERROR("D3D12SwapChain: CreateDescriptorHeap (RTV) failed");
 			return;
 		}
 
@@ -82,16 +82,16 @@ namespace Candy {
 		// Create back buffer RTVs
 		CreateSwapChainResources();
 
-		CANDY_CORE_INFO("DX12SwapChain: creation complete");
+		CANDY_CORE_INFO("D3D12SwapChain: creation complete");
 	}
 
-	DX12SwapChain::~DX12SwapChain()
+	D3D12SwapChain::~D3D12SwapChain()
 	{
 		ReleaseSwapChainResources();
-		CANDY_CORE_INFO("DX12SwapChain: destroyed");
+		CANDY_CORE_INFO("D3D12SwapChain: destroyed");
 	}
 
-	void DX12SwapChain::CreateSwapChainResources()
+	void D3D12SwapChain::CreateSwapChainResources()
 	{
 		m_BackBuffers.resize(m_Desc.BufferCount);
 
@@ -102,7 +102,7 @@ namespace Candy {
 			HRESULT hr = m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&m_BackBuffers[i]));
 			if (FAILED(hr))
 			{
-				CANDY_CORE_ERROR("DX12SwapChain: GetBuffer({}) failed", i);
+				CANDY_CORE_ERROR("D3D12SwapChain: GetBuffer({}) failed", i);
 				continue;
 			}
 
@@ -114,45 +114,45 @@ namespace Candy {
 		m_CurrentBackBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
 	}
 
-	void DX12SwapChain::ReleaseSwapChainResources()
+	void D3D12SwapChain::ReleaseSwapChainResources()
 	{
 		for (auto& buffer : m_BackBuffers)
 			buffer.Reset();
 		m_BackBuffers.clear();
 	}
 
-	const SwapChainDesc& DX12SwapChain::GetDesc() const
+	const SwapChainDesc& D3D12SwapChain::GetDesc() const
 	{
 		return m_Desc;
 	}
 
-	Ref<RHITexture> DX12SwapChain::GetCurrentBackBuffer()
+	Ref<RHITexture> D3D12SwapChain::GetCurrentBackBuffer()
 	{
-		// TODO: wrap ID3D12Resource in DX12Texture when implemented
-		CANDY_CORE_WARN("TODO: DX12SwapChain::GetCurrentBackBuffer — texture wrapper not implemented");
+		// TODO: wrap ID3D12Resource in D3D12Texture when implemented
+		CANDY_CORE_WARN("TODO: D3D12SwapChain::GetCurrentBackBuffer — texture wrapper not implemented");
 		return nullptr;
 	}
 
-	ID3D12Resource* DX12SwapChain::GetCurrentBackBufferResource() const
+	ID3D12Resource* D3D12SwapChain::GetCurrentBackBufferResource() const
 	{
 		if (m_CurrentBackBufferIndex < m_BackBuffers.size())
 			return m_BackBuffers[m_CurrentBackBufferIndex].Get();
 		return nullptr;
 	}
 
-	D3D12_CPU_DESCRIPTOR_HANDLE DX12SwapChain::GetCurrentRTVHandle() const
+	D3D12_CPU_DESCRIPTOR_HANDLE D3D12SwapChain::GetCurrentRTVHandle() const
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE handle = m_RTVHeap->GetCPUDescriptorHandleForHeapStart();
 		handle.ptr += static_cast<SIZE_T>(m_CurrentBackBufferIndex) * m_RTVDescriptorSize;
 		return handle;
 	}
 
-	void DX12SwapChain::AdvanceFrame()
+	void D3D12SwapChain::AdvanceFrame()
 	{
 		m_CurrentBackBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
 	}
 
-	void DX12SwapChain::Resize(uint32_t width, uint32_t height)
+	void D3D12SwapChain::Resize(uint32_t width, uint32_t height)
 	{
 		if (width == 0 || height == 0)
 			return;
@@ -163,7 +163,7 @@ namespace Candy {
 		// Release back buffer references before resize
 		ReleaseSwapChainResources();
 
-		CANDY_CORE_INFO("DX12SwapChain::Resize {}x{}", width, height);
+		CANDY_CORE_INFO("D3D12SwapChain::Resize {}x{}", width, height);
 
 		HRESULT hr = m_SwapChain->ResizeBuffers(
 			m_Desc.BufferCount, width, height,
@@ -172,7 +172,7 @@ namespace Candy {
 
 		if (FAILED(hr))
 		{
-			CANDY_CORE_ERROR("DX12SwapChain: ResizeBuffers failed (HRESULT: {:#x})",
+			CANDY_CORE_ERROR("D3D12SwapChain: ResizeBuffers failed (HRESULT: {:#x})",
 			                 static_cast<uint32_t>(hr));
 			return;
 		}
@@ -180,12 +180,12 @@ namespace Candy {
 		CreateSwapChainResources();
 	}
 
-	uint32_t DX12SwapChain::GetWidth() const
+	uint32_t D3D12SwapChain::GetWidth() const
 	{
 		return m_Desc.Width;
 	}
 
-	uint32_t DX12SwapChain::GetHeight() const
+	uint32_t D3D12SwapChain::GetHeight() const
 	{
 		return m_Desc.Height;
 	}

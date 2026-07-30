@@ -2,12 +2,12 @@
 #include <Windows.h>
 #include <d3d12.h>
 
-#include "Platform/DX12/DX12Buffer.h"
+#include "Platform/D3D12/D3D12Buffer.h"
 #include "Runtime/Core/Log.h"
 
 namespace Candy {
 
-	DX12Buffer::DX12Buffer(ID3D12Device* device, const BufferDesc& desc)
+	D3D12Buffer::D3D12Buffer(ID3D12Device* device, const BufferDesc& desc)
 		: m_Desc(desc)
 	{
 		if (desc.CPUAccessible)
@@ -17,22 +17,22 @@ namespace Candy {
 
 		m_GPUVirtualAddress = m_Resource->GetGPUVirtualAddress();
 
-		CANDY_CORE_TRACE("DX12Buffer: created '{}' ({} bytes, CPUAccessible={})",
+		CANDY_CORE_TRACE("D3D12Buffer: created '{}' ({} bytes, CPUAccessible={})",
 		                 desc.DebugName, desc.Size, desc.CPUAccessible);
 	}
 
-	DX12Buffer::~DX12Buffer()
+	D3D12Buffer::~D3D12Buffer()
 	{
 		if (m_IsCPUMapped)
 			Unmap();
 	}
 
-	const BufferDesc& DX12Buffer::GetDesc() const
+	const BufferDesc& D3D12Buffer::GetDesc() const
 	{
 		return m_Desc;
 	}
 
-	void* DX12Buffer::Map()
+	void* D3D12Buffer::Map()
 	{
 		if (!m_IsCPUMapped && m_Resource)
 		{
@@ -41,12 +41,12 @@ namespace Candy {
 			if (SUCCEEDED(hr))
 				m_IsCPUMapped = true;
 			else
-				CANDY_CORE_ERROR("DX12Buffer::Map failed for '{}'", m_Desc.DebugName);
+				CANDY_CORE_ERROR("D3D12Buffer::Map failed for '{}'", m_Desc.DebugName);
 		}
 		return m_MappedData;
 	}
 
-	void DX12Buffer::Unmap()
+	void D3D12Buffer::Unmap()
 	{
 		if (m_IsCPUMapped && m_Resource)
 		{
@@ -56,7 +56,7 @@ namespace Candy {
 		}
 	}
 
-	void DX12Buffer::CreateUploadBuffer(ID3D12Device* device)
+	void D3D12Buffer::CreateUploadBuffer(ID3D12Device* device)
 	{
 		D3D12_HEAP_PROPERTIES heapProps = {};
 		heapProps.Type                 = D3D12_HEAP_TYPE_UPLOAD;
@@ -83,12 +83,12 @@ namespace Candy {
 			IID_PPV_ARGS(&m_Resource));
 
 		if (FAILED(hr))
-			CANDY_CORE_ERROR("DX12Buffer: CreateCommittedResource (upload) failed for '{}'", m_Desc.DebugName);
+			CANDY_CORE_ERROR("D3D12Buffer: CreateCommittedResource (upload) failed for '{}'", m_Desc.DebugName);
 		else
 			m_State = D3D12_RESOURCE_STATE_GENERIC_READ;
 	}
 
-	void DX12Buffer::CreateDefaultBuffer(ID3D12Device* device)
+	void D3D12Buffer::CreateDefaultBuffer(ID3D12Device* device)
 	{
 		D3D12_HEAP_PROPERTIES heapProps = {};
 		heapProps.Type                 = D3D12_HEAP_TYPE_DEFAULT;
@@ -119,7 +119,7 @@ namespace Candy {
 			IID_PPV_ARGS(&m_Resource));
 
 		if (FAILED(hr))
-			CANDY_CORE_ERROR("DX12Buffer: CreateCommittedResource (default) failed for '{}'", m_Desc.DebugName);
+			CANDY_CORE_ERROR("D3D12Buffer: CreateCommittedResource (default) failed for '{}'", m_Desc.DebugName);
 		else
 			m_State = D3D12_RESOURCE_STATE_COMMON;
 	}

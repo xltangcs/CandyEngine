@@ -8,13 +8,13 @@
 namespace Candy {
 
 	// =========================================================================
-	// DX12Buffer — wraps ID3D12Resource for vertex/index/constant/storage
+	// D3D12Buffer — wraps ID3D12Resource for vertex/index/constant/storage
 	// =========================================================================
-	class DX12Buffer : public RHIBuffer
+	class D3D12Buffer : public RHIBuffer
 	{
 	public:
-		DX12Buffer(ID3D12Device* device, const BufferDesc& desc);
-		virtual ~DX12Buffer();
+		D3D12Buffer(ID3D12Device* device, const BufferDesc& desc);
+		virtual ~D3D12Buffer();
 
 		const BufferDesc& GetDesc() const override;
 

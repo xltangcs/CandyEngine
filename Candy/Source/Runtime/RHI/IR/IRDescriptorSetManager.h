@@ -13,7 +13,7 @@ namespace Candy::IR {
 	// descriptor set layout management.
 	//
 	// Vulkan:   maps to VkDescriptorPool + VkDescriptorSetLayout + VkDescriptorSet
-	// DX12:     maps to descriptor heap management + root parameter ranges
+	// D3D12:     maps to descriptor heap management + root parameter ranges
 	// =========================================================================
 	class IRDescriptorSetManager
 	{
