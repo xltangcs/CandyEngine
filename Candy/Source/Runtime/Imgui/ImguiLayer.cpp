@@ -126,6 +126,12 @@ namespace Candy {
 		{
 #ifdef CANDY_PLATFORM_WINDOWS
 			m_D3D12.GameUIContext = m_GameUIContext;
+			// Per-context ImGui_DX12 backend init for the game UI context.
+			// InitD3D12Backend is idempotent + current-context guarded so this
+			// only calls ImGui_ImplDX12_Init once for this context; shared
+			// resources stay on m_D3D12.
+			InitD3D12Backend(window);
+			CANDY_CORE_INFO("ImGuiLayer: D3D12 backend initialized (game UI context)");
 #endif
 		}
 		else
@@ -467,15 +473,31 @@ namespace Candy {
 
 	void ImGuiLayer::InitD3D12Backend(GLFWwindow* window)
 	{
-		// Get D3D12 device/queue from GraphicsContext
-		auto* win = static_cast<WindowsWindow*>(&Application::Get().GetWindow());
-		auto* gfxCtx = static_cast<D3D12GraphicsContext*>(
-			win->GetGraphicsContext());
+		// ---------------------------------------------------------------------------
+		// Idempotent per-context init:
+		//   - ImGui_ImplDX12 backend data lives in io.BackendRendererUserData of
+		//     the *current* ImGui context. ImGui_ImplDX12_Init asserts
+		//     `io.BackendRendererUserData == nullptr && "Already initialized a
+		//     renderer backend!"` so we early-return when this context already
+		//     has a backend.
+		//   - Shared physical resources (device/queue, SRV heap, per-frame
+		//     command allocators/lists, fence) are created exactly once because
+		//     they live on the single m_D3D12 struct that backs both the editor
+		//     context and the game UI context.
+		// ---------------------------------------------------------------------------
+
+		ImGuiIO& io = ImGui::GetIO();
+		if (io.BackendRendererUserData != nullptr)
+			return; // backend already initialized for this context
+
+		auto* win    = static_cast<WindowsWindow*>(&Application::Get().GetWindow());
+		auto* gfxCtx = static_cast<D3D12GraphicsContext*>(win->GetGraphicsContext());
 
 		m_D3D12.Device = gfxCtx->GetDevice()->GetNativeDevice();
 		m_D3D12.Queue  = gfxCtx->GetDevice()->GetNativeQueue();
 
-		// Create SRV descriptor heap for ImGui textures
+		// SRV descriptor heap for ImGui textures (shared by both ImGui contexts).
+		if (!m_D3D12.SRVHeap)
 		{
 			D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
 			heapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
@@ -494,37 +516,43 @@ namespace Candy {
 				D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		}
 
-		// Create per-frame resources (2 frames for double-buffering)
-		for (int i = 0; i < 2; ++i)
+		// Per-frame command lists (created once, shared across both contexts —
+		// they iterate sequentially per main loop so they do not stomp each
+		// other).
+		if (!m_D3D12.FrameAllocators[0])
 		{
-			HRESULT hr = m_D3D12.Device->CreateCommandAllocator(
-				D3D12_COMMAND_LIST_TYPE_DIRECT,
-				IID_PPV_ARGS(&m_D3D12.FrameAllocators[i]));
-			if (FAILED(hr))
+			for (int i = 0; i < 2; ++i)
 			{
-				CANDY_CORE_ERROR("ImGuiLayer: CreateCommandAllocator[{0}] failed", i);
-				return;
+				HRESULT hr = m_D3D12.Device->CreateCommandAllocator(
+					D3D12_COMMAND_LIST_TYPE_DIRECT,
+					IID_PPV_ARGS(&m_D3D12.FrameAllocators[i]));
+				if (FAILED(hr))
+				{
+					CANDY_CORE_ERROR("ImGuiLayer: CreateCommandAllocator[{0}] failed", i);
+					return;
+				}
+
+				hr = m_D3D12.Device->CreateCommandList(
+					0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+					m_D3D12.FrameAllocators[i], nullptr,
+					IID_PPV_ARGS(&m_D3D12.FrameCmdLists[i]));
+				if (FAILED(hr))
+				{
+					CANDY_CORE_ERROR("ImGuiLayer: CreateCommandList[{0}] failed", i);
+					return;
+				}
+
+				m_D3D12.FrameCmdLists[i]->Close();
 			}
 
-			hr = m_D3D12.Device->CreateCommandList(
-				0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-				m_D3D12.FrameAllocators[i], nullptr,
-				IID_PPV_ARGS(&m_D3D12.FrameCmdLists[i]));
-			if (FAILED(hr))
-			{
-				CANDY_CORE_ERROR("ImGuiLayer: CreateCommandList[{0}] failed", i);
-				return;
-			}
-
-			m_D3D12.FrameCmdLists[i]->Close();
+			m_D3D12.Device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
+			                            IID_PPV_ARGS(&m_D3D12.Fence));
+			m_D3D12.FenceEvent = CreateEventA(nullptr, FALSE, FALSE, nullptr);
 		}
 
-		// Fence for synchronization
-		m_D3D12.Device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
-		                           IID_PPV_ARGS(&m_D3D12.Fence));
-		m_D3D12.FenceEvent = CreateEventA(nullptr, FALSE, FALSE, nullptr);
-
-		// Initialize ImGui D3D12 backend
+		// Initialize ImGui D3D12 backend for the *current* context. Safe to run
+		// per-context since the Io guard at the top ensures it only runs when
+		// the context doesn't yet have a backend bound.
 		ImGui_ImplDX12_InitInfo initInfo = {};
 		initInfo.Device               = m_D3D12.Device;
 		initInfo.CommandQueue          = m_D3D12.Queue;
