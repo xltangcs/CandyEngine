@@ -633,21 +633,16 @@ float4 main(PSInput input) : SV_TARGET
 		for (const auto& attr : desc.VertexInput.Attributes)
 		{
 			D3D12_INPUT_ELEMENT_DESC elem = {};
-			elem.SemanticName         = "TEXCOORD"; // generic
+			// Use a single generic "TEXCOORD" semantic, with the attribute's
+			// location used as the semantic index.  HLSL inputs must be
+			// declared as TEXCOORD0..N to match this layout 1:1.
+			elem.SemanticName         = "TEXCOORD";
 			elem.SemanticIndex        = attr.Location;
 			elem.Format               = MapFormat(attr.Format);
 			elem.InputSlot            = attr.Binding;
 			elem.AlignedByteOffset    = attr.Offset;
 			elem.InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
 			elem.InstanceDataStepRate = 0;
-
-			// Use POSITION / COLOR semantics based on location
-			if (attr.Location == 0)
-				elem.SemanticName = "POSITION";
-			else if (attr.Location == 1)
-				elem.SemanticName = "COLOR";
-			else if (attr.Location == 2)
-				elem.SemanticName = "TEXCOORD";
 
 			inputElements.push_back(elem);
 		}
@@ -727,22 +722,39 @@ float4 main(PSInput input) : SV_TARGET
 		psoDesc.RasterizerState       = rasterizer;
 		psoDesc.DepthStencilState     = depthStencil;
 		psoDesc.InputLayout           = { inputElements.data(), static_cast<UINT>(inputElements.size()) };
-		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		psoDesc.NumRenderTargets      = 1;
+		psoDesc.PrimitiveTopologyType = (desc.Topology == PrimitiveTopology::Lines ||
+		                                 desc.Topology == PrimitiveTopology::LineStrip)
+		                                ? D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE
+		                                : (desc.Topology == PrimitiveTopology::Points)
+		                                  ? D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT
+		                                  : D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		psoDesc.NumRenderTargets      = desc.RenderTargetFormats.empty()
+		                                 ? 1u
+		                                 : static_cast<UINT>(desc.RenderTargetFormats.size());
 
-		// Use swap chain format for RTV
-		if (!desc.RenderTargetFormats.empty())
+		// Map RHIFormats → RTVFormats[i] (driver requires one entry per RT
+		// declared on the PS output signature; falling short triggers PSO
+		// creation failure on pipelines that write SV_TARGET1, etc.).
+		static const auto MapRenderTargetFormat = [](RHIFormat fmt) -> DXGI_FORMAT
 		{
-			switch (desc.RenderTargetFormats[0])
+			switch (fmt)
 			{
-			case RHIFormat::B8G8R8A8Unorm: psoDesc.RTVFormats[0] = DXGI_FORMAT_B8G8R8A8_UNORM; break;
-			case RHIFormat::B8G8R8A8Srgb:  psoDesc.RTVFormats[0] = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB; break;
-			default:                       psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM; break;
+			case RHIFormat::B8G8R8A8Unorm:    return DXGI_FORMAT_B8G8R8A8_UNORM;
+			case RHIFormat::B8G8R8A8Srgb:     return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+			case RHIFormat::R8G8B8A8Unorm:    return DXGI_FORMAT_R8G8B8A8_UNORM;
+			case RHIFormat::R32Sint:          return DXGI_FORMAT_R32_SINT;
+			default:                          return DXGI_FORMAT_R8G8B8A8_UNORM;
 			}
+		};
+
+		if (desc.RenderTargetFormats.empty())
+		{
+			psoDesc.RTVFormats[0] = DXGI_FORMAT_B8G8R8A8_UNORM;
 		}
 		else
 		{
-			psoDesc.RTVFormats[0] = DXGI_FORMAT_B8G8R8A8_UNORM;
+			for (UINT i = 0; i < psoDesc.NumRenderTargets; ++i)
+				psoDesc.RTVFormats[i] = MapRenderTargetFormat(desc.RenderTargetFormats[i]);
 		}
 
 		if (desc.DepthStencilFormat != RHIFormat::Unknown)
@@ -812,6 +824,7 @@ float4 main(PSInput input) : SV_TARGET
 		for (const auto& attr : desc.VertexInput.Attributes)
 		{
 			D3D12_INPUT_ELEMENT_DESC elem = {};
+			// Same generic TEXCOORD<N> convention as CreateGraphicsPipeline.
 			elem.SemanticName         = "TEXCOORD";
 			elem.SemanticIndex        = attr.Location;
 			elem.Format               = MapFormat(attr.Format);
@@ -819,10 +832,6 @@ float4 main(PSInput input) : SV_TARGET
 			elem.AlignedByteOffset    = attr.Offset;
 			elem.InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
 			elem.InstanceDataStepRate = 0;
-
-			if (attr.Location == 0)      elem.SemanticName = "POSITION";
-			else if (attr.Location == 1) elem.SemanticName = "COLOR";
-			else if (attr.Location == 2) elem.SemanticName = "TEXCOORD";
 
 			inputElements.push_back(elem);
 		}
@@ -855,12 +864,40 @@ float4 main(PSInput input) : SV_TARGET
 		psoDesc.RasterizerState       = rasterizer;
 		psoDesc.DepthStencilState     = depthStencil;
 		psoDesc.InputLayout           = { inputElements.data(), static_cast<UINT>(inputElements.size()) };
-		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		psoDesc.NumRenderTargets      = 2;
+		psoDesc.PrimitiveTopologyType = (desc.Topology == PrimitiveTopology::Lines ||
+		                                 desc.Topology == PrimitiveTopology::LineStrip)
+		                                ? D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE
+		                                : (desc.Topology == PrimitiveTopology::Points)
+		                                  ? D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT
+		                                  : D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		psoDesc.NumRenderTargets      = desc.RenderTargetFormats.empty()
+		                                 ? 1u
+		                                 : static_cast<UINT>(desc.RenderTargetFormats.size());
 
-		// RTV0 = RGBA8, RTV1 = R32Sint
-		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-		psoDesc.RTVFormats[1] = DXGI_FORMAT_R32_SINT;
+		// Same RTV-format mapping as CreateGraphicsPipeline so both paths
+		// honour the desc rather than baking in a fixed 2-render-target layout.
+		static const auto MapRTFormatRootSig = [](RHIFormat fmt) -> DXGI_FORMAT
+		{
+			switch (fmt)
+			{
+			case RHIFormat::B8G8R8A8Unorm: return DXGI_FORMAT_B8G8R8A8_UNORM;
+			case RHIFormat::B8G8R8A8Srgb:  return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+			case RHIFormat::R8G8B8A8Unorm: return DXGI_FORMAT_R8G8B8A8_UNORM;
+			case RHIFormat::R32Sint:       return DXGI_FORMAT_R32_SINT;
+			default:                       return DXGI_FORMAT_R8G8B8A8_UNORM;
+			}
+		};
+
+		if (desc.RenderTargetFormats.empty())
+		{
+			psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+		}
+		else
+		{
+			for (UINT i = 0; i < psoDesc.NumRenderTargets; ++i)
+				psoDesc.RTVFormats[i] = MapRTFormatRootSig(desc.RenderTargetFormats[i]);
+		}
+
 		psoDesc.DSVFormat     = DXGI_FORMAT_UNKNOWN;
 		psoDesc.SampleDesc.Count = 1;
 

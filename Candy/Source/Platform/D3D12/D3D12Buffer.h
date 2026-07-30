@@ -25,6 +25,10 @@ namespace Candy {
 		[[nodiscard]] D3D12_RESOURCE_STATES   GetState()    const { return m_State; }
 		[[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const { return m_GPUVirtualAddress; }
 
+		/// Vertex buffer stride (bytes between consecutive vertices), or 0
+		/// for non-vertex buffers.
+		[[nodiscard]] uint32_t GetStride() const { return m_Desc.Stride; }
+
 		/// Transition the resource to a new state (for barrier tracking)
 		void SetState(D3D12_RESOURCE_STATES state) { m_State = state; }
 

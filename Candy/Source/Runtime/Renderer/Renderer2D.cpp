@@ -177,13 +177,13 @@ namespace Candy {
 			s_Data.LineVertexBufferBase   = new LineVertex[s_Data.MaxVertices];
 
 			// --- GPU vertex buffers (upload heap, CPU-accessible) ---
-			auto makeUploadVB = [&](uint64_t size, const char* name) -> Ref<RHIBuffer> {
-				BufferDesc d; d.Size=size; d.Usage=ResourceUsage::VertexBuffer; d.CPUAccessible=true; d.DebugName=name;
+			auto makeUploadVB = [&](uint64_t size, uint32_t stride, const char* name) -> Ref<RHIBuffer> {
+				BufferDesc d; d.Size=size; d.Usage=ResourceUsage::VertexBuffer; d.CPUAccessible=true; d.Stride=stride; d.DebugName=name;
 				return dev->CreateBuffer(d);
 			};
-			s_Data.VkQuadVB   = makeUploadVB(s_Data.MaxVertices * sizeof(QuadVertex),  "Vk2D_QuadVB");
-			s_Data.VkCircleVB = makeUploadVB(s_Data.MaxVertices * sizeof(CircleVertex),"Vk2D_CircleVB");
-			s_Data.VkLineVB   = makeUploadVB(s_Data.MaxVertices * sizeof(LineVertex),  "Vk2D_LineVB");
+			s_Data.VkQuadVB   = makeUploadVB(s_Data.MaxVertices * sizeof(QuadVertex),  sizeof(QuadVertex),  "Vk2D_QuadVB");
+			s_Data.VkCircleVB = makeUploadVB(s_Data.MaxVertices * sizeof(CircleVertex),sizeof(CircleVertex),"Vk2D_CircleVB");
+			s_Data.VkLineVB   = makeUploadVB(s_Data.MaxVertices * sizeof(LineVertex),  sizeof(LineVertex),  "Vk2D_LineVB");
 
 			// Index buffer (with data uploaded)
 			{
@@ -315,32 +315,35 @@ namespace Candy {
 			s_Data.CircleVertexBufferBase = new CircleVertex[s_Data.MaxVertices];
 			s_Data.LineVertexBufferBase   = new LineVertex[s_Data.MaxVertices];
 
-			// --- GPU vertex buffers (upload heap, CPU-writable) ---
-			auto* dev = s_Data.D3D12Dev;
-			{
-				BufferDesc vbDesc;
-				vbDesc.Size          = s_Data.MaxVertices * sizeof(QuadVertex);
-				vbDesc.Usage         = ResourceUsage::VertexBuffer | ResourceUsage::CopyDst;
-				vbDesc.CPUAccessible = true;
-				vbDesc.DebugName     = "Renderer2D_QuadVB";
-				s_Data.D3D12QuadVB = dev->CreateBuffer(vbDesc);
-			}
-			{
-				BufferDesc vbDesc;
-				vbDesc.Size          = s_Data.MaxVertices * sizeof(CircleVertex);
-				vbDesc.Usage         = ResourceUsage::VertexBuffer | ResourceUsage::CopyDst;
-				vbDesc.CPUAccessible = true;
-				vbDesc.DebugName     = "Renderer2D_CircleVB";
-				s_Data.D3D12CircleVB = dev->CreateBuffer(vbDesc);
-			}
-			{
-				BufferDesc vbDesc;
-				vbDesc.Size          = s_Data.MaxVertices * sizeof(LineVertex);
-				vbDesc.Usage         = ResourceUsage::VertexBuffer | ResourceUsage::CopyDst;
-				vbDesc.CPUAccessible = true;
-				vbDesc.DebugName     = "Renderer2D_LineVB";
-				s_Data.D3D12LineVB = dev->CreateBuffer(vbDesc);
-			}
+		// --- GPU vertex buffers (upload heap, CPU-writable) ---
+		auto* dev = s_Data.D3D12Dev;
+		{
+			BufferDesc vbDesc;
+			vbDesc.Size          = s_Data.MaxVertices * sizeof(QuadVertex);
+			vbDesc.Usage         = ResourceUsage::VertexBuffer | ResourceUsage::CopyDst;
+			vbDesc.CPUAccessible = true;
+			vbDesc.Stride        = sizeof(QuadVertex);
+			vbDesc.DebugName     = "Renderer2D_QuadVB";
+			s_Data.D3D12QuadVB = dev->CreateBuffer(vbDesc);
+		}
+		{
+			BufferDesc vbDesc;
+			vbDesc.Size          = s_Data.MaxVertices * sizeof(CircleVertex);
+			vbDesc.Usage         = ResourceUsage::VertexBuffer | ResourceUsage::CopyDst;
+			vbDesc.CPUAccessible = true;
+			vbDesc.Stride        = sizeof(CircleVertex);
+			vbDesc.DebugName     = "Renderer2D_CircleVB";
+			s_Data.D3D12CircleVB = dev->CreateBuffer(vbDesc);
+		}
+		{
+			BufferDesc vbDesc;
+			vbDesc.Size          = s_Data.MaxVertices * sizeof(LineVertex);
+			vbDesc.Usage         = ResourceUsage::VertexBuffer | ResourceUsage::CopyDst;
+			vbDesc.CPUAccessible = true;
+			vbDesc.Stride        = sizeof(LineVertex);
+			vbDesc.DebugName     = "Renderer2D_LineVB";
+			s_Data.D3D12LineVB = dev->CreateBuffer(vbDesc);
+		}
 
 			// --- Index buffer (same pattern for quad + circle) ---
 			{
@@ -378,8 +381,8 @@ namespace Candy {
 				static const char* quadVSSrc = R"(
 cbuffer TransformCB : register(b0) { float4x4 u_ViewProjection; };
 struct VSInput {
-	float3 Position : POSITION; float4 Color : COLOR; float2 TexCoord : TEXCOORD;
-	float  TexIndex : TEXINDEX; float TilingFactor : TILINGFACTOR; int EntityID : ENTITYID;
+	float3 Position : TEXCOORD0; float4 Color : TEXCOORD1; float2 TexCoord : TEXCOORD2;
+	float  TexIndex : TEXCOORD3; float TilingFactor : TEXCOORD4; int EntityID : TEXCOORD5;
 };
 struct VSOutput { float4 Position : SV_POSITION; float4 Color : COLOR; float2 TexCoord : TEXCOORD; float TexIndex : TEXINDEX; float TilingFactor : TILINGFACTOR; int EntityID : ENTITYID; };
 VSOutput VSMain(VSInput i) { VSOutput o; o.Position = mul(u_ViewProjection, float4(i.Position,1)); o.Color=i.Color; o.TexCoord=i.TexCoord; o.TexIndex=i.TexIndex; o.TilingFactor=i.TilingFactor; o.EntityID=i.EntityID; return o; }
@@ -393,7 +396,23 @@ Texture2D u_Textures[32] : register(t0);
 SamplerState u_Sampler : register(s0);
 struct PSInput { float4 Position : SV_POSITION; float4 Color : COLOR; float2 TexCoord : TEXCOORD; float TexIndex : TEXINDEX; float TilingFactor : TILINGFACTOR; int EntityID : ENTITYID; };
 struct PSOutput { float4 Color : SV_TARGET0; int EntityID : SV_TARGET1; };
-PSOutput PSMain(PSInput i) { float2 uv = i.TexCoord * i.TilingFactor; int idx = max(0, min(31, int(i.TexIndex))); float4 texColor = i.Color * u_Textures[idx].Sample(u_Sampler, uv); PSOutput o; o.Color=texColor; o.EntityID=i.EntityID; return o; }
+PSOutput PSMain(PSInput i)
+{
+	float2 uv = i.TexCoord * i.TilingFactor;
+	int idx = max(0, min(31, int(i.TexIndex)));
+	float4 texColor = i.Color;
+	// SM5.0 forbids dynamic indexing into Texture2D[32]; unroll into 32
+	// literal-indexed Sample calls so the bindless-ish pattern is valid.
+	[unroll] for (int t = 0; t < 32; ++t)
+	{
+		[unroll] if (t == idx)
+			texColor = i.Color * u_Textures[t].Sample(u_Sampler, uv);
+	}
+	PSOutput o;
+	o.Color = texColor;
+	o.EntityID = i.EntityID;
+	return o;
+}
 )";
 				auto psBlob = dev->CompileHLSL(quadPSSrc, "PSMain", "ps_5_0", "Renderer2D_QuadPS");
 				if (psBlob)
@@ -405,8 +424,8 @@ PSOutput PSMain(PSInput i) { float2 uv = i.TexCoord * i.TilingFactor; int idx = 
 				static const char* circleVSSrc = R"(
 cbuffer TransformCB : register(b0) { float4x4 u_ViewProjection; };
 struct VSInput {
-	float3 WorldPosition : POSITION; float3 LocalPosition : TEXCOORD0; float4 Color : COLOR;
-	float Thickness : TEXCOORD1; float Fade : TEXCOORD2; int EntityID : ENTITYID;
+	float3 WorldPosition : TEXCOORD0; float3 LocalPosition : TEXCOORD1; float4 Color : TEXCOORD2;
+	float Thickness : TEXCOORD3; float Fade : TEXCOORD4; int EntityID : TEXCOORD5;
 };
 struct VSOutput {
 	float4 Position : SV_POSITION; float3 LocalPosition : LOCALPOS; float4 Color : COLOR;
@@ -433,7 +452,7 @@ PSOutput PSMain(PSInput i) { float d=1.0-length(i.LocalPosition); float c=smooth
 			{
 				static const char* lineVSSrc = R"(
 cbuffer TransformCB : register(b0) { float4x4 u_ViewProjection; };
-struct VSInput { float3 Position:POSITION; float4 Color:COLOR; int EntityID:ENTITYID; };
+struct VSInput { float3 Position:TEXCOORD0; float4 Color:TEXCOORD1; int EntityID:TEXCOORD2; };
 struct VSOutput { float4 Position:SV_POSITION; float4 Color:COLOR; int EntityID:ENTITYID; };
 VSOutput VSMain(VSInput i) { VSOutput o; o.Position=mul(u_ViewProjection,float4(i.Position,1)); o.Color=i.Color; o.EntityID=i.EntityID; return o; }
 )";
@@ -544,12 +563,12 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			s_Data.QuadVertexPositions[2] = {  0.5f,  0.5f, 0.0f, 1.0f };
 			s_Data.QuadVertexPositions[3] = { -0.5f,  0.5f, 0.0f, 1.0f };
 
-			// Set up dummy uniform buffer (not used for D3D12, camera set via CB)
-			s_Data.CameraUniformBuffer = UniformBuffer::Create(sizeof(Renderer2DData::CameraData), 0);
+		// No legacy UniformBuffer needed for D3D12; the per-frame camera CB
+		// is updated inline via D3D12Buffer::Map/Unmap inside Flush().
 
-			CANDY_CORE_INFO("Renderer2D: D3D12 backend initialized");
-			return;
-		}
+		CANDY_CORE_INFO("Renderer2D: D3D12 backend initialized");
+		return;
+	}
 
 		// =====================================================
 		// OpenGL path (unchanged)
@@ -682,8 +701,14 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 		}
 	}
 
-	void Renderer2D::BeginScene(const OrthographicCamera& camera)
+		void Renderer2D::BeginScene(const OrthographicCamera& camera)
 	{
+		if (s_Data.D3D12Active || s_Data.VkActive)
+		{
+			StartBatch();
+			return;
+		}
+
 		s_Data.QuadShader->Bind();
 		s_Data.QuadShader->SetMat4("u_ViewProjection", camera.GetViewProjectionMatrix());
 
@@ -693,7 +718,8 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 	void Renderer2D::BeginScene(const Camera& camera, const glm::mat4& transform)
 	{
 		s_Data.CameraBuffer.ViewProjection = camera.GetProjection() * glm::inverse(transform);
-		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer2DData::CameraData));
+		if (!s_Data.D3D12Active && !s_Data.VkActive)
+			s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer2DData::CameraData));
 
 		StartBatch();
 	}
@@ -701,7 +727,8 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 	void Renderer2D::BeginScene(const EditorCamera& camera)
 	{
 		s_Data.CameraBuffer.ViewProjection = camera.GetViewProjection();
-		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer2DData::CameraData));
+		if (!s_Data.D3D12Active && !s_Data.VkActive)
+			s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer2DData::CameraData));
 
 		StartBatch();
 	}

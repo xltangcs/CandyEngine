@@ -7,6 +7,7 @@
 #include "Platform/D3D12/D3D12SwapChain.h"
 #include "Platform/D3D12/D3D12Framebuffer.h"
 #include "Platform/D3D12/D3D12PipelineState.h"
+#include "Platform/D3D12/D3D12Texture.h"
 #include "Runtime/Core/Log.h"
 
 using Microsoft::WRL::ComPtr;
@@ -243,10 +244,18 @@ namespace Candy {
 		auto* d3d12buffer = dynamic_cast<D3D12Buffer*>(buffer.get());
 		if (d3d12buffer)
 		{
+			const uint32_t stride = d3d12buffer->GetStride();
+			if (stride == 0)
+			{
+				CANDY_CORE_WARN("D3D12CommandBuffer::SetVertexBuffer: buffer '{}' has zero stride; bind ignored",
+				                 d3d12buffer->GetDesc().DebugName);
+				return;
+			}
+
 			D3D12_VERTEX_BUFFER_VIEW vbv = {};
 			vbv.BufferLocation = d3d12buffer->GetGPUVirtualAddress() + offset;
 			vbv.SizeInBytes    = static_cast<UINT>(d3d12buffer->GetDesc().Size - offset);
-			vbv.StrideInBytes  = 7 * sizeof(float); // pos(3) + color(4)
+			vbv.StrideInBytes  = stride;
 
 			m_CommandList->IASetVertexBuffers(slot, 1, &vbv);
 		}
@@ -270,30 +279,48 @@ namespace Candy {
 	void D3D12CommandBuffer::SetConstantBuffer(uint32_t slot, uint32_t binding, const Ref<RHIBuffer>& buffer)
 	{
 		auto* d3d12buffer = dynamic_cast<D3D12Buffer*>(buffer.get());
-		if (!d3d12buffer || !m_Device)
+		if (!d3d12buffer || !m_CommandList)
 			return;
 
-		// Create CBV descriptor
-		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-		cbvDesc.BufferLocation = d3d12buffer->GetGPUVirtualAddress();
-		cbvDesc.SizeInBytes    = static_cast<UINT>(
-			(d3d12buffer->GetDesc().Size + 255) & ~255ull);
-
-		D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle = AllocateCBVSRVDescriptor();
-		m_Device->CreateConstantBufferView(&cbvDesc, cbvHandle);
-
-		// Bind to root parameter 0 (CBV)
-		m_CommandList->SetGraphicsRootConstantBufferView(0, d3d12buffer->GetGPUVirtualAddress());
+		// Root descriptor model: bind the buffer's GPU virtual address
+		// directly to a root CBV parameter.  No descriptor heap allocation
+		// is required and the binding persists on this slot until the next
+		// call to SetConstantBuffer with the same slot or End().
+		(void)binding; // D3D12 root CBV does not use a descriptor table index
+		m_CommandList->SetGraphicsRootConstantBufferView(slot, d3d12buffer->GetGPUVirtualAddress());
 	}
 
 	void D3D12CommandBuffer::SetTexture(uint32_t slot, uint32_t binding, const Ref<RHITexture>& texture)
 	{
-		CANDY_CORE_WARN("TODO: D3D12CommandBuffer::SetTexture");
+		auto* d3d12tex = dynamic_cast<D3D12Texture*>(texture.get());
+		if (!d3d12tex || !d3d12tex->GetResource())
+		{
+			CANDY_CORE_WARN("D3D12CommandBuffer::SetTexture: not a D3D12Texture or resource is null");
+			return;
+		}
+		if (!m_CBVSRVUAVHeap || !m_CommandList)
+			return;
+
+		// Write an SRV for this texture at offset `binding` from the heap
+		// start.  Multiple textures in the same batch occupy consecutive
+		// binding slots [0, N); the descriptor table bound to root parameter
+		// `slot` covers them all in one SetGraphicsRootDescriptorTable call.
+		d3d12tex->CreateSRV(m_CBVSRVUAVHeap, binding, m_CBVSRVDescriptorSize);
+
+		// Bind the table starting at the heap base to root parameter `slot`.
+		// Re-binding the whole table is cheap; it remains valid until End().
+		D3D12_GPU_DESCRIPTOR_HANDLE gpuBase = m_CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart();
+		m_CommandList->SetGraphicsRootDescriptorTable(slot, gpuBase);
 	}
 
 	void D3D12CommandBuffer::SetSampler(uint32_t slot, uint32_t binding, const Ref<RHISampler>& sampler)
 	{
-		CANDY_CORE_WARN("TODO: D3D12CommandBuffer::SetSampler");
+		// Renderer2D's textured root signature (see
+		// D3D12Device::CreateTexturedRootSignature) bakes a single linear
+		// static sampler at s0 with linear/min-mag-mip filter.  Non-static
+		// sampler heap binding is not yet wired through the RHI abstraction.
+		(void)sampler; (void)slot; (void)binding;
+		CANDY_CORE_TRACE("D3D12CommandBuffer::SetSampler({}, {}) — relying on static sampler", slot, binding);
 	}
 
 	// ---- Draw calls ----------------------------------------------------------

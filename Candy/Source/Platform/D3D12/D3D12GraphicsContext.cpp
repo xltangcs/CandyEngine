@@ -8,6 +8,7 @@
 #include "Platform/D3D12/D3D12SwapChain.h"
 #include "Runtime/Core/Log.h"
 #include "Runtime/RHI/RHISwapChain.h"
+#include "Runtime/RHI/RHIContext.h"
 
 namespace Candy {
 
@@ -63,6 +64,11 @@ namespace Candy {
 
 		// Store swap chain as Ref<> (shared_ptr), cast as needed
 		m_SwapChainRef = sc;
+
+		// Publish to the process-wide RHI registry so Renderer2D / Editor
+		// code can reach the active device without including Platform headers.
+		RHIContext::SetDevice(m_Device.get());
+		RHIContext::SetSwapChain(m_SwapChainRef.get());
 
 		CANDY_CORE_INFO("D3D12GraphicsContext: initialized ({}x{})", width, height);
 	}

@@ -14,3 +14,5 @@
 #include "Runtime/RHI/RHICommandQueue.h"
 #include "Runtime/RHI/RHISwapChain.h"
 #include "Runtime/RHI/RHISync.h"
+#include "Runtime/RHI/RHIFramebuffer.h"
+#include "Runtime/RHI/RHIContext.h"

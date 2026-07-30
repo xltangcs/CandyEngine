@@ -20,6 +20,9 @@ namespace Candy {
 		/// Preferred memory type (e.g. CPU-accessible vs GPU-local).  A value
 		/// of `true` means CPU-visible (upload / readback).
 		bool          CPUAccessible = false;
+		/// Stride per vertex when Usage includes VertexBuffer.  Ignored for
+		/// index/constant/storage buffers.
+		uint32_t      Stride = 0;
 		std::string   DebugName;
 	};
 
