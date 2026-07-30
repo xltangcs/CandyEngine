@@ -122,6 +122,11 @@ namespace Candy {
 		uint64_t                            m_FenceValue = 0;
 		HANDLE                              m_FenceEvent  = nullptr;
 
+		// Debug-layer info queue — tracks messages emitted by D3D12.
+		// Used in CreateGraphicsPipeline() failures to surface the real
+		// reason the driver rejected the PSO.
+		Microsoft::WRL::ComPtr<ID3D12InfoQueue> m_InfoQueue;
+
 		// Built-in shader cache
 		std::vector<uint8_t> m_TriangleVS;
 		std::vector<uint8_t> m_TrianglePS;
