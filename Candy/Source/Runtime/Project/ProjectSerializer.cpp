@@ -21,6 +21,7 @@ namespace Candy {
 		out << YAML::Key << "DefaultScene" << YAML::Value << m_Project->GetDefaultScene();
 		out << YAML::Key << "DefaultWidth" << YAML::Value << m_Project->GetDefaultWidth();
 		out << YAML::Key << "DefaultHeight" << YAML::Value << m_Project->GetDefaultHeight();
+		out << YAML::Key << "RendererAPI" << YAML::Value << m_Project->GetRendererAPI();
 		out << YAML::EndMap;
 		out << YAML::EndMap;
 
@@ -58,6 +59,7 @@ namespace Candy {
 		if (projectNode["DefaultScene"]) m_Project->m_DefaultScene = projectNode["DefaultScene"].as<std::string>();
 		if (projectNode["DefaultWidth"]) m_Project->m_DefaultWidth = projectNode["DefaultWidth"].as<uint32_t>();
 		if (projectNode["DefaultHeight"]) m_Project->m_DefaultHeight = projectNode["DefaultHeight"].as<uint32_t>();
+		if (projectNode["RendererAPI"]) m_Project->m_RendererAPI = projectNode["RendererAPI"].as<std::string>();
 		m_Project->m_ProjectFileName = std::filesystem::absolute(filepath);
 
 		return true;
@@ -87,6 +89,7 @@ namespace Candy {
 		if (projectNode["DefaultScene"]) m_Project->m_DefaultScene = projectNode["DefaultScene"].as<std::string>();
 		if (projectNode["DefaultWidth"]) m_Project->m_DefaultWidth = projectNode["DefaultWidth"].as<uint32_t>();
 		if (projectNode["DefaultHeight"]) m_Project->m_DefaultHeight = projectNode["DefaultHeight"].as<uint32_t>();
+		if (projectNode["RendererAPI"]) m_Project->m_RendererAPI = projectNode["RendererAPI"].as<std::string>();
 		m_Project->m_ProjectFileName = vfsPath;
 
 		return true;

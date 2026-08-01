@@ -31,6 +31,9 @@ namespace Candy {
 		uint32_t GetDefaultHeight() const { return m_DefaultHeight; }
 		void SetDefaultHeight(uint32_t h) { m_DefaultHeight = h; }
 
+		const std::string& GetRendererAPI() const { return m_RendererAPI; }
+		void SetRendererAPI(const std::string& api) { m_RendererAPI = api; }
+
 		friend class ProjectSerializer;
 
 	private:
@@ -40,6 +43,7 @@ namespace Candy {
 		std::string m_DefaultScene;
 		uint32_t m_DefaultWidth = 1280;
 		uint32_t m_DefaultHeight = 720;
+		std::string m_RendererAPI = "D3D12";   ///< persisted into .candyproj; used at startup to choose RHI backend
 		std::filesystem::path m_ProjectFileName;
 	};
 
