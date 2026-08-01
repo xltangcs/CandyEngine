@@ -609,8 +609,26 @@ namespace Candy {
 
 	void ImGuiLayer::RenderD3D12(ImDrawData* drawData)
 	{
+		static bool s_first = true;
+		if (s_first)
+		{
+			s_first = false;
+			CANDY_CORE_INFO("ImGuiLayer::RenderD3D12 FIRST — cmdLists={} totalVtx={}",
+			                drawData ? drawData->CmdListsCount : 0,
+			                drawData ? drawData->TotalVtxCount    : 0);
+		}
 		if (!drawData || drawData->CmdListsCount == 0)
 			return;
+
+		auto* gfxCtx = static_cast<D3D12GraphicsContext*>(
+			static_cast<WindowsWindow*>(&Application::Get().GetWindow())
+				->GetGraphicsContext());
+		auto* sc = gfxCtx ? gfxCtx->GetSwapChain() : nullptr;
+		if (!sc)
+		{
+			CANDY_CORE_ERROR("ImGuiLayer::RenderD3D12 — no D3D12 swap chain bound");
+			return;
+		}
 
 		uint32_t fi = m_D3D12.FrameIndex;
 
@@ -629,8 +647,37 @@ namespace Candy {
 		ID3D12DescriptorHeap* heaps[] = { m_D3D12.SRVHeap };
 		m_D3D12.FrameCmdLists[fi]->SetDescriptorHeaps(1, heaps);
 
+		// ---------------------------------------------------------------
+		// Bind the swap-chain back buffer as the ImGui render target:
+		// PRESENT → RENDER_TARGET barrier, OMSetRenderTargets to its RTV,
+		// then clear to the engine's editor clear color.  Without this the
+		// ImGui_DX12 draw commands had no RT bound and Present would flip
+		// uninitialized back buffers — causing the "全黑 viewport" symptom.
+		// ---------------------------------------------------------------
+		ID3D12Resource*           backBuffer = sc->GetCurrentBackBufferResource();
+		D3D12_CPU_DESCRIPTOR_HANDLE rtv       = sc->GetCurrentRTVHandle();
+
+		D3D12_RESOURCE_BARRIER inBarrier = {};
+		inBarrier.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		inBarrier.Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		inBarrier.Transition.pResource   = backBuffer;
+		inBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+		inBarrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		inBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		m_D3D12.FrameCmdLists[fi]->ResourceBarrier(1, &inBarrier);
+
+		static const float kClearColor[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
+		m_D3D12.FrameCmdLists[fi]->ClearRenderTargetView(rtv, kClearColor, 0, nullptr);
+		m_D3D12.FrameCmdLists[fi]->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+
 		// Render ImGui draw data
 		ImGui_ImplDX12_RenderDrawData(drawData, m_D3D12.FrameCmdLists[fi]);
+
+		// RENDER_TARGET → PRESENT barrier before Present.
+		D3D12_RESOURCE_BARRIER outBarrier = inBarrier;
+		outBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		outBarrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PRESENT;
+		m_D3D12.FrameCmdLists[fi]->ResourceBarrier(1, &outBarrier);
 
 		m_D3D12.FrameCmdLists[fi]->Close();
 
@@ -643,16 +690,9 @@ namespace Candy {
 		m_D3D12.Queue->Signal(m_D3D12.Fence, m_D3D12.FenceValue);
 
 		// Present the D3D12 swap chain
-		auto* gfxCtx = static_cast<D3D12GraphicsContext*>(
-			static_cast<WindowsWindow*>(&Application::Get().GetWindow())
-				->GetGraphicsContext());
-
-		if (auto* sc = gfxCtx->GetSwapChain())
-		{
-			UINT flags = 0;
-			sc->GetSwapChain()->Present(1, flags);
-			sc->AdvanceFrame();
-		}
+		UINT presentFlags = 0;
+		sc->GetSwapChain()->Present(sc->GetDesc().VSync ? 1u : 0u, presentFlags);
+		sc->AdvanceFrame();
 
 		// Advance frame index (double-buffered)
 		m_D3D12.FrameIndex = (fi + 1) % 2;

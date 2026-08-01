@@ -141,6 +141,12 @@ namespace Candy {
 
 	void Application::Run()
 	{
+		static bool s_RunStarted = false;
+		if (!s_RunStarted)
+		{
+			s_RunStarted = true;
+			CANDY_CORE_INFO("App: Run loop started; isEditor={}", m_IsEditor);
+		}
 		while (m_Running)
 		{
 			float time = (float)glfwGetTime();

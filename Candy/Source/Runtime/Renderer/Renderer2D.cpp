@@ -837,6 +837,16 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 	}
 	void Renderer2D::Flush()
 	{
+		static bool s_FirstFlush = true;
+		if (s_FirstFlush)
+		{
+			s_FirstFlush = false;
+			CANDY_CORE_INFO("Renderer2D::Flush FIRST CALL — D3D12Active={}, VkActive={}, OL_Active={}, activeRT={} QuadIdx={} CircleIdx={} LineVtx={}",
+			                s_Data.D3D12Active, s_Data.VkActive, s_Data.OL_Active,
+			                (bool)s_Data.ActiveRenderTarget,
+			                s_Data.QuadIndexCount, s_Data.CircleIndexCount, s_Data.LineVertexCount);
+		}
+
 		if (s_Data.VkActive)
 		{
 			auto* dev = s_Data.VkDev;

@@ -108,6 +108,18 @@ namespace Candy {
 
 	void EditorLayer::OnUpdate(Timestep ts)
 	{
+		static bool s_FirstOnUpdate = true;
+		if (s_FirstOnUpdate)
+		{
+			s_FirstOnUpdate = false;
+			CANDY_CORE_INFO("EditorLayer::OnUpdate FIRST — activeProject={}, activeScene={}, viewport=({},{}) focused={} sceneState={}",
+			                (bool)Application::Get().GetProject(),
+			                (bool)m_ActiveScene,
+			                m_ViewportSize.x, m_ViewportSize.y,
+			                m_ViewportFocused,
+			                static_cast<int>(m_SceneState));
+		}
+
 		CANDY_PROFILE_FUNCTION();
 
 		// Resize
