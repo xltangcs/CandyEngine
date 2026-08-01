@@ -943,12 +943,20 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			// Upload camera constant buffer
 			{
 				auto* d3d12CB = dynamic_cast<D3D12Buffer*>(s_Data.D3D12CameraCB.get());
-				if (d3d12CB && d3d12CB->GetResource())
+			if (d3d12CB && d3d12CB->GetResource())
+			{
+				void* mapped = d3d12CB->Map();
+				if (mapped)
 				{
-					void* mapped = d3d12CB->Map();
 					memcpy(mapped, &s_Data.CameraBuffer, sizeof(s_Data.CameraBuffer));
 					d3d12CB->Unmap();
 				}
+				else
+				{
+					CANDY_CORE_ERROR("Renderer2D::Flush (D3D12) — CameraCB Map failed; skipping this frame");
+					return;
+				}
+			}
 			}
 
 			auto& queue = dev->GetCommandQueue();
@@ -1015,13 +1023,18 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 					reinterpret_cast<uint8_t*>(s_Data.QuadVertexBufferPtr) -
 					reinterpret_cast<uint8_t*>(s_Data.QuadVertexBufferBase));
 
-				auto* d3d12VB = dynamic_cast<D3D12Buffer*>(s_Data.D3D12QuadVB.get());
-				if (d3d12VB)
+			auto* d3d12VB = dynamic_cast<D3D12Buffer*>(s_Data.D3D12QuadVB.get());
+			if (d3d12VB)
+			{
+				void* mapped = d3d12VB->Map();
+				if (mapped)
 				{
-					void* mapped = d3d12VB->Map();
 					memcpy(mapped, s_Data.QuadVertexBufferBase, dataSize);
 					d3d12VB->Unmap();
 				}
+				else
+					CANDY_CORE_WARN("Renderer2D::Flush (D3D12) — QuadVB Map failed; stale data used");
+			}
 
 				cmd->SetPipeline(s_Data.D3D12QuadPipeline);
 				cmd->SetConstantBuffer(0, 0, s_Data.D3D12CameraCB);
@@ -1080,13 +1093,18 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 					reinterpret_cast<uint8_t*>(s_Data.CircleVertexBufferPtr) -
 					reinterpret_cast<uint8_t*>(s_Data.CircleVertexBufferBase));
 
-				auto* d3d12VB = dynamic_cast<D3D12Buffer*>(s_Data.D3D12CircleVB.get());
-				if (d3d12VB)
+			auto* d3d12VB = dynamic_cast<D3D12Buffer*>(s_Data.D3D12CircleVB.get());
+			if (d3d12VB)
+			{
+				void* mapped = d3d12VB->Map();
+				if (mapped)
 				{
-					void* mapped = d3d12VB->Map();
 					memcpy(mapped, s_Data.CircleVertexBufferBase, dataSize);
 					d3d12VB->Unmap();
 				}
+				else
+					CANDY_CORE_WARN("Renderer2D::Flush (D3D12) — CircleVB Map failed; stale data used");
+			}
 
 				cmd->SetPipeline(s_Data.D3D12CirclePipeline);
 				cmd->SetConstantBuffer(0, 0, s_Data.D3D12CameraCB);
@@ -1107,8 +1125,13 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 				if (d3d12VB)
 				{
 					void* mapped = d3d12VB->Map();
-					memcpy(mapped, s_Data.LineVertexBufferBase, dataSize);
-					d3d12VB->Unmap();
+					if (mapped)
+					{
+						memcpy(mapped, s_Data.LineVertexBufferBase, dataSize);
+						d3d12VB->Unmap();
+					}
+					else
+						CANDY_CORE_WARN("Renderer2D::Flush (D3D12) — LineVB Map failed; stale data used");
 				}
 
 				cmd->SetPipeline(s_Data.D3D12LinePipeline);
