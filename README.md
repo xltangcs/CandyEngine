@@ -31,6 +31,10 @@ msbuild CandyEngine.sln /p:Configuration=Debug
 
 构建配置对应宏：`Debug` → `CANDY_DEBUG`，`Release` → `CANDY_RELEASE`，`Dist` → `CANDY_DIST`。
 
+### 引擎编辑器截图
+
+<img src = "./Resources/Images/CandyEngine.png" alt = "CandyEngine 编辑器截图" align = center />
+
 ### 已实现的功能
 
 | 模块 | 说明 |
