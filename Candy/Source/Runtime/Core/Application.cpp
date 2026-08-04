@@ -11,15 +11,25 @@
 
 #include "Runtime/Scripting/ScriptSystem.h"
 #include "Utils/PlatformUtils.h"
+#include "Runtime/Project/RecentProjects.h"
 
 namespace Candy {
 	Application* Application::s_Instance = nullptr;
 
-	Application::Application(const std::string& name, uint32_t width, uint32_t height, bool resizable, bool isEditor)
+	Application::Application(const std::string& name, uint32_t width, uint32_t height, bool resizable, bool isEditor, const std::string& rendererAPI)
 		: m_IsEditor(isEditor)
 	{
 		CANDY_CORE_ASSERT(!s_Instance, "Application already exists!");
 		s_Instance = this;
+
+		// Resolve / lock the active RHI backend *before* Window/GraphicsContext
+		// are created (the context reads Renderer::GetAPI() to pick the impl).
+		// `rendererAPI` defaults to "D3D12" but CandyEditor passes a value read
+		// from the auto-opened .candyproj so per-project Renderer API actually
+		// takes effect after a editor restart.
+		RendererAPI::SetAPI(RendererAPI::APIFromString(rendererAPI));
+		CANDY_CORE_INFO("Application: RHI backend = '{}'", RendererAPI::StringFromAPI(RendererAPI::GetAPI()));
+
 		m_Window = Window::Create(WindowProps(name, width, height, resizable));
 		m_Window->SetEventCallback(CANDY_BIND_EVENT_FN(Application::OnEvent));
 
@@ -42,13 +52,29 @@ namespace Candy {
 		if (m_IsEditor)
 		{
 			// Editor: mount the real Engine Content directory (hot-reload friendly).
-			std::filesystem::path engineDir = std::filesystem::path("..") / "Candy" / "Content";
-			if (!std::filesystem::exists(engineDir))
-				engineDir = "Content";
-			if (std::filesystem::exists(engineDir))
+			// Try several candidate relative paths so the editor works whether the
+			// process cwd is the workspace root (`Candy/Content`) or under bin/.
+			std::array<const char*, 5> candidates = {
+				"Candy/Content",          // cwd == workspace root (e.g. `E:\CandyEngine`)
+				"../Candy/Content",       // cwd == bin/Debug-windows-x86_64/CandyEditor
+				"../../Candy/Content",
+				"../../../Candy/Content",
+				"Content",                // last-resort fallback beside the exe
+			};
+			std::filesystem::path engineDir;
+			for (const char* c : candidates)
+			{
+				std::filesystem::path p(c);
+				if (std::filesystem::exists(p))
+				{
+					engineDir = p;
+					break;
+				}
+			}
+			if (!engineDir.empty())
 				FileSystem::Get().Mount("Engine", engineDir);
 			else
-				CANDY_CORE_WARN("Engine content not found: {0}", engineDir.string());
+				CANDY_CORE_WARN("Engine content not found in any candidate path");
 		}
 		else
 		{
@@ -115,6 +141,12 @@ namespace Candy {
 
 	void Application::Run()
 	{
+		static bool s_RunStarted = false;
+		if (!s_RunStarted)
+		{
+			s_RunStarted = true;
+			CANDY_CORE_INFO("App: Run loop started; isEditor={}", m_IsEditor);
+		}
 		while (m_Running)
 		{
 			float time = (float)glfwGetTime();

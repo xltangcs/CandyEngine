@@ -20,6 +20,14 @@ namespace Candy {
 
 		glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+		m_RHIDesc.Width       = width;
+		m_RHIDesc.Height      = height;
+		m_RHIDesc.Format      = RHIFormat::R8G8B8A8Unorm;
+		m_RHIDesc.MipLevels   = 1;
+		m_RHIDesc.ArrayLayers = 1;
+		m_RHIDesc.Usage       = ResourceUsage::ShaderRead;
+		m_RHIDesc.SampleCount = 1;
 	}
 
 	OpenGLTexture2D::OpenGLTexture2D(const std::string& path)

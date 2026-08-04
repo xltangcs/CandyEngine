@@ -27,10 +27,8 @@
 #include "Platform/Windows/WindowsWindow.h"
 #endif
 
-#ifndef CANDY_PLATFORM_WINDOWS
 #include <glad/glad.h>
 #include <backends/imgui_impl_opengl3.h>
-#endif
 
 namespace Candy {
 
@@ -88,6 +86,14 @@ namespace Candy {
 		m_IsD3D12   = (Renderer::GetAPI() == RendererAPI::API::D3D12);
 		m_IsVulkan = (Renderer::GetAPI() == RendererAPI::API::Vulkan);
 
+		// Multi-viewport platform rendering is only wired through the
+		// OpenGL/Glfw backend (UpdatePlatformWindowsDefault path).  D3D12 and
+		// Vulkan backends do not yet hook RenderPlatformWindowsDefault, so
+		// leaving the flag enabled would trip the
+		// `Forgot to call UpdatePlatformWindows()` assertion in imgui.cpp.
+		if (m_IsD3D12 || m_IsVulkan)
+			io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
+
 		if (m_IsVulkan)
 		{
 			ImGui_ImplGlfw_InitForVulkan(window, true);
@@ -108,10 +114,8 @@ namespace Candy {
 		}
 		else
 		{
-#ifndef CANDY_PLATFORM_WINDOWS
 			ImGui_ImplGlfw_InitForOpenGL(window, true);
 			ImGui_ImplOpenGL3_Init("#version 410");
-#endif
 		}
 
 		// Create game UI context
@@ -122,13 +126,17 @@ namespace Candy {
 		{
 #ifdef CANDY_PLATFORM_WINDOWS
 			m_D3D12.GameUIContext = m_GameUIContext;
+			// Per-context ImGui_DX12 backend init for the game UI context.
+			// InitD3D12Backend is idempotent + current-context guarded so this
+			// only calls ImGui_ImplDX12_Init once for this context; shared
+			// resources stay on m_D3D12.
+			InitD3D12Backend(window);
+			CANDY_CORE_INFO("ImGuiLayer: D3D12 backend initialized (game UI context)");
 #endif
 		}
 		else
 		{
-#ifndef CANDY_PLATFORM_WINDOWS
 			ImGui_ImplOpenGL3_Init("#version 410");
-#endif
 		}
 
 		ImGuiIO& gameIO = ImGui::GetIO();
@@ -170,13 +178,11 @@ namespace Candy {
 		}
 		else
 		{
-#ifndef CANDY_PLATFORM_WINDOWS
 			ImGui::SetCurrentContext(m_GameUIContext);
 			ImGui_ImplOpenGL3_Shutdown();
 			ImGui::SetCurrentContext(m_EditorContext);
 			ImGui_ImplOpenGL3_Shutdown();
 			ImGui_ImplGlfw_Shutdown();
-#endif
 		}
 
 		ImGui::DestroyContext(m_GameUIContext);
@@ -218,10 +224,8 @@ namespace Candy {
 		}
 		else
 		{
-#ifndef CANDY_PLATFORM_WINDOWS
 			ImGui_ImplOpenGL3_NewFrame();
 			ImGui_ImplGlfw_NewFrame();
-#endif
 		}
 
 		ImGui::NewFrame();
@@ -251,20 +255,16 @@ namespace Candy {
 		}
 		else
 		{
-#ifndef CANDY_PLATFORM_WINDOWS
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-#endif
 		}
 
 		if (!m_IsD3D12 && (Renderer::GetAPI() != RendererAPI::API::Vulkan)
 		    && (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable))
 		{
-#ifndef CANDY_PLATFORM_WINDOWS
 			GLFWwindow* backup_current_context = glfwGetCurrentContext();
 			ImGui::UpdatePlatformWindows();
 			ImGui::RenderPlatformWindowsDefault();
 			glfwMakeContextCurrent(backup_current_context);
-#endif
 		}
 	}
 
@@ -462,17 +462,42 @@ namespace Candy {
 		*outGPU = gpu;
 	}
 
+	void ImGuiLayer::SRVDeallocator(ImGui_ImplDX12_InitInfo* /*info*/,
+	                                D3D12_CPU_DESCRIPTOR_HANDLE /*cpu*/,
+	                                D3D12_GPU_DESCRIPTOR_HANDLE /*gpu*/)
+	{
+		// ImGui_ImplDX12_InitInfo requires both Alloc and Free callbacks to be
+		// non-null (see assertion in ImGui_ImplDX12_Init).  Our allocator is a
+		// simple linear bump that resets every frame, so nothing to release.
+	}
+
 	void ImGuiLayer::InitD3D12Backend(GLFWwindow* window)
 	{
-		// Get D3D12 device/queue from GraphicsContext
-		auto* win = static_cast<WindowsWindow*>(&Application::Get().GetWindow());
-		auto* gfxCtx = static_cast<D3D12GraphicsContext*>(
-			win->GetGraphicsContext());
+		// ---------------------------------------------------------------------------
+		// Idempotent per-context init:
+		//   - ImGui_ImplDX12 backend data lives in io.BackendRendererUserData of
+		//     the *current* ImGui context. ImGui_ImplDX12_Init asserts
+		//     `io.BackendRendererUserData == nullptr && "Already initialized a
+		//     renderer backend!"` so we early-return when this context already
+		//     has a backend.
+		//   - Shared physical resources (device/queue, SRV heap, per-frame
+		//     command allocators/lists, fence) are created exactly once because
+		//     they live on the single m_D3D12 struct that backs both the editor
+		//     context and the game UI context.
+		// ---------------------------------------------------------------------------
+
+		ImGuiIO& io = ImGui::GetIO();
+		if (io.BackendRendererUserData != nullptr)
+			return; // backend already initialized for this context
+
+		auto* win    = static_cast<WindowsWindow*>(&Application::Get().GetWindow());
+		auto* gfxCtx = static_cast<D3D12GraphicsContext*>(win->GetGraphicsContext());
 
 		m_D3D12.Device = gfxCtx->GetDevice()->GetNativeDevice();
 		m_D3D12.Queue  = gfxCtx->GetDevice()->GetNativeQueue();
 
-		// Create SRV descriptor heap for ImGui textures
+		// SRV descriptor heap for ImGui textures (shared by both ImGui contexts).
+		if (!m_D3D12.SRVHeap)
 		{
 			D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
 			heapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
@@ -491,37 +516,43 @@ namespace Candy {
 				D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		}
 
-		// Create per-frame resources (2 frames for double-buffering)
-		for (int i = 0; i < 2; ++i)
+		// Per-frame command lists (created once, shared across both contexts —
+		// they iterate sequentially per main loop so they do not stomp each
+		// other).
+		if (!m_D3D12.FrameAllocators[0])
 		{
-			HRESULT hr = m_D3D12.Device->CreateCommandAllocator(
-				D3D12_COMMAND_LIST_TYPE_DIRECT,
-				IID_PPV_ARGS(&m_D3D12.FrameAllocators[i]));
-			if (FAILED(hr))
+			for (int i = 0; i < 2; ++i)
 			{
-				CANDY_CORE_ERROR("ImGuiLayer: CreateCommandAllocator[{0}] failed", i);
-				return;
+				HRESULT hr = m_D3D12.Device->CreateCommandAllocator(
+					D3D12_COMMAND_LIST_TYPE_DIRECT,
+					IID_PPV_ARGS(&m_D3D12.FrameAllocators[i]));
+				if (FAILED(hr))
+				{
+					CANDY_CORE_ERROR("ImGuiLayer: CreateCommandAllocator[{0}] failed", i);
+					return;
+				}
+
+				hr = m_D3D12.Device->CreateCommandList(
+					0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+					m_D3D12.FrameAllocators[i], nullptr,
+					IID_PPV_ARGS(&m_D3D12.FrameCmdLists[i]));
+				if (FAILED(hr))
+				{
+					CANDY_CORE_ERROR("ImGuiLayer: CreateCommandList[{0}] failed", i);
+					return;
+				}
+
+				m_D3D12.FrameCmdLists[i]->Close();
 			}
 
-			hr = m_D3D12.Device->CreateCommandList(
-				0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-				m_D3D12.FrameAllocators[i], nullptr,
-				IID_PPV_ARGS(&m_D3D12.FrameCmdLists[i]));
-			if (FAILED(hr))
-			{
-				CANDY_CORE_ERROR("ImGuiLayer: CreateCommandList[{0}] failed", i);
-				return;
-			}
-
-			m_D3D12.FrameCmdLists[i]->Close();
+			m_D3D12.Device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
+			                            IID_PPV_ARGS(&m_D3D12.Fence));
+			m_D3D12.FenceEvent = CreateEventA(nullptr, FALSE, FALSE, nullptr);
 		}
 
-		// Fence for synchronization
-		m_D3D12.Device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
-		                           IID_PPV_ARGS(&m_D3D12.Fence));
-		m_D3D12.FenceEvent = CreateEventA(nullptr, FALSE, FALSE, nullptr);
-
-		// Initialize ImGui D3D12 backend
+		// Initialize ImGui D3D12 backend for the *current* context. Safe to run
+		// per-context since the Io guard at the top ensures it only runs when
+		// the context doesn't yet have a backend bound.
 		ImGui_ImplDX12_InitInfo initInfo = {};
 		initInfo.Device               = m_D3D12.Device;
 		initInfo.CommandQueue          = m_D3D12.Queue;
@@ -530,7 +561,7 @@ namespace Candy {
 		initInfo.DSVFormat            = DXGI_FORMAT_UNKNOWN;
 		initInfo.SrvDescriptorHeap    = m_D3D12.SRVHeap;
 		initInfo.SrvDescriptorAllocFn = SRVAllocator;
-		initInfo.SrvDescriptorFreeFn  = nullptr;  // linear allocator, no free needed
+		initInfo.SrvDescriptorFreeFn  = SRVDeallocator;
 		initInfo.UserData             = this;
 
 		if (!ImGui_ImplDX12_Init(&initInfo))
@@ -578,8 +609,26 @@ namespace Candy {
 
 	void ImGuiLayer::RenderD3D12(ImDrawData* drawData)
 	{
+		static bool s_first = true;
+		if (s_first)
+		{
+			s_first = false;
+			CANDY_CORE_INFO("ImGuiLayer::RenderD3D12 FIRST — cmdLists={} totalVtx={}",
+			                drawData ? drawData->CmdListsCount : 0,
+			                drawData ? drawData->TotalVtxCount    : 0);
+		}
 		if (!drawData || drawData->CmdListsCount == 0)
 			return;
+
+		auto* gfxCtx = static_cast<D3D12GraphicsContext*>(
+			static_cast<WindowsWindow*>(&Application::Get().GetWindow())
+				->GetGraphicsContext());
+		auto* sc = gfxCtx ? gfxCtx->GetSwapChain() : nullptr;
+		if (!sc)
+		{
+			CANDY_CORE_ERROR("ImGuiLayer::RenderD3D12 — no D3D12 swap chain bound");
+			return;
+		}
 
 		uint32_t fi = m_D3D12.FrameIndex;
 
@@ -598,8 +647,37 @@ namespace Candy {
 		ID3D12DescriptorHeap* heaps[] = { m_D3D12.SRVHeap };
 		m_D3D12.FrameCmdLists[fi]->SetDescriptorHeaps(1, heaps);
 
+		// ---------------------------------------------------------------
+		// Bind the swap-chain back buffer as the ImGui render target:
+		// PRESENT → RENDER_TARGET barrier, OMSetRenderTargets to its RTV,
+		// then clear to the engine's editor clear color.  Without this the
+		// ImGui_DX12 draw commands had no RT bound and Present would flip
+		// uninitialized back buffers — causing the "全黑 viewport" symptom.
+		// ---------------------------------------------------------------
+		ID3D12Resource*           backBuffer = sc->GetCurrentBackBufferResource();
+		D3D12_CPU_DESCRIPTOR_HANDLE rtv       = sc->GetCurrentRTVHandle();
+
+		D3D12_RESOURCE_BARRIER inBarrier = {};
+		inBarrier.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		inBarrier.Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		inBarrier.Transition.pResource   = backBuffer;
+		inBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+		inBarrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		inBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		m_D3D12.FrameCmdLists[fi]->ResourceBarrier(1, &inBarrier);
+
+		static const float kClearColor[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
+		m_D3D12.FrameCmdLists[fi]->ClearRenderTargetView(rtv, kClearColor, 0, nullptr);
+		m_D3D12.FrameCmdLists[fi]->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+
 		// Render ImGui draw data
 		ImGui_ImplDX12_RenderDrawData(drawData, m_D3D12.FrameCmdLists[fi]);
+
+		// RENDER_TARGET → PRESENT barrier before Present.
+		D3D12_RESOURCE_BARRIER outBarrier = inBarrier;
+		outBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		outBarrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PRESENT;
+		m_D3D12.FrameCmdLists[fi]->ResourceBarrier(1, &outBarrier);
 
 		m_D3D12.FrameCmdLists[fi]->Close();
 
@@ -612,16 +690,9 @@ namespace Candy {
 		m_D3D12.Queue->Signal(m_D3D12.Fence, m_D3D12.FenceValue);
 
 		// Present the D3D12 swap chain
-		auto* gfxCtx = static_cast<D3D12GraphicsContext*>(
-			static_cast<WindowsWindow*>(&Application::Get().GetWindow())
-				->GetGraphicsContext());
-
-		if (auto* sc = gfxCtx->GetSwapChain())
-		{
-			UINT flags = 0;
-			sc->GetSwapChain()->Present(1, flags);
-			sc->AdvanceFrame();
-		}
+		UINT presentFlags = 0;
+		sc->GetSwapChain()->Present(sc->GetDesc().VSync ? 1u : 0u, presentFlags);
+		sc->AdvanceFrame();
 
 		// Advance frame index (double-buffered)
 		m_D3D12.FrameIndex = (fi + 1) % 2;

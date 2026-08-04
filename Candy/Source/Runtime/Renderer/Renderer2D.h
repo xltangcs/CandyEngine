@@ -4,12 +4,9 @@
 #include "Runtime/Renderer/Texture.h"
 #include "Runtime/Renderer/OrthographicCamera.h"
 #include "Runtime/Renderer/EditorCamera.h"
+#include "Runtime/RHI/RHI.h"
 
 #include "Runtime/Scene/Components.h"
-
-namespace Candy {
-	class D3D12Framebuffer;
-}
 
 namespace Candy {
 	class Renderer2D
@@ -37,7 +34,7 @@ namespace Candy {
 		static void DrawRotatedQuad(const glm::vec3& position, const glm::vec2& size, float rotation, const glm::vec4& color);
 		static void DrawRotatedQuad(const glm::vec2& position, const glm::vec2& size, float rotation, const Ref<Texture2D>& texture, float tilingFactor = 1.0f, const glm::vec4& tintColor = glm::vec4(1.0f));
 		static void DrawRotatedQuad(const glm::vec3& position, const glm::vec2& size, float rotation, const Ref<Texture2D>& texture, float tilingFactor = 1.0f, const glm::vec4& tintColor = glm::vec4(1.0f));
-		
+
 		static void DrawCircle(const glm::mat4& transform, const glm::vec4& color, float thickness = 1.0f, float fade = 0.005f, int entityID = -1);
 		static void DrawLine(const glm::vec3& p0, glm::vec3& p1, const glm::vec4& color, int entityID = -1);
 
@@ -61,8 +58,12 @@ namespace Candy {
 		static void ResetStats();
 		static Statistics GetStats();
 
-		/// Sets the active D3D12 framebuffer for the next Flush() call (D3D12 only).
-		static void SetD3D12ActiveFramebuffer(D3D12Framebuffer* fb);
+		/// Sets the active render-target framebuffer for the next Flush() call.
+		/// Replaces the old backend-specific SetD3D12ActiveFramebuffer(); the
+		/// framebuffer is expected to also surface-compatible with RHIFramebuffer
+		/// (both OpenGLFramebuffer and D3D12Framebuffer do via multi-inheritance).
+		static void SetActiveRenderTarget(const Ref<RHIFramebuffer>& fb);
+
 	private:
 		static void StartBatch();
 		static void NextBatch();

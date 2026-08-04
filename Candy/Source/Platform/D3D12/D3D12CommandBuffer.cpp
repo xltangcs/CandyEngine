@@ -86,9 +86,9 @@ namespace Candy {
 		m_CurrentFramebuffer = nullptr;
 	}
 
-	void D3D12CommandBuffer::SetFramebufferRenderTarget(D3D12Framebuffer* framebuffer)
+	void D3D12CommandBuffer::SetFramebufferRenderTarget(const Ref<RHIFramebuffer>& framebuffer)
 	{
-		m_CurrentFramebuffer = framebuffer;
+		m_CurrentFramebuffer = dynamic_cast<D3D12Framebuffer*>(framebuffer.get());
 		m_CurrentSwapChain   = nullptr;
 	}
 

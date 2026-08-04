@@ -447,7 +447,17 @@ namespace Candy {
 	void D3D12Framebuffer::ClearAttachment(uint32_t attachmentIndex, int value)
 	{
 		CANDY_CORE_ASSERT(!m_Specification.SwapChainTarget);
-		CANDY_CORE_ASSERT(attachmentIndex < m_ColorAttachments.size());
+		if (attachmentIndex >= m_ColorAttachments.size())
+		{
+			CANDY_CORE_ERROR("D3D12Framebuffer::ClearAttachment — index {} out of range (colorAttachments={})",
+			                 attachmentIndex, m_ColorAttachments.size());
+			return;
+		}
+		if (!m_RTVHeap)
+		{
+			CANDY_CORE_ERROR("D3D12Framebuffer::ClearAttachment — m_RTVHeap null; skipping clear (attachment {})", attachmentIndex);
+			return;
+		}
 
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRTVHandle(attachmentIndex);
 		FLOAT clearColor[4] = {
@@ -501,6 +511,19 @@ namespace Candy {
 
 	D3D12_CPU_DESCRIPTOR_HANDLE D3D12Framebuffer::GetRTVHandle(uint32_t index) const
 	{
+		if (!m_RTVHeap)
+		{
+			static bool s_warned = false;
+			if (!s_warned)
+			{
+				s_warned = true;
+				CANDY_CORE_ERROR("D3D12Framebuffer::GetRTVHandle — m_RTVHeap null; Invalidate may have failed (device={}, colorCount={}, swapchain={})",
+				                 (bool)m_Device,
+				                 m_ColorAttachments.size(),
+				                 m_Specification.SwapChainTarget);
+			}
+			return {};
+		}
 		D3D12_CPU_DESCRIPTOR_HANDLE handle = m_RTVHeap->GetCPUDescriptorHandleForHeapStart();
 		handle.ptr += static_cast<SIZE_T>(index) * m_RTVDescriptorSize;
 		return handle;

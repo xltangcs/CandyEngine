@@ -18,6 +18,37 @@ using Microsoft::WRL::ComPtr;
 
 namespace Candy {
 
+	// Dumps any stored D3D12 debug-layer messages and clears the queue so the
+	// next call starts fresh.  Called at PSO creation failure sites.
+	static void DumpInfoQueueMessages(ID3D12InfoQueue* q)
+	{
+		if (!q)
+			return;
+		UINT64 count = q->GetNumStoredMessages();
+		for (UINT64 i = 0; i < count; ++i)
+		{
+			SIZE_T msgLen = 0;
+			if (FAILED(q->GetMessage(i, nullptr, &msgLen)) || msgLen == 0)
+				continue;
+			std::vector<uint8_t> buf(msgLen);
+			auto* msg = reinterpret_cast<D3D12_MESSAGE*>(buf.data());
+			if (SUCCEEDED(q->GetMessage(i, msg, &msgLen)))
+			{
+				const char* severity = "INFO";
+				switch (msg->Severity)
+				{
+				case D3D12_MESSAGE_SEVERITY_WARNING:     severity = "WARN"; break;
+				case D3D12_MESSAGE_SEVERITY_ERROR:       severity = "ERROR"; break;
+				case D3D12_MESSAGE_SEVERITY_CORRUPTION:  severity = "CORRUPTION"; break;
+				default: break;
+				}
+				CANDY_CORE_ERROR("D3D12InfoQueue [{0}]: {1}", severity,
+				                 msg->pDescription ? msg->pDescription : "");
+			}
+		}
+		q->ClearStoredMessages();
+	}
+
 	// =========================================================================
 	// Built-in triangle shader source (HLSL, compiled at runtime via D3DCompile)
 	// =========================================================================
@@ -290,6 +321,29 @@ float4 main(PSInput input) : SV_TARGET
 		}
 
 		m_FenceEvent = CreateEventA(nullptr, FALSE, FALSE, nullptr);
+
+		// Hook the debug-layer info queue so failure sites can log the
+		// actual message D3D12 emitted (PSO shadER mismatch, RT format
+		// mismatch, etc).
+		if (m_NativeDevice)
+		{
+			if (SUCCEEDED(m_NativeDevice->QueryInterface(IID_PPV_ARGS(&m_InfoQueue))))
+			{
+				// Allow every severity through the storage filter so the
+				// engine can drain messages after pipeline creation failure.
+				D3D12_MESSAGE_SEVERITY severities[] = {
+					D3D12_MESSAGE_SEVERITY_INFO,
+					D3D12_MESSAGE_SEVERITY_WARNING,
+					D3D12_MESSAGE_SEVERITY_ERROR,
+					D3D12_MESSAGE_SEVERITY_CORRUPTION,
+				};
+				D3D12_INFO_QUEUE_FILTER filter = {};
+				filter.AllowList.NumSeverities = static_cast<UINT>(std::size(severities));
+				filter.AllowList.pSeverityList = severities;
+				m_InfoQueue->PushStorageFilter(&filter);
+				CANDY_CORE_INFO("D3D12Device: info queue attached (filter: info+warn+error+corruption)");
+			}
+		}
 
 		CANDY_CORE_INFO("D3D12Device: initialization complete");
 	}
@@ -622,10 +676,14 @@ float4 main(PSInput input) : SV_TARGET
 		{
 			switch (fmt)
 			{
-			case RHIFormat::R32G32Float:       return DXGI_FORMAT_R32G32_FLOAT;
-			case RHIFormat::R32G32B32Float:    return DXGI_FORMAT_R32G32B32_FLOAT;
-			case RHIFormat::R32G32B32A32Float: return DXGI_FORMAT_R32G32B32A32_FLOAT;
-			case RHIFormat::R8G8B8A8Unorm:     return DXGI_FORMAT_R8G8B8A8_UNORM;
+			case RHIFormat::R32G32Float:        return DXGI_FORMAT_R32G32_FLOAT;
+			case RHIFormat::R32G32B32Float:     return DXGI_FORMAT_R32G32B32_FLOAT;
+			case RHIFormat::R32G32B32A32Float:  return DXGI_FORMAT_R32G32B32A32_FLOAT;
+			case RHIFormat::R8G8B8A8Unorm:      return DXGI_FORMAT_R8G8B8A8_UNORM;
+			case RHIFormat::R32Float:           return DXGI_FORMAT_R32_FLOAT;
+			case RHIFormat::R32Sint:            return DXGI_FORMAT_R32_SINT;
+			case RHIFormat::R32Uint:            return DXGI_FORMAT_R32_UINT;
+			case RHIFormat::R16G16B16A16Float:  return DXGI_FORMAT_R16G16B16A16_FLOAT;
 			default:                           return DXGI_FORMAT_UNKNOWN;
 			}
 		};
@@ -695,6 +753,10 @@ float4 main(PSInput input) : SV_TARGET
 		// ---- Blend state ---------------------------------------------------
 
 		D3D12_BLEND_DESC blend = {};
+		// Per-RT blend allowed: RT0 (color) blends alpha, RT1 (R32_SINT
+		// entity-id) must NOT blend under any circumstances — D3D12 otherwise
+		// rejects PSO creation ("R32_SINT does not support blending").
+		blend.IndependentBlendEnable   = TRUE;
 		blend.RenderTarget[0].BlendEnable   = desc.Blend.BlendEnable;
 		blend.RenderTarget[0].SrcBlend      = D3D12_BLEND_SRC_ALPHA;
 		blend.RenderTarget[0].DestBlend     = D3D12_BLEND_INV_SRC_ALPHA;
@@ -780,6 +842,7 @@ float4 main(PSInput input) : SV_TARGET
 		if (FAILED(hr))
 		{
 			CANDY_CORE_ERROR("D3D12Device::CreateGraphicsPipeline: CreateGraphicsPipelineState failed");
+			DumpInfoQueueMessages(m_InfoQueue.Get());
 			return nullptr;
 		}
 
@@ -846,6 +909,10 @@ float4 main(PSInput input) : SV_TARGET
 			? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
 
 		D3D12_BLEND_DESC blend = {};
+		// Per-RT blend allowed: RT0 (color) blends alpha, RT1 (R32_SINT
+		// entity-id) must NOT blend under any circumstances — D3D12 otherwise
+		// rejects PSO creation ("R32_SINT does not support blending").
+		blend.IndependentBlendEnable   = TRUE;
 		blend.RenderTarget[0].BlendEnable   = desc.Blend.BlendEnable;
 		blend.RenderTarget[0].SrcBlend      = D3D12_BLEND_SRC_ALPHA;
 		blend.RenderTarget[0].DestBlend     = D3D12_BLEND_INV_SRC_ALPHA;
@@ -906,6 +973,7 @@ float4 main(PSInput input) : SV_TARGET
 		if (FAILED(hr))
 		{
 			CANDY_CORE_ERROR("D3D12Device::CreateGraphicsPipelineWithRootSig: CreateGraphicsPipelineState failed");
+			DumpInfoQueueMessages(m_InfoQueue.Get());
 			return nullptr;
 		}
 
