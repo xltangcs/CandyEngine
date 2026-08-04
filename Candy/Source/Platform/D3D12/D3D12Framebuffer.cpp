@@ -95,6 +95,15 @@ namespace Candy {
 			return;
 		}
 
+		// Wait for any in-flight GPU work to finish before releasing and
+		// recreating the attachments. If the previous frame's command list is
+		// still executing and touches these resources (which were also being
+		// rendered into right before a viewport resize), releasing them early
+		// makes the GPU fault on already-freed memory and the device gets
+		// removed (DXGI_ERROR_DEVICE_REMOVED 0x887A0005).
+		if (m_Device)
+			m_Device->WaitIdle();
+
 		// Release old resources
 		m_ColorAttachments.clear();
 		m_DepthAttachment.Reset();
@@ -117,7 +126,8 @@ namespace Candy {
 			HRESULT hr = nativeDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_RTVHeap));
 			if (FAILED(hr))
 			{
-				CANDY_CORE_ERROR("D3D12Framebuffer: RTV heap creation failed");
+				CANDY_CORE_ERROR("D3D12Framebuffer: RTV heap creation failed (hr=0x{:08X}, width={}, height={}, colorCount={})",
+				                 static_cast<unsigned int>(hr), width, height, colorCount);
 				return;
 			}
 			m_RTVDescriptorSize = nativeDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -324,9 +334,19 @@ namespace Candy {
 	int D3D12Framebuffer::ReadPixel(uint32_t attachmentIndex, int x, int y)
 	{
 		CANDY_CORE_ASSERT(!m_Specification.SwapChainTarget);
-		CANDY_CORE_ASSERT(attachmentIndex < m_ColorAttachments.size());
+		if (attachmentIndex >= m_ColorAttachments.size())
+		{
+			// Runtime bound check (NOT just an assert): Invalidate() can bail
+			// early (e.g. descriptor heap creation fails on a resize), leaving
+			// m_ColorAttachments empty while the EditorLayer still calls
+			// ReadPixel(1, ...) every frame for entity picking. Treating this as
+			// "no entity" avoids the std::vector operator[] OOB crash.
+			CANDY_CORE_ERROR("D3D12Framebuffer::ReadPixel — index {} out of range (colorAttachments={})",
+			                 attachmentIndex, m_ColorAttachments.size());
+			return -1;
+		}
 
-		ID3D12Device* nativeDevice = m_Device->GetNativeDevice();
+		ID3D12Device* nativeDevice = m_Device ? m_Device->GetNativeDevice() : nullptr;
 		if (!nativeDevice)
 			return -1;
 

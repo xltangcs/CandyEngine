@@ -3,3 +3,4 @@ Project:
   DefaultScene: VFS://Game/Scenes/TestScene.candy
   DefaultWidth: 1280
   DefaultHeight: 720
+  RendererAPI: D3D12

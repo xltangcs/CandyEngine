@@ -41,7 +41,8 @@ namespace Candy {
 			if (SUCCEEDED(hr))
 				m_IsCPUMapped = true;
 			else
-				CANDY_CORE_ERROR("D3D12Buffer::Map failed for '{}'", m_Desc.DebugName);
+				CANDY_CORE_ERROR("D3D12Buffer::Map failed for '{}' (hr=0x{:08X}, IsCPUMapped={}, Resource={})",
+				                 m_Desc.DebugName, static_cast<unsigned int>(hr), m_IsCPUMapped, (void*)m_Resource.Get());
 		}
 		return m_MappedData;
 	}
