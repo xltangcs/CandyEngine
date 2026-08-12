@@ -6,6 +6,7 @@
 #include "Runtime/RHI/RHISwapChain.h"
 
 #include <cstdint>
+#include <cstring>
 #include <string>
 
 namespace Candy {
@@ -75,6 +76,19 @@ namespace Candy {
 		/// with CPUAccessible = true.
 		virtual void* Map()    = 0;
 		virtual void  Unmap()  = 0;
+
+		/// Convenience upload: Map + memcpy + Unmap in one call. Returns false
+		/// when the buffer cannot be mapped (stale data is left in place).
+		/// Backends with faster upload paths may override.
+		virtual bool Write(const void* data, uint64_t size, uint64_t offset = 0)
+		{
+			void* mapped = Map();
+			if (!mapped)
+				return false;
+			memcpy(static_cast<uint8_t*>(mapped) + offset, data, static_cast<size_t>(size));
+			Unmap();
+			return true;
+		}
 	};
 
 	// =========================================================================

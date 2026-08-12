@@ -227,14 +227,8 @@ namespace Candy {
 					ibDesc.DebugName = "Vk2D_QuadIB";
 					s_Data.VkQuadIB = dev->CreateBuffer(ibDesc);
 				}
-				// Map + upload
-				auto* vkIB = dynamic_cast<VulkanBuffer*>(s_Data.VkQuadIB.get());
-				if (vkIB)
-				{
-					void* m = vkIB->Map();
-					memcpy(m, indices, s_Data.MaxIndices * sizeof(uint32_t));
-					vkIB->Unmap();
-				}
+				// Upload
+				s_Data.VkQuadIB->Write(indices, s_Data.MaxIndices * sizeof(uint32_t));
 				delete[] indices;
 			}
 
@@ -649,13 +643,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			ib.CPUAccessible = true;
 			ib.DebugName     = "OL_QuadIB";
 			s_Data.OL_QuadIB = olDev->CreateBuffer(ib);
-			auto* rhiIB = dynamic_cast<OpenGLRHIBuffer*>(s_Data.OL_QuadIB.get());
-			if (rhiIB)
-			{
-				void* m = rhiIB->Map();
-				if (m) memcpy(m, quadIndices, static_cast<size_t>(ib.Size));
-				rhiIB->Unmap();
-			}
+			s_Data.OL_QuadIB->Write(quadIndices, static_cast<size_t>(ib.Size));
 			delete[] quadIndices;
 		}
 
@@ -859,10 +847,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			if (!dev) return;
 
 			// Upload camera CB
-			{
-				auto* vkCB = dynamic_cast<VulkanBuffer*>(s_Data.VkCameraCB.get());
-				if (vkCB) { void* m = vkCB->Map(); memcpy(m, &s_Data.CameraBuffer, sizeof(s_Data.CameraBuffer)); vkCB->Unmap(); }
-			}
+			s_Data.VkCameraCB->Write(&s_Data.CameraBuffer, sizeof(s_Data.CameraBuffer));
 
 			// Update descriptor set
 			{
@@ -903,9 +888,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			VkDevice vd = dev->GetVkDevice();
 
 			auto uploadVkVB = [&](Ref<RHIBuffer>& vb, const void* data, uint32_t size) -> bool {
-				auto* vkBuf = dynamic_cast<VulkanBuffer*>(vb.get());
-				if (vkBuf) { void* m = vkBuf->Map(); memcpy(m, data, size); vkBuf->Unmap(); }
-				return vkBuf != nullptr;
+				return vb && vb->Write(data, size);
 			};
 
 			// Quad batch
@@ -962,22 +945,10 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			if (!dev) return;
 
 			// Upload camera constant buffer
+			if (!s_Data.D3D12CameraCB->Write(&s_Data.CameraBuffer, sizeof(s_Data.CameraBuffer)))
 			{
-				auto* d3d12CB = dynamic_cast<D3D12Buffer*>(s_Data.D3D12CameraCB.get());
-			if (d3d12CB && d3d12CB->GetResource())
-			{
-				void* mapped = d3d12CB->Map();
-				if (mapped)
-				{
-					memcpy(mapped, &s_Data.CameraBuffer, sizeof(s_Data.CameraBuffer));
-					d3d12CB->Unmap();
-				}
-				else
-				{
-					CANDY_CORE_ERROR("Renderer2D::Flush (D3D12) — CameraCB Map failed; skipping this frame");
-					return;
-				}
-			}
+				CANDY_CORE_ERROR("Renderer2D::Flush (D3D12) — CameraCB upload failed; skipping this frame");
+				return;
 			}
 
 			auto& queue = dev->GetCommandQueue();
@@ -1052,18 +1023,8 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 					reinterpret_cast<uint8_t*>(s_Data.QuadVertexBufferPtr) -
 					reinterpret_cast<uint8_t*>(s_Data.QuadVertexBufferBase));
 
-			auto* d3d12VB = dynamic_cast<D3D12Buffer*>(s_Data.D3D12QuadVB.get());
-			if (d3d12VB)
-			{
-				void* mapped = d3d12VB->Map();
-				if (mapped)
-				{
-					memcpy(mapped, s_Data.QuadVertexBufferBase, dataSize);
-					d3d12VB->Unmap();
-				}
-				else
-					CANDY_CORE_WARN("Renderer2D::Flush (D3D12) — QuadVB Map failed; stale data used");
-			}
+				if (!s_Data.D3D12QuadVB->Write(s_Data.QuadVertexBufferBase, dataSize))
+					CANDY_CORE_WARN("Renderer2D::Flush (D3D12) — QuadVB upload failed; stale data used");
 
 				cmd->SetPipeline(s_Data.D3D12QuadPipeline);
 				cmd->SetConstantBuffer(0, 0, s_Data.D3D12CameraCB);
@@ -1122,18 +1083,8 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 					reinterpret_cast<uint8_t*>(s_Data.CircleVertexBufferPtr) -
 					reinterpret_cast<uint8_t*>(s_Data.CircleVertexBufferBase));
 
-			auto* d3d12VB = dynamic_cast<D3D12Buffer*>(s_Data.D3D12CircleVB.get());
-			if (d3d12VB)
-			{
-				void* mapped = d3d12VB->Map();
-				if (mapped)
-				{
-					memcpy(mapped, s_Data.CircleVertexBufferBase, dataSize);
-					d3d12VB->Unmap();
-				}
-				else
-					CANDY_CORE_WARN("Renderer2D::Flush (D3D12) — CircleVB Map failed; stale data used");
-			}
+				if (!s_Data.D3D12CircleVB->Write(s_Data.CircleVertexBufferBase, dataSize))
+					CANDY_CORE_WARN("Renderer2D::Flush (D3D12) — CircleVB upload failed; stale data used");
 
 				cmd->SetPipeline(s_Data.D3D12CirclePipeline);
 				cmd->SetConstantBuffer(0, 0, s_Data.D3D12CameraCB);
@@ -1150,18 +1101,8 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 					reinterpret_cast<uint8_t*>(s_Data.LineVertexBufferPtr) -
 					reinterpret_cast<uint8_t*>(s_Data.LineVertexBufferBase));
 
-				auto* d3d12VB = dynamic_cast<D3D12Buffer*>(s_Data.D3D12LineVB.get());
-				if (d3d12VB)
-				{
-					void* mapped = d3d12VB->Map();
-					if (mapped)
-					{
-						memcpy(mapped, s_Data.LineVertexBufferBase, dataSize);
-						d3d12VB->Unmap();
-					}
-					else
-						CANDY_CORE_WARN("Renderer2D::Flush (D3D12) — LineVB Map failed; stale data used");
-				}
+				if (!s_Data.D3D12LineVB->Write(s_Data.LineVertexBufferBase, dataSize))
+					CANDY_CORE_WARN("Renderer2D::Flush (D3D12) — LineVB upload failed; stale data used");
 
 				cmd->SetPipeline(s_Data.D3D12LinePipeline);
 				cmd->SetConstantBuffer(0, 0, s_Data.D3D12CameraCB);
@@ -1232,12 +1173,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			gl->SetScissor(0, 0, vpW, vpH);
 
 			// Upload camera CB
-			if (auto* cb = dynamic_cast<OpenGLRHIBuffer*>(s_Data.OL_CameraCB.get()))
-			{
-				void* m = cb->Map();
-				if (m) memcpy(m, &s_Data.CameraBuffer, sizeof(Renderer2DData::CameraData));
-				cb->Unmap();
-			}
+			s_Data.OL_CameraCB->Write(&s_Data.CameraBuffer, sizeof(Renderer2DData::CameraData));
 
 			// Quad batch (textured)
 			if (s_Data.QuadIndexCount && s_Data.OL_QuadPipeline)
@@ -1245,12 +1181,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 				uint32_t dataSize = static_cast<uint32_t>(
 				    reinterpret_cast<uint8_t*>(s_Data.QuadVertexBufferPtr) -
 				    reinterpret_cast<uint8_t*>(s_Data.QuadVertexBufferBase));
-				if (auto* vb = dynamic_cast<OpenGLRHIBuffer*>(s_Data.OL_QuadVB.get()))
-				{
-					void* m = vb->Map();
-					if (m) memcpy(m, s_Data.QuadVertexBufferBase, dataSize);
-					vb->Unmap();
-				}
+				s_Data.OL_QuadVB->Write(s_Data.QuadVertexBufferBase, dataSize);
 
 				gl->SetPipeline(s_Data.OL_QuadPipeline);
 				gl->SetConstantBuffer(0, 0, s_Data.OL_CameraCB);
@@ -1276,12 +1207,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 				uint32_t dataSize = static_cast<uint32_t>(
 				    reinterpret_cast<uint8_t*>(s_Data.CircleVertexBufferPtr) -
 				    reinterpret_cast<uint8_t*>(s_Data.CircleVertexBufferBase));
-				if (auto* vb = dynamic_cast<OpenGLRHIBuffer*>(s_Data.OL_CircleVB.get()))
-				{
-					void* m = vb->Map();
-					if (m) memcpy(m, s_Data.CircleVertexBufferBase, dataSize);
-					vb->Unmap();
-				}
+				s_Data.OL_CircleVB->Write(s_Data.CircleVertexBufferBase, dataSize);
 
 				gl->SetPipeline(s_Data.OL_CirclePipeline);
 				gl->SetConstantBuffer(0, 0, s_Data.OL_CameraCB);
@@ -1297,12 +1223,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 				uint32_t dataSize = static_cast<uint32_t>(
 				    reinterpret_cast<uint8_t*>(s_Data.LineVertexBufferPtr) -
 				    reinterpret_cast<uint8_t*>(s_Data.LineVertexBufferBase));
-				if (auto* vb = dynamic_cast<OpenGLRHIBuffer*>(s_Data.OL_LineVB.get()))
-				{
-					void* m = vb->Map();
-					if (m) memcpy(m, s_Data.LineVertexBufferBase, dataSize);
-					vb->Unmap();
-				}
+				s_Data.OL_LineVB->Write(s_Data.LineVertexBufferBase, dataSize);
 
 				gl->SetPipeline(s_Data.OL_LinePipeline);
 				gl->SetConstantBuffer(0, 0, s_Data.OL_CameraCB);
