@@ -143,19 +143,13 @@ namespace Candy {
 		Candy::Renderer2D::ResetStats();
 
 		m_Framebuffer->Bind();
-		Candy::RenderCommand::SetViewport(0, 0, m_Framebuffer->GetWidth(), m_Framebuffer->GetHeight());
 
 		// Bind the viewport framebuffer as the Renderer2D active render target.
 		// Framebuffer single-inherits RHIFramebuffer, so this is a plain upcast.
+		// Clear semantics live in Renderer2D::Flush's render pass (LoadOp::Clear on
+		// the first flush after binding); viewport follows the target size there too.
 		Candy::Renderer2D::SetActiveRenderTarget(m_Framebuffer);
 
-		// Clear color+depth FIRST, then clear entity-ID attachment to -1.
-		// Order matters: glClear wipes all draw buffers (including RED_INTEGER) with the
-		// float clear color, which would overwrite -1 with 0 and break entity picking.
-		// Note: In D3D12, clearing happens inside Renderer2D::Flush via BeginRenderPass(Clear)
-		//       and ClearAttachment creates a temp command buffer for the entity-ID RTV.
-		Candy::RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1 });
-		Candy::RenderCommand::Clear();
 		m_Framebuffer->ClearAttachment(1, -1);
 
 		// Render scene via GameFrameRenderer
@@ -891,18 +885,15 @@ namespace Candy {
 		sceneCamera.SetViewportSize(prevWidth, prevHeight);
 
 		m_CameraPreviewFramebuffer->Bind();
-		RenderCommand::SetViewport(0, 0, prevWidth, prevHeight);
-		RenderCommand::SetClearColor({ 0.0f, 0.0f, 0.0f, 1.0f });
-		RenderCommand::Clear();
 
-		// Bind the camera-preview framebuffer for this pass.
+		// Bind the camera-preview framebuffer for this pass (clear happens via
+		// LoadOp::Clear on the first flush after binding).
 		Candy::Renderer2D::SetActiveRenderTarget(m_CameraPreviewFramebuffer);
 
 		m_ActiveScene->RenderSceneFromCamera(cameraComp, cameraTransform.GetTransform());
 
 		m_CameraPreviewFramebuffer->Unbind();
 		m_Framebuffer->Bind(); // Re-bind main FBO for subsequent UI rendering
-		RenderCommand::SetViewport(0, 0, m_Framebuffer->GetWidth(), m_Framebuffer->GetHeight());
 
 		// Restore main viewport framebuffer as the active render target.
 		Candy::Renderer2D::SetActiveRenderTarget(m_Framebuffer);

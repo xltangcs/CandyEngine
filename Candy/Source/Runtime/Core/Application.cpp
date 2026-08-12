@@ -212,7 +212,6 @@ namespace Candy {
 		}
 
 		m_Minimized = false;
-		Renderer::OnWindowResize(e.GetWidth(), e.GetHeight());
 
 		// Resize the swap chain to match the window. Without this the D3D12 back
 		// buffers stay at their init size while the OS window grows, and every

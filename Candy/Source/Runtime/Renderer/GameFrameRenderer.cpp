@@ -3,7 +3,6 @@
 #include "Runtime/Renderer/GameFrameRenderer.h"
 #include "Runtime/Core/Application.h"
 #include "Runtime/Renderer/Framebuffer.h"
-#include "Runtime/Renderer/RenderCommand.h"
 #include "Runtime/Renderer/Renderer2D.h"
 #include "Runtime/Renderer/EditorCamera.h"
 #include "Runtime/Scene/Scene.h"
@@ -15,9 +14,8 @@ namespace Candy {
 	void GameFrameRenderer::RenderSceneTo(Framebuffer& target, Scene& scene, EditorCamera* editorCamera)
 	{
 		target.Bind();
-		RenderCommand::SetViewport(0, 0, target.GetWidth(), target.GetHeight());
-		// Note: caller is responsible for SetClearColor/Clear (and ClearAttachment for entity-pick FBO)
-		// so the order between Clear and ClearAttachment(id, -1) is controlled by the caller.
+		// Clear/viewport semantics live in Renderer2D::Flush (LoadOp::Clear on the
+		// first flush after SetActiveRenderTarget; viewport follows target size).
 
 		if (editorCamera)
 		{

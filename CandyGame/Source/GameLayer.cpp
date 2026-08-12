@@ -3,7 +3,6 @@
 #include <algorithm>
 
 #include "Runtime/Renderer/Renderer2D.h"
-#include "Runtime/Renderer/RenderCommand.h"
 #include "Runtime/Renderer/Framebuffer.h"
 #include "Runtime/Renderer/GameFrameRenderer.h"
 #include "Runtime/Project/Project.h"
@@ -90,12 +89,9 @@ namespace Candy {
 		// Update logic (physics, scripts, audio)
 		m_ActiveScene->OnUpdateRuntimeLogic(ts);
 
-		// Render scene + UI into SwapChainTarget (framebuffer 0)
-		// Clear first -- RenderSceneTo no longer clears, caller controls clear order.
+		// Render scene + UI into SwapChainTarget (framebuffer 0).
+		// Clear/viewport semantics live in Renderer2D::Flush (swap-chain path always clears).
 		m_GameFramebuffer->Bind();
-		RenderCommand::SetViewport(0, 0, m_GameFramebuffer->GetWidth(), m_GameFramebuffer->GetHeight());
-		RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1 });
-		RenderCommand::Clear();
 		GameFrameRenderer::RenderSceneTo(*m_GameFramebuffer, *m_ActiveScene, nullptr);
 
 		// Mouse position in window coordinates (fullscreen game = 1:1)

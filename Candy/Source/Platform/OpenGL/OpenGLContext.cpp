@@ -10,6 +10,28 @@
 
 namespace Candy {
 
+	#ifdef CANDY_DEBUG
+	static void OpenGLMessageCallback(
+		unsigned source,
+		unsigned type,
+		unsigned id,
+		unsigned severity,
+		int length,
+		const char* message,
+		const void* userParam)
+	{
+		switch (severity)
+		{
+		case GL_DEBUG_SEVERITY_HIGH:         CANDY_CORE_CRITICAL(message); return;
+		case GL_DEBUG_SEVERITY_MEDIUM:       CANDY_CORE_ERROR(message); return;
+		case GL_DEBUG_SEVERITY_LOW:          CANDY_CORE_WARN(message); return;
+		case GL_DEBUG_SEVERITY_NOTIFICATION: CANDY_CORE_TRACE(message); return;
+		}
+
+		CANDY_CORE_ASSERT(false, "Unknown severity level!");
+	}
+	#endif
+
 	OpenGLContext::OpenGLContext(const WindowHandle& handle)
 		: m_WindowHandle(static_cast<GLFWwindow*>(handle.Native))
 	{
@@ -24,6 +46,13 @@ namespace Candy {
 
 		CANDY_CORE_ASSERT(GLVersion.major > 4 || (GLVersion.major == 4 && GLVersion.minor >= 5),
 		                 "CandyEngine requires at least OpenGL version 4.5!");
+
+	#ifdef CANDY_DEBUG
+		glEnable(GL_DEBUG_OUTPUT);
+		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+		glDebugMessageCallback(OpenGLMessageCallback, nullptr);
+		glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, NULL, GL_FALSE);
+	#endif
 
 		// RHI adapter layer: OpenGLRHIDevice owns the IR subsystems
 		// (Pipeline cache / shader library / etc.) and registers its own
