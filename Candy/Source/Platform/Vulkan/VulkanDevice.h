@@ -17,6 +17,13 @@ namespace Candy {
 	class VulkanFunctionLoader;
 
 	// =========================================================================
+	// [EXPERIMENTAL — FROZEN] Vulkan backend is parked as of the RHI
+	// consolidation refactor (2026-08). The code is kept compiling but receives
+	// no further patches. To re-enable, follow the D3D12↔Vulkan concept map in
+	// AGENTS.md (CommandList↔VkCommandBuffer, PSO↔VkPipeline, RootSignature↔
+	// VkPipelineLayout, DescriptorTable↔VkDescriptorSet, barriers↔Vk*MemoryBarrier;
+	// note VkRenderPass bakes loadOps at creation — cache passes per loadOp combo).
+	//
 	// VulkanDevice — Vulkan backend
 	//
 	// Dynamic loading of vulkan-1.dll; no SDK link library required.

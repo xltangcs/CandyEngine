@@ -75,7 +75,14 @@ Candy::Application* Candy::CreateApplication() {
   - **Edit**: 直接编辑 `m_EditorScene`，无物理
   - **Play**: `Scene::Copy(m_EditorScene)` → `OnRuntimeStart()` → 物理 + 原生脚本
   - **Simulate**: 深拷贝，仅物理，编辑器摄像机
-- **渲染**: `RendererAPI` 抽象接口 + 静态单例 `RenderCommand` / `Renderer2D`（批量四边形/圆形/线条/精灵），当前仅 OpenGL 后端
+- **渲染分层**（2026-08 RHI 收敛重构后）：
+  - **RHI 层**（`Runtime/RHI/`）：`RHIDevice`（资源工厂 + CommandQueue）/ `RHICommandBuffer`（Begin/End + `BeginRenderPass(RHIFramebuffer* target, desc)`——target=nullptr 渲染到 swap chain）/ `RHIBuffer`（含 `Write()` 上传）/ `RHIFramebuffer`。后端实现于 `Platform/D3D12`、`Platform/OpenGL`
+  - **Renderer2D**：`Flush()` 只有**一份实现**（纯 RHI 接口，无后端分支）。清屏语义 = `LoadOp`：`SetActiveRenderTarget` 绑定 RT 后首次 Flush 用 `Clear`，同帧后续 pass 用 `Load`（防止空 overlay pass 抹掉已渲染内容）
+  - **GameFrameRenderer**：编辑器帧编排（`RenderEditorFrame(ctx)`：场景 pass → overlay → 相机预览 PIP → game UI 合成）；`EditorLayer` 只填充 `EditorRenderContext`，不直接调渲染 API
+  - **ImGui 后端适配器**：`ImGuiBackend` 接口（`Runtime/Imgui/`），实现在 `Platform/*/XxxImGuiBackend.*`；`ImguiLayer` 不含任何后端类型/#ifdef
+  - **RendererAPI**：仅保留全局后端选择（`RendererAPI::GetAPI()/SetAPI()`），无渲染虚接口；`RenderCommand`/旧 `RendererAPI` 虚接口已删除
+  - **后端状态**：D3D12 = 主参考后端；OpenGL = RHI 适配参考；**Vulkan = [EXPERIMENTAL — FROZEN]**（代码保留编译通过，不再打补丁；重新启用时按 D3D12↔Vulkan 概念映射平移：CommandList↔VkCommandBuffer、PSO↔VkPipeline、DescriptorTable↔VkDescriptorSet、RootSignature↔VkPipelineLayout、ResourceBarrier↔Vk*MemoryBarrier；注意 VkRenderPass 创建时烘焙 loadOp，需按 loadOp 组合缓存）
+  - **IR 层**（`Runtime/RHI/IR/`）：7 个子系统类（资源注册/PSO 缓存/命令校验/描述符集/内存分配/shader 库），`IRDevice` 为三后端设备基类；当前仅 `IRPipelineCache` 实际接线，其余待按需接入
 - **ECS**: 使用 EnTT，`Scene` 拥有 `entt::registry` + `b2World`。`Entity` = `entt::entity + Scene*`。组件位于 `Scene/Components.h`
 - **物理**: Box2D 集成（Rigidbody2D + Box/CircleCollider2D），运行时 body/fixture 存为 `void*`
 - **原生脚本**: `ScriptableEntity` 基类 + `NativeScriptComponent::Bind<T>()`
