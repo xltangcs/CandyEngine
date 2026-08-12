@@ -14,6 +14,7 @@ namespace Candy {
 		virtual ~WindowsWindow();
 
 		void OnUpdate() override;
+		void PollEvents() override;
 
 		inline unsigned int GetWidth() const override { return m_Data.Width; }
 		inline unsigned int GetHeight() const override { return m_Data.Height; }
@@ -27,6 +28,12 @@ namespace Candy {
 		void SetSize(uint32_t w, uint32_t h) override;
 
 		inline virtual void* GetNativeWindow() const { return m_Window; }
+
+		void* GetNativeWindowHandle() const override;
+
+		/// Returns the graphics context for backend-specific access (D3D12/Vulkan).
+		GraphicsContext* GetGraphicsContext() override { return m_Context.get(); }
+
 	private:
 		virtual void Init(const WindowProps& props);
 		virtual void Shutdown();

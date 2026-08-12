@@ -15,6 +15,19 @@ msbuild CandyEngine.sln /p:Configuration=Debug
 - 配置: `Debug`/`Release`/`Dist` → `CANDY_DEBUG`/`CANDY_RELEASE`/`CANDY_DIST`
 - Sandbox 默认注释在根 `premake5.lua:40`
 
+### AI 代码变更后的编译自检（强制）
+
+- **凡是修改 C/C++ 源码，必须自行编译验证**，不得把编译错误留给用户 F5 时才发现
+- 编译命令：`.\Scripts\Build.ps1`（默认 `Debug|x64` 增量构建，透传 MSBuild 完整输出）
+- 流程：
+  1. 仅修改已有 `.cpp`/`.h` → 直接 `.\Scripts\Build.ps1`
+  2. 新增/删除/重命名 `.cpp`/`.h` → 先 `.\Scripts\GenerateProjects.bat` 重新生成 vcxproj，再 `.\Scripts\Build.ps1`
+- **编译失败必须基于完整错误日志自行修复并重试，最多 5 轮**：
+  - 每轮基于 MSBuild 输出的 `error C2xxx` / `error LNK2019` 等定位根因再改，禁止盲改
+  - 再次运行 `.\Scripts\Build.ps1` 验证
+  - 5 轮内成功即结束；5 轮仍失败，停止重试，把完整错误日志和已尝试的修复总结给用户
+- 非代码类错误（SDK 缺失、链接配置、premake 未重生成等）不要靠反复改 .cpp 硬试，应直接报告原因
+
 ## Design Philosophy — 参考 Godot & UE
 
 本引擎虽当前架构接近 Hazel Engine（The Cherno 教程），但**设计目标应向 Godot 和 UE 靠拢**：

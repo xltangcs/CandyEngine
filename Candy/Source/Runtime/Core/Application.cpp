@@ -5,21 +5,35 @@
 #include "Runtime/Core/Input.h"
 #include "Runtime/Core/FileSystem.h"
 #include "Runtime/Renderer/Renderer.h"
+#include "Runtime/Renderer/GraphicsContext.h"
 #include "Runtime/Project/ProjectSerializer.h"
 
 #include <glfw/glfw3.h>
 
+#include <chrono>
+#include <thread>
+
 #include "Runtime/Scripting/ScriptSystem.h"
 #include "Utils/PlatformUtils.h"
+#include "Runtime/Project/RecentProjects.h"
 
 namespace Candy {
 	Application* Application::s_Instance = nullptr;
 
-	Application::Application(const std::string& name, uint32_t width, uint32_t height, bool resizable, bool isEditor)
+	Application::Application(const std::string& name, uint32_t width, uint32_t height, bool resizable, bool isEditor, const std::string& rendererAPI)
 		: m_IsEditor(isEditor)
 	{
 		CANDY_CORE_ASSERT(!s_Instance, "Application already exists!");
 		s_Instance = this;
+
+		// Resolve / lock the active RHI backend *before* Window/GraphicsContext
+		// are created (the context reads Renderer::GetAPI() to pick the impl).
+		// `rendererAPI` defaults to "D3D12" but CandyEditor passes a value read
+		// from the auto-opened .candyproj so per-project Renderer API actually
+		// takes effect after a editor restart.
+		RendererAPI::SetAPI(RendererAPI::APIFromString(rendererAPI));
+		CANDY_CORE_INFO("Application: RHI backend = '{}'", RendererAPI::StringFromAPI(RendererAPI::GetAPI()));
+
 		m_Window = Window::Create(WindowProps(name, width, height, resizable));
 		m_Window->SetEventCallback(CANDY_BIND_EVENT_FN(Application::OnEvent));
 
@@ -42,13 +56,29 @@ namespace Candy {
 		if (m_IsEditor)
 		{
 			// Editor: mount the real Engine Content directory (hot-reload friendly).
-			std::filesystem::path engineDir = std::filesystem::path("..") / "Candy" / "Content";
-			if (!std::filesystem::exists(engineDir))
-				engineDir = "Content";
-			if (std::filesystem::exists(engineDir))
+			// Try several candidate relative paths so the editor works whether the
+			// process cwd is the workspace root (`Candy/Content`) or under bin/.
+			std::array<const char*, 5> candidates = {
+				"Candy/Content",          // cwd == workspace root (e.g. `E:\CandyEngine`)
+				"../Candy/Content",       // cwd == bin/Debug-windows-x86_64/CandyEditor
+				"../../Candy/Content",
+				"../../../Candy/Content",
+				"Content",                // last-resort fallback beside the exe
+			};
+			std::filesystem::path engineDir;
+			for (const char* c : candidates)
+			{
+				std::filesystem::path p(c);
+				if (std::filesystem::exists(p))
+				{
+					engineDir = p;
+					break;
+				}
+			}
+			if (!engineDir.empty())
 				FileSystem::Get().Mount("Engine", engineDir);
 			else
-				CANDY_CORE_WARN("Engine content not found: {0}", engineDir.string());
+				CANDY_CORE_WARN("Engine content not found in any candidate path");
 		}
 		else
 		{
@@ -115,12 +145,27 @@ namespace Candy {
 
 	void Application::Run()
 	{
+		static bool s_RunStarted = false;
+		if (!s_RunStarted)
+		{
+			s_RunStarted = true;
+			CANDY_CORE_INFO("App: Run loop started; isEditor={}", m_IsEditor);
+		}
 		while (m_Running)
 		{
+			// Poll window/input events BEFORE rendering so a window resize is
+			// applied to the swap chain before this frame's Present. If the resize
+			// is only handled after Present (old loop order), the frame presents a
+			// back buffer whose size no longer matches the window — the display
+			// pipeline hangs and the GPU is removed (DXGI_ERROR_DEVICE_HUNG).
+			m_Window->PollEvents();
+
+			double frameStart = (double)glfwGetTime();
+
 			float time = (float)glfwGetTime();
 			Timestep timestep = time - m_LastFrameTime;
 			m_LastFrameTime = time;
-			
+
 			//update layer
 			if (!m_Minimized)
 			{
@@ -136,6 +181,25 @@ namespace Candy {
 			m_Window->OnUpdate();
 
 			ProcessScheduledLayerChanges();
+
+			// Cap the frame rate to the display refresh rate. D3D12 flip-model
+			// Present() does not reliably block for vsync here, so without a cap
+			// the app presents thousands of frames/sec, flooding the flip queue and
+			// hanging the GPU (DXGI_ERROR_DEVICE_HUNG) whenever the swap chain is
+			// resized.
+			static double s_TargetFrameTime = 0.0;
+			if (s_TargetFrameTime <= 0.0)
+			{
+				const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+				int refreshRate = mode ? mode->refreshRate : 60;
+				s_TargetFrameTime = (refreshRate > 0) ? (1.0 / refreshRate) : (1.0 / 60.0);
+			}
+			double frameElapsed = (double)glfwGetTime() - frameStart;
+			if (frameElapsed < s_TargetFrameTime)
+			{
+				std::this_thread::sleep_for(
+					std::chrono::duration<double>(s_TargetFrameTime - frameElapsed));
+			}
 		}
 	}
 
@@ -149,6 +213,15 @@ namespace Candy {
 
 		m_Minimized = false;
 		Renderer::OnWindowResize(e.GetWidth(), e.GetHeight());
+
+		// Resize the swap chain to match the window. Without this the D3D12 back
+		// buffers stay at their init size while the OS window grows, and every
+		// subsequent Present flips stale-sized buffers — a documented cause of
+		// DXGI_ERROR_DEVICE_REMOVED (0x887A0005). (OpenGL's default framebuffer
+		// follows the window automatically; OnResize is a no-op there.)
+		if (m_Window && m_Window->GetGraphicsContext())
+			m_Window->GetGraphicsContext()->OnResize(e.GetWidth(), e.GetHeight());
+
 		CANDY_CORE_TRACE("Resize Window size to ({0}, {1})", e.GetWidth(), e.GetHeight());
 
 		return false;

@@ -12,6 +12,9 @@
 
 #include "Platform/OpenGL/OpenGLContext.h"
 
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+
 namespace Candy {
 
 	static uint8_t s_GLFWWindowCount = 0;
@@ -46,16 +49,21 @@ namespace Candy {
 			CANDY_CORE_ASSERT(success, "Could not initialize GLFW!");
 			glfwSetErrorCallback(GLFWErrorCallback);
 		}
+
+		// For D3D12/Vulkan, tell GLFW not to create an OpenGL context
+		if (Renderer::GetAPI() != RendererAPI::API::OpenGL)
+			glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		#if defined(CANDY_DEBUG)
-				if (Renderer::GetAPI() == RendererAPI::API::OpenGL)
-					glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+		else if (Renderer::GetAPI() == RendererAPI::API::OpenGL)
+			glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 		#endif
+
 		glfwWindowHint(GLFW_RESIZABLE, props.Resizable ? GLFW_TRUE : GLFW_FALSE);
 		m_Window = glfwCreateWindow((int)props.Width, (int)props.Height, m_Data.Title.c_str(), nullptr, nullptr);
 		
 		s_GLFWWindowCount ++;
 
-		m_Context = GraphicsContext::Create(m_Window);
+		m_Context = GraphicsContext::Create(WindowHandle{m_Window});
 		m_Context->Init();
 
 		glfwSetWindowUserPointer(m_Window, &m_Data);
@@ -163,9 +171,13 @@ namespace Candy {
 		}
 	}
 
-	void WindowsWindow::OnUpdate()
+	void WindowsWindow::PollEvents()
 	{
 		glfwPollEvents();
+	}
+
+	void WindowsWindow::OnUpdate()
+	{
 		m_Context->SwapBuffers();
 	}
 
@@ -178,10 +190,11 @@ namespace Candy {
 
 	void WindowsWindow::SetVSync(bool enabled)
 	{
-		if (enabled)
-			glfwSwapInterval(1);
-		else
-			glfwSwapInterval(0);
+		// glfwSwapInterval only applies to OpenGL (and errors without a GL
+		// context). D3D12/Vulkan handle vsync through their own swapchain Present
+		// sync interval, so don't touch GLFW there.
+		if (Renderer::GetAPI() == RendererAPI::API::OpenGL)
+			glfwSwapInterval(enabled ? 1 : 0);
 
 		m_Data.VSync = enabled;
 	}
@@ -189,6 +202,11 @@ namespace Candy {
 	bool WindowsWindow::IsVSync() const
 	{
 		return m_Data.VSync;
+	}
+
+	void* WindowsWindow::GetNativeWindowHandle() const
+	{
+		return glfwGetWin32Window(m_Window);
 	}
 
 }

@@ -8,6 +8,8 @@
 
 namespace Candy {
 
+	class GraphicsContext;
+
 	struct WindowProps
 	{
 		std::string Title;
@@ -34,6 +36,14 @@ namespace Candy {
 
 		virtual void OnUpdate() = 0;
 
+		/// Process pending window/input events. Must be called at the START of
+		/// the frame — before any render + Present — so that a window resize is
+		/// applied to the swap chain *before* this frame presents. Presenting a
+		/// back buffer whose size no longer matches the window (because the resize
+		/// was only handled after Present) hangs the display pipeline and the GPU
+		/// is removed with DXGI_ERROR_DEVICE_HUNG (TDR).
+		virtual void PollEvents() = 0;
+
 		virtual uint32_t GetWidth() const = 0;
 		virtual uint32_t GetHeight() const = 0;
 
@@ -46,6 +56,12 @@ namespace Candy {
 		virtual void SetSize(uint32_t w, uint32_t h) = 0;
 
 		virtual void* GetNativeWindow() const = 0;
+
+		/// Returns the platform-native window handle (HWND on Windows).
+		virtual void* GetNativeWindowHandle() const = 0;
+
+		/// Returns the graphics context for backend-specific operations.
+		virtual GraphicsContext* GetGraphicsContext() = 0;
 
 		static Scope<Window> Create(const WindowProps& props = WindowProps());
 	};

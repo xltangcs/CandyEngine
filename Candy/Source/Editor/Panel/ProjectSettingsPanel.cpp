@@ -74,19 +74,47 @@ namespace Candy {
 				project->Save();
 			}
 
-			// Default Height
-			ImGui::TableNextRow();
-			ImGui::TableSetColumnIndex(0);
-			ImGui::Text("Default Height");
-			ImGui::TableSetColumnIndex(1);
-			int defaultHeight = static_cast<int>(project->GetDefaultHeight());
-			if (ImGui::InputInt("##DefaultHeight", &defaultHeight))
+		// Default Height
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::Text("Default Height");
+		ImGui::TableSetColumnIndex(1);
+		int defaultHeight = static_cast<int>(project->GetDefaultHeight());
+		if (ImGui::InputInt("##DefaultHeight", &defaultHeight))
+		{
+			project->SetDefaultHeight(static_cast<uint32_t>(defaultHeight));
+			project->Save();
+		}
+
+		// Renderer API (OpenGL / D3D12 / Vulkan) — persisted into the project,
+		// applied at the next CandyEditor launch.
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::Text("Renderer API");
+		ImGui::TableSetColumnIndex(1);
+		{
+			const char* kRendererAPIs[] = { "OpenGL", "D3D12", "Vulkan" };
+			const int   kCount          = IM_ARRAYSIZE(kRendererAPIs);
+			std::string currentAPI      = project->GetRendererAPI();
+			int         selectedIndex   = 0;  // default OpenGL if unknown
+			if      (currentAPI == "D3D12")  selectedIndex = 1;
+			else if (currentAPI == "Vulkan") selectedIndex = 2;
+			bool changed = ImGui::Combo("##RendererAPI", &selectedIndex, kRendererAPIs, kCount);
+			ImGui::SameLine();
+			ImGui::TextDisabled("(restart to apply)");
+			if (changed)
 			{
-				project->SetDefaultHeight(static_cast<uint32_t>(defaultHeight));
-				project->Save();
+				std::string newAPI = kRendererAPIs[selectedIndex];
+				if (newAPI != currentAPI)
+				{
+					project->SetRendererAPI(newAPI);
+					project->Save();
+					CANDY_CORE_INFO("Project Renderer API changed to '{}' (restart CandyEditor for the change to take effect)", newAPI);
+				}
 			}
-			
-			ImGui::EndTable();
+		}
+
+		ImGui::EndTable();
 		}
 
 		ImGui::End();

@@ -26,6 +26,7 @@
 #include <cstdlib>
 
 #include "Runtime/Core/FileSystem.h"
+#include "Platform/D3D12/D3D12Framebuffer.h"
 
 namespace Candy {
 
@@ -98,6 +99,7 @@ namespace Candy {
 	void EditorLayer::OnDetach()
 	{
 		CANDY_PROFILE_FUNCTION();
+
 		EditorSettings::Get().Save();
 		if (auto project = Application::Get().GetProject())
 			project->Save();
@@ -106,6 +108,18 @@ namespace Candy {
 
 	void EditorLayer::OnUpdate(Timestep ts)
 	{
+		static bool s_FirstOnUpdate = true;
+		if (s_FirstOnUpdate)
+		{
+			s_FirstOnUpdate = false;
+			CANDY_CORE_INFO("EditorLayer::OnUpdate FIRST — activeProject={}, activeScene={}, viewport=({},{}) focused={} sceneState={}",
+			                (bool)Application::Get().GetProject(),
+			                (bool)m_ActiveScene,
+			                m_ViewportSize.x, m_ViewportSize.y,
+			                m_ViewportFocused,
+			                static_cast<int>(m_SceneState));
+		}
+
 		CANDY_PROFILE_FUNCTION();
 
 		// Resize
@@ -126,10 +140,20 @@ namespace Candy {
 		Candy::Renderer2D::ResetStats();
 
 		m_Framebuffer->Bind();
+		const auto& spec = m_Framebuffer->GetSpecification();
+		Candy::RenderCommand::SetViewport(0, 0, spec.Width, spec.Height);
+
+		// Bind the viewport framebuffer as the Renderer2D active render target.
+		// Both OpenGLFramebuffer and D3D12Framebuffer multi-inherit RHIFramebuffer
+		// so the cast is valid across all backends.
+		Candy::Renderer2D::SetActiveRenderTarget(
+			std::dynamic_pointer_cast<Candy::RHIFramebuffer>(m_Framebuffer));
 
 		// Clear color+depth FIRST, then clear entity-ID attachment to -1.
 		// Order matters: glClear wipes all draw buffers (including RED_INTEGER) with the
 		// float clear color, which would overwrite -1 with 0 and break entity picking.
+		// Note: In D3D12, clearing happens inside Renderer2D::Flush via BeginRenderPass(Clear)
+		//       and ClearAttachment creates a temp command buffer for the entity-ID RTV.
 		Candy::RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1 });
 		Candy::RenderCommand::Clear();
 		m_Framebuffer->ClearAttachment(1, -1);
@@ -167,18 +191,15 @@ namespace Candy {
 		mx -= m_ViewportBounds[0].x;
 		my -= m_ViewportBounds[0].y;
 		glm::vec2 viewportSize = m_ViewportBounds[1] - m_ViewportBounds[0];
-		// ImGui IO.MousePos needs left-top origin (unflipped my);
-		// ReadPixel needs left-bottom origin (flipped my).
+		// ImGui IO.MousePos needs left-top origin (unflipped my).
 		float uiMouseY = my;
-		my = viewportSize.y - my;
-		int mouseX = (int)mx;
-		int mouseY = (int)my;
 
-		if (mouseX >= 0 && mouseY >= 0 && mouseX < (int)viewportSize.x && mouseY < (int)viewportSize.y)
-		{
-			int pixelData = m_Framebuffer->ReadPixel(1, mouseX, mouseY);
-			m_HoveredEntity = pixelData == -1 ? Entity() : Entity((entt::entity)pixelData, m_ActiveScene.get());
-		}
+		// NOTE: Entity picking (ReadPixel) is intentionally NOT done every frame.
+		// It runs on mouse-click inside OnMouseButtonPressed — ReadPixel copies the
+		// whole entity-ID attachment back to the CPU and stalls the GPU; doing it
+		// every frame on hover raced the frame's own rendering and (together with
+		// the old double-present) was a root cause of the D3D12 device-removed
+		// crashes on viewport interaction.
 
 		OnOverlayRender();
 
@@ -207,7 +228,11 @@ namespace Candy {
 			}
 		}
 
-		// Render game UI into FBO
+		// Render game UI into FBO — only while the game is actually running
+		// (Play/Simulate). In Edit mode there is no game HUD to show, and rendering
+		// it anyway made the game UI present the swap chain an extra time every
+		// frame (double-present → startup flicker + swap chain corruption).
+		if (m_SceneState != SceneState::Edit)
 		{
 			bool mouseDown = ImGui::GetIO().MouseDown[0];
 			GameFrameRenderer::RenderUITo(*m_Framebuffer, *m_ActiveScene, mx, uiMouseY, mouseDown, ts.GetSeconds());
@@ -355,7 +380,7 @@ namespace Candy {
 					ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (remaining - tw) * 0.5f);
 			
 				Ref<Texture2D> playIcon = (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate) ? m_IconPlay : m_IconStop;
-				if (ImGui::ImageButton("##PlayStop", (ImTextureID)playIcon->GetRendererID(), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0.0f, 0.0f, 0.0f, 0.0f), tint) && enabled)
+				if (ImGui::ImageButton("##PlayStop", reinterpret_cast<void*>(playIcon->GetRendererID64()), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0.0f, 0.0f, 0.0f, 0.0f), tint) && enabled)
 				{
 					if (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate)
 						OnScenePlay();
@@ -364,7 +389,7 @@ namespace Candy {
 				}
 				ImGui::SameLine();
 				Ref<Texture2D> simIcon = (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Play) ? m_IconSimulate : m_IconStop;
-				if (ImGui::ImageButton("##Simulate", (ImTextureID)simIcon->GetRendererID(), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0.0f, 0.0f, 0.0f, 0.0f), tint) && enabled)
+				if (ImGui::ImageButton("##Simulate", reinterpret_cast<void*>(simIcon->GetRendererID64()), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0.0f, 0.0f, 0.0f, 0.0f), tint) && enabled)
 				{
 					if (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Play)
 						OnSceneSimulate();
@@ -418,8 +443,20 @@ namespace Candy {
 		ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
 		m_ViewportSize = { viewportPanelSize.x, viewportPanelSize.y };
 
-		uint64_t textureID = m_Framebuffer->GetColorAttachmentRendererID();
-		ImGui::Image(reinterpret_cast<void*>(textureID), ImVec2{ m_ViewportSize.x, m_ViewportSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+		uint64_t textureID = m_Framebuffer->GetColorAttachmentGPUHandle();
+
+		// UV flipping: OpenGL framebuffers are stored bottom-up (V=0 is the bottom
+		// row), so the image is flipped vertically to display upright. D3D12/Vulkan
+		// framebuffers are top-down (V=0 is the top row) — no flip needed; applying
+		// the OpenGL flip there shows the scene upside down.
+		ImVec2 uv0{ 0, 1 }, uv1{ 1, 0 };
+		if (Renderer::GetAPI() == RendererAPI::API::D3D12
+			|| Renderer::GetAPI() == RendererAPI::API::Vulkan)
+		{
+			uv0 = ImVec2{ 0, 0 };
+			uv1 = ImVec2{ 1, 1 };
+		}
+		ImGui::Image(reinterpret_cast<void*>(textureID), ImVec2{ m_ViewportSize.x, m_ViewportSize.y }, uv0, uv1);
 		
 		if (ImGui::BeginDragDropTarget())
 		{
@@ -507,13 +544,20 @@ namespace Candy {
 			auto& tag = m_CameraPreviewEntity.GetComponent<TagComponent>();
 			ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 0.8f), tag.Tag.c_str());
 
-			// Preview image
+			// Preview image (UV flip: OpenGL needs it, D3D12/Vulkan does not)
 			ImGui::SetCursorPos(previewPos);
-			uint64_t previewTextureID = m_CameraPreviewFramebuffer->GetColorAttachmentRendererID();
+			uint64_t previewTextureID = m_CameraPreviewFramebuffer->GetColorAttachmentGPUHandle();
+			ImVec2 uv0{ 0, 1 }, uv1{ 1, 0 };
+			if (Renderer::GetAPI() == RendererAPI::API::D3D12
+				|| Renderer::GetAPI() == RendererAPI::API::Vulkan)
+			{
+				uv0 = ImVec2{ 0, 0 };
+				uv1 = ImVec2{ 1, 1 };
+			}
 			ImGui::Image(
 				reinterpret_cast<void*>(previewTextureID),
 				ImVec2(previewWidth, previewHeight),
-				ImVec2(0, 1), ImVec2(1, 0)
+				uv0, uv1
 			);
 		}
 
@@ -622,13 +666,27 @@ namespace Candy {
 	{
 		if (e.GetMouseButton() == Mouse::ButtonLeft)
 		{
-			if (!m_HoveredEntity)
-			{
-				return false;
-			}
 			if (m_ViewportHovered && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftAlt))
 			{
-				m_SceneHierarchyPanel.SetSelectedEntity(m_HoveredEntity);
+				// Entity picking: read the entity-ID pixel at the cursor. Done here
+				// on the actual click (NOT every frame on hover) — ReadPixel copies
+				// the whole entity-ID attachment back to the CPU and stalls the GPU,
+				// and doing it every frame was a root cause of the D3D12
+				// device-removed crashes on viewport interaction.
+				auto [mx, my] = ImGui::GetMousePos();
+				mx -= m_ViewportBounds[0].x;
+				my -= m_ViewportBounds[0].y;
+				glm::vec2 viewportSize = m_ViewportBounds[1] - m_ViewportBounds[0];
+				my = viewportSize.y - my; // flip to bottom-left origin for ReadPixel
+
+				if (mx >= 0 && my >= 0 && mx < viewportSize.x && my < viewportSize.y)
+				{
+					int pixelData = m_Framebuffer->ReadPixel(1, (int)mx, (int)my);
+					m_HoveredEntity = pixelData == -1 ? Entity() : Entity((entt::entity)pixelData, m_ActiveScene.get());
+				}
+
+				if (m_HoveredEntity)
+					m_SceneHierarchyPanel.SetSelectedEntity(m_HoveredEntity);
 			}
 		}
 		return false;
@@ -834,13 +892,24 @@ namespace Candy {
 		sceneCamera.SetViewportSize(prevWidth, prevHeight);
 
 		m_CameraPreviewFramebuffer->Bind();
+		RenderCommand::SetViewport(0, 0, prevWidth, prevHeight);
 		RenderCommand::SetClearColor({ 0.0f, 0.0f, 0.0f, 1.0f });
 		RenderCommand::Clear();
+
+		// Bind the camera-preview framebuffer for this pass.
+		Candy::Renderer2D::SetActiveRenderTarget(
+			std::dynamic_pointer_cast<Candy::RHIFramebuffer>(m_CameraPreviewFramebuffer));
 
 		m_ActiveScene->RenderSceneFromCamera(cameraComp, cameraTransform.GetTransform());
 
 		m_CameraPreviewFramebuffer->Unbind();
 		m_Framebuffer->Bind(); // Re-bind main FBO for subsequent UI rendering
+		const auto& mainSpec = m_Framebuffer->GetSpecification();
+		RenderCommand::SetViewport(0, 0, mainSpec.Width, mainSpec.Height);
+
+		// Restore main viewport framebuffer as the active render target.
+		Candy::Renderer2D::SetActiveRenderTarget(
+			std::dynamic_pointer_cast<Candy::RHIFramebuffer>(m_Framebuffer));
 
 		// Restore camera viewport to main viewport size
 		sceneCamera.SetViewportSize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
@@ -1225,4 +1294,5 @@ namespace Candy {
 
 		FileDialogs::OpenInShell(buildDir.string());
 	}
+
 }

@@ -5,6 +5,7 @@
 #include <imgui/imgui.h>
 #include <imgui/misc/cpp/imgui_stdlib.h>
 #include "Runtime/Core/Application.h"
+#include "Runtime/Renderer/Renderer.h"
 
 #include <algorithm>
 #include <cctype>
@@ -258,7 +259,16 @@ namespace Candy {
 			ImGui::PushID(filenameString.c_str());
 			Ref<Texture2D> icon = directoryEntry.is_directory() ? m_DirectoryIcon : m_FileIcon;
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-			ImGui::ImageButton(filenameString.c_str(), (ImTextureID)icon->GetRendererID(), { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
+			// UV flip: OpenGL framebuffers are bottom-up (V=0 is bottom); D3D12/Vulkan
+			// are top-down (V=0 is top), so the flip would show icons upside down.
+			ImVec2 uv0{ 0, 1 }, uv1{ 1, 0 };
+			if (Renderer::GetAPI() == RendererAPI::API::D3D12
+				|| Renderer::GetAPI() == RendererAPI::API::Vulkan)
+			{
+				uv0 = ImVec2{ 0, 0 };
+				uv1 = ImVec2{ 1, 1 };
+			}
+			ImGui::ImageButton(filenameString.c_str(), reinterpret_cast<void*>(icon->GetRendererID64()), { thumbnailSize, thumbnailSize }, uv0, uv1);
 
 			if (ImGui::BeginDragDropSource())
 			{
