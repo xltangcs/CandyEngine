@@ -5,31 +5,14 @@
 #include "Runtime/Renderer/Renderer.h"
 
 #include "Runtime/Imgui/ImguiLayer.h"
+#include "Runtime/Imgui/ImGuiBackend.h"
 
 #include <imgui.h>
-#include <backends/imgui_impl_glfw.h>
 #include "ImGuizmo.h"
 #include <GLFW/glfw3.h>
 #include <filesystem>
 
 #include "imgui_internal.h"
-
-#ifdef CANDY_PLATFORM_WINDOWS
-#include <backends/imgui_impl_dx12.h>
-#define IMGUI_IMPL_VULKAN_NO_PROTOTYPES
-#include <backends/imgui_impl_vulkan.h>
-#include "Platform/D3D12/D3D12GraphicsContext.h"
-#include "Platform/D3D12/D3D12Device.h"
-#include "Platform/D3D12/D3D12SwapChain.h"
-#include "Platform/D3D12/D3D12Framebuffer.h"
-#include "Platform/Vulkan/VulkanGraphicsContext.h"
-#include "Platform/Vulkan/VulkanDevice.h"
-#include "Platform/Vulkan/VulkanSwapChain.h"
-#include "Platform/Windows/WindowsWindow.h"
-#endif
-
-#include <glad/glad.h>
-#include <backends/imgui_impl_opengl3.h>
 
 namespace Candy {
 
@@ -39,15 +22,6 @@ namespace Candy {
 
 	ImGuiLayer::ImGuiLayer()
 	{
-	}
-
-	// =========================================================================
-	// Backend detection
-	// =========================================================================
-
-	bool ImGuiLayer::IsD3D12Backend() const
-	{
-		return m_IsD3D12;
 	}
 
 	// =========================================================================
@@ -83,62 +57,29 @@ namespace Candy {
 		Application& app = Application::Get();
 		GLFWwindow* window = static_cast<GLFWwindow*>(app.GetWindow().GetNativeWindow());
 
-		// Detect backend
-		m_IsD3D12   = (Renderer::GetAPI() == RendererAPI::API::D3D12);
-		m_IsVulkan = (Renderer::GetAPI() == RendererAPI::API::Vulkan);
+		// Graphics-API backend adapter 鈥?owns all backend-specific rendering.
+		m_Backend = ImGuiBackend::Create();
 
 		// Multi-viewport platform rendering is only wired through the
-		// OpenGL/Glfw backend (UpdatePlatformWindowsDefault path).  D3D12 and
-		// Vulkan backends do not yet hook RenderPlatformWindowsDefault, so
-		// leaving the flag enabled would trip the
-		// `Forgot to call UpdatePlatformWindows()` assertion in imgui.cpp.
-		if (m_IsD3D12 || m_IsVulkan)
+		// OpenGL/Glfw backend (UpdatePlatformWindowsDefault path).  Backends
+		// without platform-window support must disable the flag, otherwise
+		// imgui.cpp trips the `Forgot to call UpdatePlatformWindows()` assertion.
+		if (!m_Backend->SupportsPlatformWindows())
 			io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
 
-		if (m_IsVulkan)
-		{
-			ImGui_ImplGlfw_InitForVulkan(window, true);
-			InitVulkanBackend(window);
-			CANDY_CORE_INFO("ImGuiLayer: Vulkan backend initialized");
-		}
-		else if (m_IsD3D12)
-		{
-#ifdef CANDY_PLATFORM_WINDOWS
-			// GLFW platform backend (no OpenGL context)
-			ImGui_ImplGlfw_InitForOther(window, true);
-
-			// D3D12 renderer backend
-			InitD3D12Backend(window);
-
-			CANDY_CORE_INFO("ImGuiLayer: D3D12 backend initialized");
-#endif
-		}
-		else
-		{
-			ImGui_ImplGlfw_InitForOpenGL(window, true);
-			ImGui_ImplOpenGL3_Init("#version 410");
-		}
+		// One-time init (GLFW platform + shared renderer resources), then
+		// per-context renderer init for the editor context (current).
+		m_Backend->Init(window);
+		m_Backend->InitContext();
+		CANDY_CORE_INFO("ImGuiLayer: {} backend initialized",
+		                RendererAPI::StringFromAPI(Renderer::GetAPI()));
 
 		// Create game UI context
 		m_GameUIContext = ImGui::CreateContext();
 		ImGui::SetCurrentContext(m_GameUIContext);
 
-		if (m_IsD3D12)
-		{
-#ifdef CANDY_PLATFORM_WINDOWS
-			m_D3D12.GameUIContext = m_GameUIContext;
-			// Per-context ImGui_DX12 backend init for the game UI context.
-			// InitD3D12Backend is idempotent + current-context guarded so this
-			// only calls ImGui_ImplDX12_Init once for this context; shared
-			// resources stay on m_D3D12.
-			InitD3D12Backend(window);
-			CANDY_CORE_INFO("ImGuiLayer: D3D12 backend initialized (game UI context)");
-#endif
-		}
-		else
-		{
-			ImGui_ImplOpenGL3_Init("#version 410");
-		}
+		// Per-context renderer init for the game UI context.
+		m_Backend->InitContext();
 
 		ImGuiIO& gameIO = ImGui::GetIO();
 		gameIO.IniFilename = nullptr;
@@ -155,36 +96,11 @@ namespace Candy {
 
 	void ImGuiLayer::OnDetach()
 	{
-		if (m_IsVulkan)
-		{
-#ifdef CANDY_PLATFORM_WINDOWS
-			ImGui::SetCurrentContext(m_GameUIContext);
-			ImGui_ImplVulkan_Shutdown();
-			ImGui::SetCurrentContext(m_EditorContext);
-			ImGui_ImplVulkan_Shutdown();
-			ImGui_ImplGlfw_Shutdown();
-			ShutdownVulkanBackend();
-#endif
-		}
-		else if (m_IsD3D12)
-		{
-#ifdef CANDY_PLATFORM_WINDOWS
-			ImGui::SetCurrentContext(m_GameUIContext);
-			ImGui_ImplDX12_Shutdown();
-			ImGui::SetCurrentContext(m_EditorContext);
-			ImGui_ImplDX12_Shutdown();
-			ImGui_ImplGlfw_Shutdown();
-			ShutdownD3D12Backend();
-#endif
-		}
-		else
-		{
-			ImGui::SetCurrentContext(m_GameUIContext);
-			ImGui_ImplOpenGL3_Shutdown();
-			ImGui::SetCurrentContext(m_EditorContext);
-			ImGui_ImplOpenGL3_Shutdown();
-			ImGui_ImplGlfw_Shutdown();
-		}
+		ImGui::SetCurrentContext(m_GameUIContext);
+		m_Backend->ShutdownContext();
+		ImGui::SetCurrentContext(m_EditorContext);
+		m_Backend->ShutdownContext();
+		m_Backend->Shutdown();
 
 		ImGui::DestroyContext(m_GameUIContext);
 		ImGui::DestroyContext(m_EditorContext);
@@ -213,21 +129,7 @@ namespace Candy {
 		if (m_EditorChromeDisabled)
 			return;
 
-		if (m_IsVulkan)
-		{
-			NewFrameVulkan();
-		}
-		else if (m_IsD3D12)
-		{
-#ifdef CANDY_PLATFORM_WINDOWS
-			NewFrameD3D12();
-#endif
-		}
-		else
-		{
-			ImGui_ImplOpenGL3_NewFrame();
-			ImGui_ImplGlfw_NewFrame();
-		}
+		m_Backend->NewFrame();
 
 		ImGui::NewFrame();
 		ImGuizmo::BeginFrame();
@@ -244,29 +146,8 @@ namespace Candy {
 
 		ImGui::Render();
 
-		if (m_IsVulkan)
-		{
-			RenderVulkan(ImGui::GetDrawData());
-		}
-		else if (m_IsD3D12)
-		{
-#ifdef CANDY_PLATFORM_WINDOWS
-			RenderD3D12(ImGui::GetDrawData());
-#endif
-		}
-		else
-		{
-			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-		}
-
-		if (!m_IsD3D12 && (Renderer::GetAPI() != RendererAPI::API::Vulkan)
-		    && (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable))
-		{
-			GLFWwindow* backup_current_context = glfwGetCurrentContext();
-			ImGui::UpdatePlatformWindows();
-			ImGui::RenderPlatformWindowsDefault();
-			glfwMakeContextCurrent(backup_current_context);
-		}
+		// Swap-chain render + present (backend handles platform windows when supported).
+		m_Backend->RenderDrawData(ImGui::GetDrawData(), nullptr);
 	}
 
 	// =========================================================================
@@ -283,18 +164,7 @@ namespace Candy {
 		io.MousePos = ImVec2(mouseX, mouseY);
 		io.MouseDown[0] = mouseDown;
 
-		if (m_IsD3D12)
-		{
-#ifdef CANDY_PLATFORM_WINDOWS
-			ImGui_ImplDX12_NewFrame();
-#endif
-		}
-		else
-		{
-#ifndef CANDY_PLATFORM_WINDOWS
-			ImGui_ImplOpenGL3_NewFrame();
-#endif
-		}
+		m_Backend->NewFrameGameUI();
 
 		ImGui::NewFrame();
 	}
@@ -304,27 +174,10 @@ namespace Candy {
 		ImGui::SetCurrentContext(m_GameUIContext);
 		ImGui::Render();
 
-		if (m_IsD3D12)
-		{
-#ifdef CANDY_PLATFORM_WINDOWS
-			// The game UI belongs INSIDE the viewport: composite it into the target
-			// framebuffer instead of presenting the swap chain. Presenting here (in
-			// addition to the editor's own present) flips the swap chain twice per
-			// frame and hangs the GPU (device removed). When no framebuffer target
-			// is available (standalone game), fall back to the swap chain.
-			auto* d3d12fb = target ? dynamic_cast<D3D12Framebuffer*>(target) : nullptr;
-			if (d3d12fb)
-				RenderD3D12ToFramebuffer(ImGui::GetDrawData(), d3d12fb);
-			else
-				RenderD3D12(ImGui::GetDrawData());
-#endif
-		}
-		else
-		{
-#ifndef CANDY_PLATFORM_WINDOWS
-			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-#endif
-		}
+		// The game UI belongs INSIDE the viewport: the backend composites it into
+		// the target framebuffer (no present). When no target is available
+		// (standalone game), it falls back to the swap chain.
+		m_Backend->RenderDrawData(ImGui::GetDrawData(), target);
 
 		ImGui::SetCurrentContext(m_EditorContext);
 	}
@@ -445,469 +298,5 @@ namespace Candy {
 		colors[ImGuiCol_TitleBgActive] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
 		colors[ImGuiCol_TitleBgCollapsed] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
 	}
-
-	// =========================================================================
-	// D3D12 Backend Implementation (Windows only)
-	// =========================================================================
-
-#ifdef CANDY_PLATFORM_WINDOWS
-
-	void ImGuiLayer::SRVAllocator(ImGui_ImplDX12_InitInfo* info,
-	                              D3D12_CPU_DESCRIPTOR_HANDLE* outCPU,
-	                              D3D12_GPU_DESCRIPTOR_HANDLE* outGPU)
-	{
-		auto* self = static_cast<ImGuiLayer*>(info->UserData);
-		auto& s = self->m_D3D12;
-
-		// Each ImGui context owns a distinct descriptor region of the device heap
-		// so their fonts never collide: editor @32, game UI @64. Renderer2D uses
-		// 0-31, viewport @128+, engine textures @160+. The per-context counters
-		// persist (fonts are created once and stay put).
-		const bool isGameUI = (ImGui::GetCurrentContext() == self->m_GameUIContext);
-		const uint32_t kBase = isGameUI ? 64u : 32u;
-		uint32_t& used = isGameUI ? s.SRVHeapUsedGameUI : s.SRVHeapUsedEditor;
-
-		D3D12_CPU_DESCRIPTOR_HANDLE cpu = s.SRVHeap->GetCPUDescriptorHandleForHeapStart();
-		D3D12_GPU_DESCRIPTOR_HANDLE gpu = s.SRVHeap->GetGPUDescriptorHandleForHeapStart();
-
-		cpu.ptr += static_cast<SIZE_T>(kBase + used) * s.SRVDescSize;
-		gpu.ptr += static_cast<SIZE_T>(kBase + used) * s.SRVDescSize;
-
-		used++;
-
-		*outCPU = cpu;
-		*outGPU = gpu;
-	}
-
-	void ImGuiLayer::SRVDeallocator(ImGui_ImplDX12_InitInfo* /*info*/,
-	                                D3D12_CPU_DESCRIPTOR_HANDLE /*cpu*/,
-	                                D3D12_GPU_DESCRIPTOR_HANDLE /*gpu*/)
-	{
-		// ImGui_ImplDX12_InitInfo requires both Alloc and Free callbacks to be
-		// non-null (see assertion in ImGui_ImplDX12_Init).  Our allocator is a
-		// simple linear bump that resets every frame, so nothing to release.
-	}
-
-	void ImGuiLayer::InitD3D12Backend(GLFWwindow* window)
-	{
-		// ---------------------------------------------------------------------------
-		// Idempotent per-context init:
-		//   - ImGui_ImplDX12 backend data lives in io.BackendRendererUserData of
-		//     the *current* ImGui context. ImGui_ImplDX12_Init asserts
-		//     `io.BackendRendererUserData == nullptr && "Already initialized a
-		//     renderer backend!"` so we early-return when this context already
-		//     has a backend.
-		//   - Shared physical resources (device/queue, SRV heap, per-frame
-		//     command allocators/lists, fence) are created exactly once because
-		//     they live on the single m_D3D12 struct that backs both the editor
-		//     context and the game UI context.
-		// ---------------------------------------------------------------------------
-
-		ImGuiIO& io = ImGui::GetIO();
-		if (io.BackendRendererUserData != nullptr)
-			return; // backend already initialized for this context
-
-		auto* win    = static_cast<WindowsWindow*>(&Application::Get().GetWindow());
-		auto* gfxCtx = static_cast<D3D12GraphicsContext*>(win->GetGraphicsContext());
-
-		m_D3D12.Device = gfxCtx->GetDevice()->GetNativeDevice();
-		m_D3D12.Queue  = gfxCtx->GetDevice()->GetNativeQueue();
-
-		// SRV descriptor heap for ImGui textures. Use the *device's* shared
-		// CBV_SRV_UAV heap so that ALL SRVs ImGui displays (fonts, viewport
-		// framebuffer at slot 128+, engine icons/textures at slot 160+) live in ONE
-		// heap that RenderD3D12 binds. D3D12 allows only one CBV_SRV_UAV heap per
-		// SetDescriptorHeaps, so a separate small heap would leave the viewport /
-		// icon descriptors out of the bound heap (they would not display).
-		if (!m_D3D12.SRVHeap)
-		{
-			m_D3D12.SRVHeap = gfxCtx->GetDevice()->GetCBVSRVUAVHeap();
-			m_D3D12.SRVDescSize = gfxCtx->GetDevice()->GetCBVSRVDescriptorSize();
-			if (!m_D3D12.SRVHeap)
-			{
-				CANDY_CORE_ERROR("ImGuiLayer::InitD3D12Backend: no device CBV_SRV_UAV heap");
-				return;
-			}
-		}
-
-		// Per-frame command lists (created once, shared across both contexts —
-		// they iterate sequentially per main loop so they do not stomp each
-		// other).
-		if (!m_D3D12.FrameAllocators[0])
-		{
-			for (int i = 0; i < 2; ++i)
-			{
-				HRESULT hr = m_D3D12.Device->CreateCommandAllocator(
-					D3D12_COMMAND_LIST_TYPE_DIRECT,
-					IID_PPV_ARGS(&m_D3D12.FrameAllocators[i]));
-				if (FAILED(hr))
-				{
-					CANDY_CORE_ERROR("ImGuiLayer: CreateCommandAllocator[{0}] failed", i);
-					return;
-				}
-
-				hr = m_D3D12.Device->CreateCommandList(
-					0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-					m_D3D12.FrameAllocators[i], nullptr,
-					IID_PPV_ARGS(&m_D3D12.FrameCmdLists[i]));
-				if (FAILED(hr))
-				{
-					CANDY_CORE_ERROR("ImGuiLayer: CreateCommandList[{0}] failed", i);
-					return;
-				}
-
-				m_D3D12.FrameCmdLists[i]->Close();
-			}
-
-			m_D3D12.Device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
-			                            IID_PPV_ARGS(&m_D3D12.Fence));
-			m_D3D12.FenceEvent = CreateEventA(nullptr, FALSE, FALSE, nullptr);
-
-			// Dedicated game UI allocator/list (renders to the viewport framebuffer,
-			// separate from the editor's swap-chain-bound frame state).
-			if (!m_D3D12.GameUIAllocator)
-			{
-				m_D3D12.Device->CreateCommandAllocator(
-					D3D12_COMMAND_LIST_TYPE_DIRECT,
-					IID_PPV_ARGS(&m_D3D12.GameUIAllocator));
-				m_D3D12.Device->CreateCommandList(
-					0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-					m_D3D12.GameUIAllocator, nullptr,
-					IID_PPV_ARGS(&m_D3D12.GameUICmdList));
-				if (m_D3D12.GameUICmdList)
-					m_D3D12.GameUICmdList->Close();
-			}
-		}
-
-		// Initialize ImGui D3D12 backend for the *current* context. Safe to run
-		// per-context since the Io guard at the top ensures it only runs when
-		// the context doesn't yet have a backend bound.
-		ImGui_ImplDX12_InitInfo initInfo = {};
-		initInfo.Device               = m_D3D12.Device;
-		initInfo.CommandQueue          = m_D3D12.Queue;
-		initInfo.NumFramesInFlight     = 2;
-		initInfo.RTVFormat            = DXGI_FORMAT_B8G8R8A8_UNORM;
-		initInfo.DSVFormat            = DXGI_FORMAT_UNKNOWN;
-		initInfo.SrvDescriptorHeap    = m_D3D12.SRVHeap;
-		initInfo.SrvDescriptorAllocFn = SRVAllocator;
-		initInfo.SrvDescriptorFreeFn  = SRVDeallocator;
-		initInfo.UserData             = this;
-
-		if (!ImGui_ImplDX12_Init(&initInfo))
-		{
-			CANDY_CORE_ERROR("ImGuiLayer: ImGui_ImplDX12_Init failed");
-		}
-	}
-
-	void ImGuiLayer::ShutdownD3D12Backend()
-	{
-		// Wait for GPU to finish
-		if (m_D3D12.Fence && m_D3D12.Queue)
-		{
-			m_D3D12.FenceValue++;
-			m_D3D12.Queue->Signal(m_D3D12.Fence, m_D3D12.FenceValue);
-			if (m_D3D12.Fence->GetCompletedValue() < m_D3D12.FenceValue)
-			{
-				m_D3D12.Fence->SetEventOnCompletion(m_D3D12.FenceValue, m_D3D12.FenceEvent);
-				WaitForSingleObject(m_D3D12.FenceEvent, INFINITE);
-			}
-		}
-
-		for (int i = 0; i < 2; ++i)
-		{
-			if (m_D3D12.FrameCmdLists[i])   m_D3D12.FrameCmdLists[i]->Release();
-			if (m_D3D12.FrameAllocators[i]) m_D3D12.FrameAllocators[i]->Release();
-		}
-		if (m_D3D12.GameUICmdList)   m_D3D12.GameUICmdList->Release();
-		if (m_D3D12.GameUIAllocator) m_D3D12.GameUIAllocator->Release();
-		// m_D3D12.SRVHeap points at the device's shared heap (owned by
-		// D3D12Device), so it must NOT be released here — null it instead.
-		m_D3D12.SRVHeap = nullptr;
-		if (m_D3D12.Fence)   m_D3D12.Fence->Release();
-
-		if (m_D3D12.FenceEvent)
-		{
-			CloseHandle(m_D3D12.FenceEvent);
-			m_D3D12.FenceEvent = nullptr;
-		}
-
-		memset(&m_D3D12, 0, sizeof(m_D3D12));
-	}
-
-	void ImGuiLayer::NewFrameD3D12()
-	{
-		ImGui_ImplDX12_NewFrame();
-		ImGui_ImplGlfw_NewFrame();
-	}
-
-	void ImGuiLayer::RenderD3D12(ImDrawData* drawData)
-	{
-		static bool s_first = true;
-		if (s_first)
-		{
-			s_first = false;
-			CANDY_CORE_INFO("ImGuiLayer::RenderD3D12 FIRST — cmdLists={} totalVtx={}",
-			                drawData ? drawData->CmdListsCount : 0,
-			                drawData ? drawData->TotalVtxCount    : 0);
-		}
-		if (!drawData || drawData->CmdListsCount == 0)
-			return;
-
-		auto* gfxCtx = static_cast<D3D12GraphicsContext*>(
-			static_cast<WindowsWindow*>(&Application::Get().GetWindow())
-				->GetGraphicsContext());
-		auto* sc = gfxCtx ? gfxCtx->GetSwapChain() : nullptr;
-		if (!sc)
-		{
-			CANDY_CORE_ERROR("ImGuiLayer::RenderD3D12 — no D3D12 swap chain bound");
-			return;
-		}
-
-		// The window may have been resized after the last event poll (e.g. the
-		// OS resized it mid-frame). Flip-model swapchains require the back buffer
-		// to match the window size — presenting a stale-size buffer hangs the GPU
-		// (DXGI_ERROR_DEVICE_HUNG). Resize the swap chain now, before we capture
-		// the back buffer, so this frame always presents a matching size.
-		if (gfxCtx)
-			gfxCtx->EnsureSwapChainMatchesWindow();
-
-		// Use the swap chain's CURRENT back-buffer index as the frame index, exactly
-		// like the imgui example_dx12. DXGI guarantees the current back buffer is
-		// available to render into; using our own independent counter can desync and
-		// make us render into a buffer that is still being displayed (present queued)
-		// → the GPU hangs (DXGI_ERROR_DEVICE_HUNG) when that buffer is presented.
-		uint32_t fi = sc->GetSwapChain()->GetCurrentBackBufferIndex();
-		m_D3D12.FrameIndex = fi;
-
-		// Wait for previous frame to complete
-		if (m_D3D12.Fence->GetCompletedValue() < m_D3D12.FenceValue)
-		{
-			m_D3D12.Fence->SetEventOnCompletion(m_D3D12.FenceValue, m_D3D12.FenceEvent);
-			WaitForSingleObject(m_D3D12.FenceEvent, INFINITE);
-		}
-
-		// Reset allocator and command list
-		m_D3D12.FrameAllocators[fi]->Reset();
-		m_D3D12.FrameCmdLists[fi]->Reset(m_D3D12.FrameAllocators[fi], nullptr);
-
-		// Set descriptor heaps — bind the device's shared CBV_SRV_UAV heap. All
-		// SRVs ImGui displays (fonts @32/64, viewport @128+, engine textures @160+)
-		// live in this heap, so their handles are only valid while it is bound.
-		ID3D12DescriptorHeap* heaps[] = { m_D3D12.SRVHeap };
-		m_D3D12.FrameCmdLists[fi]->SetDescriptorHeaps(1, heaps);
-
-		// ---------------------------------------------------------------
-		// Bind the swap-chain back buffer as the ImGui render target:
-		// PRESENT → RENDER_TARGET barrier, OMSetRenderTargets to its RTV,
-		// then clear to the engine's editor clear color.  Without this the
-		// ImGui_DX12 draw commands had no RT bound and Present would flip
-		// uninitialized back buffers — causing the "全黑 viewport" symptom.
-		// ---------------------------------------------------------------
-		ID3D12Resource*           backBuffer = sc->GetCurrentBackBufferResource();
-		D3D12_CPU_DESCRIPTOR_HANDLE rtv       = sc->GetCurrentRTVHandle();
-
-		// Defensive: a removed device or a broken swap chain (e.g. a failed
-		// ResizeBuffers left it without back buffers) would make the barrier /
-		// ClearRenderTargetView below crash. Detect it and skip the frame.
-		if (!backBuffer || !sc->GetRTVHeap())
-		{
-			CANDY_CORE_ERROR("ImGuiLayer::RenderD3D12 — swap chain has no back buffer/RTV; skipping frame");
-			return;
-		}
-		if (gfxCtx && gfxCtx->GetDevice() && gfxCtx->GetDevice()->GetNativeDevice())
-		{
-			HRESULT removed = gfxCtx->GetDevice()->GetNativeDevice()->GetDeviceRemovedReason();
-			if (removed != S_OK)
-			{
-				CANDY_CORE_ERROR("ImGuiLayer::RenderD3D12 — device removed (0x{:08X}); skipping frame",
-				                 static_cast<uint32_t>(removed));
-				gfxCtx->GetDevice()->LogDebugLayerMessages();
-				return;
-			}
-		}
-
-		D3D12_RESOURCE_BARRIER inBarrier = {};
-		inBarrier.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		inBarrier.Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		inBarrier.Transition.pResource   = backBuffer;
-		inBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-		inBarrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
-		inBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-		m_D3D12.FrameCmdLists[fi]->ResourceBarrier(1, &inBarrier);
-
-		static const float kClearColor[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
-		m_D3D12.FrameCmdLists[fi]->ClearRenderTargetView(rtv, kClearColor, 0, nullptr);
-		m_D3D12.FrameCmdLists[fi]->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
-
-		// Render ImGui draw data
-		ImGui_ImplDX12_RenderDrawData(drawData, m_D3D12.FrameCmdLists[fi]);
-
-		// RENDER_TARGET → PRESENT barrier before Present.
-		D3D12_RESOURCE_BARRIER outBarrier = inBarrier;
-		outBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-		outBarrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PRESENT;
-		m_D3D12.FrameCmdLists[fi]->ResourceBarrier(1, &outBarrier);
-
-		m_D3D12.FrameCmdLists[fi]->Close();
-
-		// Submit
-		ID3D12CommandList* lists[] = { m_D3D12.FrameCmdLists[fi] };
-		m_D3D12.Queue->ExecuteCommandLists(1, lists);
-
-		// Signal fence for this frame
-		m_D3D12.FenceValue++;
-		m_D3D12.Queue->Signal(m_D3D12.Fence, m_D3D12.FenceValue);
-
-		// Present the D3D12 swap chain
-		UINT presentFlags = 0;
-		sc->GetSwapChain()->Present(sc->GetDesc().VSync ? 1u : 0u, presentFlags);
-		sc->AdvanceFrame();
-
-		// Signal the resize fence after Present so a window resize can safely
-		// drain this frame before ResizeBuffers (avoids DXGI_ERROR_DEVICE_REMOVED).
-		sc->SignalAfterPresent();
-
-		// NOTE: no manual FrameIndex advance — fi mirrors the swap chain's current
-		// back-buffer index, which AdvanceFrame() already updated.
-	}
-
-	void ImGuiLayer::RenderD3D12ToFramebuffer(ImDrawData* drawData, D3D12Framebuffer* fb)
-	{
-		if (!drawData || drawData->CmdListsCount == 0)
-			return;
-		if (!fb)
-		{
-			RenderD3D12(drawData);
-			return;
-		}
-
-		// The game UI uses its own dedicated allocator/list (it renders into the
-		// viewport framebuffer, not the swap chain, so it must not share the
-		// editor's swap-chain-bound frame state).
-		ID3D12CommandAllocator*    guiAlloc  = m_D3D12.GameUIAllocator;
-		ID3D12GraphicsCommandList* guiCmd    = m_D3D12.GameUICmdList;
-		if (!guiAlloc || !guiCmd)
-			return;
-
-		// Wait for the previous game UI submission.
-		if (m_D3D12.Fence->GetCompletedValue() < m_D3D12.FenceValue)
-		{
-			m_D3D12.Fence->SetEventOnCompletion(m_D3D12.FenceValue, m_D3D12.FenceEvent);
-			WaitForSingleObject(m_D3D12.FenceEvent, INFINITE);
-		}
-
-		// Reset allocator and command list
-		guiAlloc->Reset();
-		guiCmd->Reset(guiAlloc, nullptr);
-
-		// Bind ImGui's own CBV_SRV_UAV heap (same as RenderD3D12).
-		ID3D12DescriptorHeap* heaps[] = { m_D3D12.SRVHeap };
-		guiCmd->SetDescriptorHeaps(1, heaps);
-
-		// Render into the framebuffer's color attachment 0. Renderer2D's EndRenderPass
-		// leaves the attachment in PIXEL_SHADER_RESOURCE (so the editor can display it),
-		// so we must explicitly transition it back to RENDER_TARGET first — otherwise
-		// D3D12 renders into a texture in the wrong state and the GPU faults/hangs.
-		fb->EnsureColorAttachmentState(guiCmd, 0, D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-		D3D12_CPU_DESCRIPTOR_HANDLE rtv = fb->GetRTVHandle(0);
-		guiCmd->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
-
-		ImGui_ImplDX12_RenderDrawData(drawData, guiCmd);
-
-		// Back to PIXEL_SHADER_RESOURCE so the editor ImGui pass can read the viewport
-		// image from this framebuffer.
-		fb->EnsureColorAttachmentState(guiCmd, 0, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
-		guiCmd->Close();
-
-		// Execute + signal fence. NO Present — the swap chain is presented exactly
-		// once per frame by the editor's RenderD3D12.
-		ID3D12CommandList* lists[] = { guiCmd };
-		m_D3D12.Queue->ExecuteCommandLists(1, lists);
-
-		m_D3D12.FenceValue++;
-		m_D3D12.Queue->Signal(m_D3D12.Fence, m_D3D12.FenceValue);
-	}
-
-	// =========================================================================
-	// Vulkan ImGui backend
-	// =========================================================================
-
-	void ImGuiLayer::InitVulkanBackend(GLFWwindow* window)
-	{
-		auto* gfxCtx = static_cast<VulkanGraphicsContext*>(
-			static_cast<WindowsWindow*>(&Application::Get().GetWindow())->GetGraphicsContext());
-		auto* vkDev  = gfxCtx->GetDevice();
-		auto* vkSC   = gfxCtx->GetSwapChain();
-
-		VkDevice device = vkDev->GetVkDevice();
-
-		// Create descriptor pool for ImGui
-		{
-			VkDescriptorPoolSize poolSizes[] = {
-				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 16 },
-			};
-			VkDescriptorPoolCreateInfo dpci = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-			dpci.flags         = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-			dpci.maxSets       = 16;
-			dpci.poolSizeCount = 1;
-			dpci.pPoolSizes    = poolSizes;
-
-			VkDescriptorPool pool;
-			vkDev->fnCreateDescriptorPool(device, &dpci, nullptr, &pool);
-			m_VkDescriptorPool = pool;
-		}
-
-		// Init info
-		ImGui_ImplVulkan_InitInfo initInfo = {};
-		initInfo.Instance        = vkDev->GetVkInstance();
-		initInfo.PhysicalDevice  = vkDev->GetVkPhysicalDevice();
-		initInfo.Device          = device;
-		initInfo.QueueFamily     = vkDev->GetGraphicsQueueFamilyIndex();
-		initInfo.Queue           = vkDev->GetVkQueue();
-		initInfo.DescriptorPool  = static_cast<VkDescriptorPool>(m_VkDescriptorPool);
-		initInfo.MinImageCount   = 2;
-		initInfo.ImageCount      = 2;
-		initInfo.PipelineInfoMain.RenderPass = vkSC->GetRenderPass();
-		initInfo.PipelineInfoMain.Subpass = 0;
-
-		// Load Vulkan functions for ImGui
-		ImGui_ImplVulkan_LoadFunctions(VK_API_VERSION_1_3, [](const char* name, void* userData) -> PFN_vkVoidFunction {
-			auto* dev = static_cast<VulkanDevice*>(userData);
-			return dev->GetProcAddr(name);
-		}, vkDev);
-
-		ImGui_ImplVulkan_Init(&initInfo);
-	}
-
-	void ImGuiLayer::ShutdownVulkanBackend()
-	{
-		ImGui_ImplVulkan_Shutdown();
-
-		auto* gfxCtx = static_cast<VulkanGraphicsContext*>(
-			static_cast<WindowsWindow*>(&Application::Get().GetWindow())->GetGraphicsContext());
-		if (gfxCtx && gfxCtx->GetDevice() && m_VkDescriptorPool)
-		{
-			gfxCtx->GetDevice()->fnDestroyDescriptorPool(
-				gfxCtx->GetDevice()->GetVkDevice(),
-				static_cast<VkDescriptorPool>(m_VkDescriptorPool), nullptr);
-		}
-		m_VkDescriptorPool = nullptr;
-	}
-
-	void ImGuiLayer::NewFrameVulkan()
-	{
-		ImGui_ImplVulkan_NewFrame();
-		ImGui_ImplGlfw_NewFrame();
-	}
-
-	void ImGuiLayer::RenderVulkan(ImDrawData* drawData)
-	{
-		if (!drawData || drawData->CmdListsCount == 0) return;
-		ImGui_ImplVulkan_RenderDrawData(drawData, VK_NULL_HANDLE, VK_NULL_HANDLE);
-	}
-
-#endif // CANDY_PLATFORM_WINDOWS
 
 }
