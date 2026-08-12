@@ -13,6 +13,7 @@ namespace Candy {
 	class RHITexture;
 	class RHISampler;
 	class RHIGraphicsPipeline;
+	class RHIFramebuffer;
 
 	// =========================================================================
 	// RHICommandBuffer — records GPU commands for later submission
@@ -29,7 +30,10 @@ namespace Candy {
 
 		// ---- Render pass ---------------------------------------------------
 
-		virtual void BeginRenderPass(const RenderPassDesc& desc) = 0;
+		/// Begin a render pass targeting `target`; nullptr targets the swap chain
+		/// back buffer (resolved from RHIContext). The target's attachments are
+		/// bound and cleared per-attachment LoadOp before any draw.
+		virtual void BeginRenderPass(RHIFramebuffer* target, const RenderPassDesc& desc) = 0;
 		virtual void EndRenderPass() = 0;
 
 		// ---- Pipeline & state ----------------------------------------------

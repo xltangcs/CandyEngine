@@ -22,7 +22,7 @@ namespace Candy {
 		void Begin() override;
 		void End()   override;
 
-		void BeginRenderPass(const RenderPassDesc& desc) override;
+		void BeginRenderPass(RHIFramebuffer* target, const RenderPassDesc& desc) override;
 		void EndRenderPass() override;
 
 		void SetPipeline(const Ref<RHIGraphicsPipeline>& pipeline) override;
@@ -47,11 +47,6 @@ namespace Candy {
 		                 uint32_t firstIndex    = 0,
 		                 int32_t  vertexOffset  = 0,
 		                 uint32_t firstInstance = 0) override;
-
-		/// D3D12 path's banded API for parity; in OpenGL this just records
-		/// the target for the subsequent BeginRenderPass.
-		void SetSwapChainRenderTarget(RHISwapChain* swapChain);
-		void SetFramebufferRenderTarget(const Ref<RHIFramebuffer>& framebuffer);
 
 	private:
 		GLuint m_DefaultVAO = 0;

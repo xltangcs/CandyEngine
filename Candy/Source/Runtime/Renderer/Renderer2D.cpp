@@ -881,7 +881,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 
 		RenderPassDesc rpDesc;
 		rpDesc.ColorAttachments.push_back({RHIFormat::R8G8B8A8Unorm, vkLoadOp, StoreOp::Store, {0.1f,0.1f,0.15f,1.0f}});
-		cmd->BeginRenderPass(rpDesc);
+		cmd->BeginRenderPass(s_Data.ActiveRenderTarget.get(), rpDesc);
 		s_Data.ActiveRenderTargetPendingClear = false;
 			cmd->SetViewport(0,0,1280.f,720.f); cmd->SetScissor(0,0,1280,720);
 
@@ -956,20 +956,6 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			if (!cmd) return;
 			auto* d3d12cb = static_cast<D3D12CommandBuffer*>(cmd.get());
 
-			// Set render target
-			if (s_Data.ActiveRenderTarget)
-			{
-				d3d12cb->SetFramebufferRenderTarget(s_Data.ActiveRenderTarget);
-			}
-			else
-			{
-				// Fallback to swap chain (for non-viewport rendering)
-				auto* gfxCtx = dynamic_cast<D3D12GraphicsContext*>(
-					Application::Get().GetWindow().GetGraphicsContext());
-				if (gfxCtx)
-					d3d12cb->SetSwapChainRenderTarget(gfxCtx->GetSwapChain());
-			}
-
 			cmd->Begin();
 
 		// Clear only on the first Flush after the target was bound; later passes
@@ -1003,7 +989,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 				rpDesc.ColorAttachments.push_back(idAttachment);
 			}
 		}
-		cmd->BeginRenderPass(rpDesc);
+		cmd->BeginRenderPass(s_Data.ActiveRenderTarget.get(), rpDesc);
 		s_Data.ActiveRenderTargetPendingClear = false;
 
 			// Viewport + scissor
@@ -1135,19 +1121,13 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			auto  cmd   = queue.CreateCommandBuffer(); // Scope<RHICommandBuffer>
 			auto* gl    = static_cast<OpenGLRHICommandBuffer*>(cmd.get());
 
-			// Pick the render target — EditorLayer hands in a viewport
-			// OpenGLFramebuffer via SetActiveRenderTarget; fall back to the
-			// swap chain (default framebuffer) when rendering the title-bar area.
+			// Viewport size follows the render target (default 1280x720 for the
+			// swap-chain path used by the title-bar area).
 			uint32_t vpW = 1280, vpH = 720;
 			if (s_Data.ActiveRenderTarget)
 			{
-				gl->SetFramebufferRenderTarget(s_Data.ActiveRenderTarget);
 				vpW = s_Data.ActiveRenderTarget->GetWidth();
 				vpH = s_Data.ActiveRenderTarget->GetHeight();
-			}
-			else
-			{
-				gl->SetSwapChainRenderTarget(RHIContext::GetSwapChain());
 			}
 
 		gl->Begin();
@@ -1167,7 +1147,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			colorAttachment.ClearColor[3] = 1.0f;
 			rpDesc.ColorAttachments.push_back(colorAttachment);
 		}
-		gl->BeginRenderPass(rpDesc);
+		gl->BeginRenderPass(s_Data.ActiveRenderTarget.get(), rpDesc);
 		s_Data.ActiveRenderTargetPendingClear = false;
 			gl->SetViewport(0.0f, 0.0f, static_cast<float>(vpW), static_cast<float>(vpH));
 			gl->SetScissor(0, 0, vpW, vpH);

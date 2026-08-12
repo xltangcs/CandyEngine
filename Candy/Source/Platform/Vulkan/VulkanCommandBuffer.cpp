@@ -41,8 +41,11 @@ namespace Candy {
 		}
 	}
 
-	void VulkanCommandBuffer::BeginRenderPass(const RenderPassDesc& desc)
+	void VulkanCommandBuffer::BeginRenderPass(RHIFramebuffer* target, const RenderPassDesc& desc)
 	{
+		// [EXPERIMENTAL — FROZEN] off-screen framebuffer targets are not wired;
+		// the pass uses whatever render pass/framebuffer SetRenderPassInfo set.
+		(void)target;
 		if (!m_ActiveRenderPass)
 		{
 			CANDY_CORE_WARN("VulkanCommandBuffer::BeginRenderPass: no render pass set");

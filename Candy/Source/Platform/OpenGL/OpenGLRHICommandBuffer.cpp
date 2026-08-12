@@ -20,8 +20,24 @@ namespace Candy {
 		glBindVertexArray(0);
 	}
 
-	void OpenGLRHICommandBuffer::BeginRenderPass(const RenderPassDesc& desc)
+	void OpenGLRHICommandBuffer::BeginRenderPass(RHIFramebuffer* target, const RenderPassDesc& desc)
 	{
+		// Resolve the render target: an explicit framebuffer's native FBO, or the
+		// default framebuffer (0) when target is null (swap chain path).
+		if (target)
+		{
+			if (auto* oglFb = dynamic_cast<OpenGLFramebuffer*>(target))
+				m_Framebuffer = oglFb->GetNativeFBO();
+			else if (auto* rhiFb = dynamic_cast<OpenGLRHIFramebuffer*>(target))
+				m_Framebuffer = rhiFb->GetFBO();
+			else
+				m_Framebuffer = 0;
+		}
+		else
+		{
+			m_Framebuffer = 0;
+		}
+
 		glBindFramebuffer(GL_FRAMEBUFFER, m_Framebuffer);
 
 		GLenum buffers[4] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
@@ -191,24 +207,6 @@ namespace Candy {
 			                        indices, static_cast<GLsizei>(instanceCount));
 		}
 		(void)vertexOffset;
-	}
-
-	void OpenGLRHICommandBuffer::SetSwapChainRenderTarget(RHISwapChain* /*swapChain*/)
-	{
-		m_Framebuffer = 0; // default framebuffer
-	}
-
-	void OpenGLRHICommandBuffer::SetFramebufferRenderTarget(const Ref<RHIFramebuffer>& framebuffer)
-	{
-		// Legacy-bridge path: EditorLayer hands in an OpenGLFramebuffer that
-		// multi-inherits RHIFramebuffer; expose its native FBO id.
-		if (auto* oglFb = dynamic_cast<OpenGLFramebuffer*>(framebuffer.get()))
-		{
-			m_Framebuffer = oglFb->GetNativeFBO();
-			return;
-		}
-		auto* gl = dynamic_cast<OpenGLRHIFramebuffer*>(framebuffer.get());
-		m_Framebuffer = gl ? gl->GetFBO() : 0;
 	}
 
 } // namespace Candy

@@ -19,7 +19,7 @@ namespace Candy {
 
 		void Begin() override;
 		void End()   override;
-		void BeginRenderPass(const RenderPassDesc& desc) override;
+		void BeginRenderPass(RHIFramebuffer* target, const RenderPassDesc& desc) override;
 		void EndRenderPass() override;
 		void SetPipeline(const Candy::Ref<RHIGraphicsPipeline>& pipeline) override;
 		void SetViewport(float x, float y, float width, float height,

@@ -9,6 +9,7 @@
 #include "Platform/D3D12/D3D12PipelineState.h"
 #include "Platform/D3D12/D3D12Texture.h"
 #include "Runtime/Core/Log.h"
+#include "Runtime/RHI/RHIContext.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -78,24 +79,23 @@ namespace Candy {
 			CANDY_CORE_ERROR("D3D12CommandBuffer::End: Close failed");
 	}
 
-	// ---- Render target -------------------------------------------------------
-
-	void D3D12CommandBuffer::SetSwapChainRenderTarget(D3D12SwapChain* swapChain)
-	{
-		m_CurrentSwapChain   = swapChain;
-		m_CurrentFramebuffer = nullptr;
-	}
-
-	void D3D12CommandBuffer::SetFramebufferRenderTarget(const Ref<RHIFramebuffer>& framebuffer)
-	{
-		m_CurrentFramebuffer = dynamic_cast<D3D12Framebuffer*>(framebuffer.get());
-		m_CurrentSwapChain   = nullptr;
-	}
-
 	// ---- Render pass ---------------------------------------------------------
 
-	void D3D12CommandBuffer::BeginRenderPass(const RenderPassDesc& desc)
+	void D3D12CommandBuffer::BeginRenderPass(RHIFramebuffer* target, const RenderPassDesc& desc)
 	{
+		// Resolve the render target: an explicit framebuffer, or the swap chain
+		// published in RHIContext when target is null.
+		if (target)
+		{
+			m_CurrentFramebuffer = static_cast<D3D12Framebuffer*>(target);
+			m_CurrentSwapChain   = nullptr;
+		}
+		else
+		{
+			m_CurrentSwapChain   = static_cast<D3D12SwapChain*>(RHIContext::GetSwapChain());
+			m_CurrentFramebuffer = nullptr;
+		}
+
 		// ---- Framebuffer target paths ----
 		if (m_CurrentFramebuffer)
 		{

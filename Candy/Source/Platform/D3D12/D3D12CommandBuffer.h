@@ -31,14 +31,8 @@ namespace Candy {
 
 		// ---- Render pass ---------------------------------------------------
 
-		void BeginRenderPass(const RenderPassDesc& desc) override;
+		void BeginRenderPass(RHIFramebuffer* target, const RenderPassDesc& desc) override;
 		void EndRenderPass() override;
-
-		/// Set the swap chain as the current render target.
-		void SetSwapChainRenderTarget(D3D12SwapChain* swapChain);
-
-		/// Set a framebuffer as the current render target (for off-screen rendering).
-		void SetFramebufferRenderTarget(const Ref<RHIFramebuffer>& framebuffer);
 
 		// ---- Pipeline & state ----------------------------------------------
 
