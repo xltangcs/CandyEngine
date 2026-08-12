@@ -1,6 +1,9 @@
 #pragma once
 
 #include "Runtime/Core/Base.h"
+#include "Runtime/Scene/Entity.h"
+
+#include <glm/glm.hpp>
 
 namespace Candy {
 
@@ -8,11 +11,42 @@ namespace Candy {
 	class Framebuffer;
 	class EditorCamera;
 
+	// =========================================================================
+	// EditorRenderContext — everything the editor frame render needs, filled
+	// by EditorLayer (UI layer) and consumed by GameFrameRenderer (render
+	// layer). The render layer never reaches back into editor UI state.
+	// =========================================================================
+	struct EditorRenderContext
+	{
+		Scene*           ActiveScene   = nullptr;
+		EditorCamera*    EditorCamera  = nullptr;  ///< nullptr → render runtime (primary) camera path
+
+		Ref<Framebuffer> ViewportTarget;           ///< main viewport framebuffer
+		Ref<Framebuffer> PreviewTarget;            ///< camera-preview PIP framebuffer (used when PreviewEntity is valid)
+		Entity           PreviewEntity;            ///< camera entity to preview; invalid → skip PIP pass
+
+		bool             ShowPhysicsColliders = false;
+		bool             RenderGameUI = false;     ///< Play/Simulate only
+
+		float            UIMouseX = 0.0f, UIMouseY = 0.0f;
+		bool             UIMouseDown = false;
+		float            DeltaTime = 0.0f;
+	};
+
 	class GameFrameRenderer
 	{
 	public:
+		/// Render one full editor frame: scene pass → overlay pass → camera
+		/// preview PIP → game UI composite. All clear/viewport semantics are
+		/// owned by Renderer2D's render passes (LoadOp).
+		static void RenderEditorFrame(const EditorRenderContext& ctx);
+
 		static void RenderSceneTo(Framebuffer& target, Scene& scene, EditorCamera* editorCamera);
 		static void RenderUITo(Framebuffer& target, Scene& scene, float mouseX, float mouseY, bool mouseDown, float deltaTime);
+
+	private:
+		static void RenderOverlay(const EditorRenderContext& ctx);
+		static void RenderCameraPreview(const EditorRenderContext& ctx);
 	};
 
 }

@@ -29,8 +29,6 @@ namespace Candy {
 		bool OnKeyPressed(KeyPressedEvent& e);
 		bool OnMouseButtonPressed(MouseButtonPressedEvent& e);
 
-		void OnOverlayRender();
-
 		void NewScene();
 		void OpenScene();
 		void OpenScene(const std::filesystem::path& path);
@@ -43,8 +41,6 @@ namespace Candy {
 		void OnSceneStop();
 
 		void OnDuplicateEntity();
-
-		void RenderPreviewScene();
 
 		// Project
 		void OpenRecent(const std::filesystem::path& path);

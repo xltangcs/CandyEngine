@@ -142,52 +142,6 @@ namespace Candy {
 
 		Candy::Renderer2D::ResetStats();
 
-		m_Framebuffer->Bind();
-
-		// Bind the viewport framebuffer as the Renderer2D active render target.
-		// Framebuffer single-inherits RHIFramebuffer, so this is a plain upcast.
-		// Clear semantics live in Renderer2D::Flush's render pass (LoadOp::Clear on
-		// the first flush after binding); viewport follows the target size there too.
-		Candy::Renderer2D::SetActiveRenderTarget(m_Framebuffer);
-
-		m_Framebuffer->ClearAttachment(1, -1);
-
-		// Render scene via GameFrameRenderer
-		switch (m_SceneState)
-		{
-			case SceneState::Edit:
-			{
-				if (m_ViewportFocused)
-					m_CameraController.OnUpdate(ts);
-
-				m_EditorCamera.OnUpdate(ts);
-
-				GameFrameRenderer::RenderSceneTo(*m_Framebuffer, *m_ActiveScene, &m_EditorCamera);
-				break;
-			}
-			case SceneState::Simulate:
-			{
-				m_EditorCamera.OnUpdate(ts);
-
-				m_ActiveScene->OnUpdateSimulationLogic(ts);
-				GameFrameRenderer::RenderSceneTo(*m_Framebuffer, *m_ActiveScene, &m_EditorCamera);
-				break;
-			}
-			case SceneState::Play:
-			{
-				m_ActiveScene->OnUpdateRuntimeLogic(ts);
-				GameFrameRenderer::RenderSceneTo(*m_Framebuffer, *m_ActiveScene, nullptr);
-				break;
-			}
-		}
-
-		auto [mx, my] = ImGui::GetMousePos();
-		mx -= m_ViewportBounds[0].x;
-		my -= m_ViewportBounds[0].y;
-		glm::vec2 viewportSize = m_ViewportBounds[1] - m_ViewportBounds[0];
-		// ImGui IO.MousePos needs left-top origin (unflipped my).
-		float uiMouseY = my;
-
 		// NOTE: Entity picking (ReadPixel) is intentionally NOT done every frame.
 		// It runs on mouse-click inside OnMouseButtonPressed — ReadPixel copies the
 		// whole entity-ID attachment back to the CPU and stalls the GPU; doing it
@@ -195,9 +149,7 @@ namespace Candy {
 		// the old double-present) was a root cause of the D3D12 device-removed
 		// crashes on viewport interaction.
 
-		OnOverlayRender();
-
-		// Camera Preview PIP
+		// Camera Preview PIP — resolve which camera entity to preview (UI state)
 		{
 			Entity selectedEntity = m_SceneHierarchyPanel.GetSelectedEntity();
 			if (!m_CameraPreviewPinned)
@@ -216,23 +168,33 @@ namespace Candy {
 				m_CameraPreviewEntity = {};
 				m_CameraPreviewPinned = false;
 			}
-			if (m_CameraPreviewEntity)
-			{
-				RenderPreviewScene();
-			}
 		}
 
-		// Render game UI into FBO — only while the game is actually running
-		// (Play/Simulate). In Edit mode there is no game HUD to show, and rendering
-		// it anyway made the game UI present the swap chain an extra time every
-		// frame (double-present → startup flicker + swap chain corruption).
-		if (m_SceneState != SceneState::Edit)
-		{
-			bool mouseDown = ImGui::GetIO().MouseDown[0];
-			GameFrameRenderer::RenderUITo(*m_Framebuffer, *m_ActiveScene, mx, uiMouseY, mouseDown, ts.GetSeconds());
-		}
+		// Game logic tick (not rendering)
+		if (m_SceneState == SceneState::Simulate)
+			m_ActiveScene->OnUpdateSimulationLogic(ts);
+		else if (m_SceneState == SceneState::Play)
+			m_ActiveScene->OnUpdateRuntimeLogic(ts);
 
-		m_Framebuffer->Unbind();
+		// ---- Render the whole editor frame (scene → overlay → PIP → game UI) ----
+		auto [mx, my] = ImGui::GetMousePos();
+		mx -= m_ViewportBounds[0].x;
+		my -= m_ViewportBounds[0].y;
+
+		EditorRenderContext ctx;
+		ctx.ActiveScene   = m_ActiveScene.get();
+		ctx.EditorCamera  = (m_SceneState == SceneState::Play) ? nullptr : &m_EditorCamera;
+		ctx.ViewportTarget = m_Framebuffer;
+		ctx.PreviewTarget  = m_CameraPreviewFramebuffer;
+		ctx.PreviewEntity  = m_CameraPreviewEntity;
+		ctx.ShowPhysicsColliders = EditorSettings::Get().m_ShowPhysicsColliders;
+		ctx.RenderGameUI  = (m_SceneState != SceneState::Edit);
+		ctx.UIMouseX = mx;
+		ctx.UIMouseY = my;
+		ctx.UIMouseDown = ImGui::GetIO().MouseDown[0];
+		ctx.DeltaTime   = ts.GetSeconds();
+
+		GameFrameRenderer::RenderEditorFrame(ctx);
 	}
 
 	void EditorLayer::OnImGuiRender()
@@ -686,60 +648,6 @@ namespace Candy {
 		return false;
 	}
 
-	void EditorLayer::OnOverlayRender()
-	{
-		if (m_SceneState == SceneState::Play)
-		{
-			Entity camera = m_ActiveScene->GetPrimaryCameraEntity();
-			if (!camera)    return;
-			Renderer2D::BeginScene(camera.GetComponent<CameraComponent>().Camera, camera.GetComponent<TransformComponent>().GetTransform());
-		}
-		else
-		{
-			Renderer2D::BeginScene(m_EditorCamera);
-		}
-
-		if (EditorSettings::Get().m_ShowPhysicsColliders)
-		{
-			// Box Colliders
-			{
-				auto view = m_ActiveScene->GetAllEntitiesWith<TransformComponent, BoxCollider2DComponent>();
-				for (auto entity : view)
-				{
-					auto [tc, bc2d] = view.get<TransformComponent, BoxCollider2DComponent>(entity);
-
-					glm::vec3 translation = tc.Translation + glm::vec3(bc2d.Offset, 0.001f);
-					glm::vec3 scale = tc.Scale * glm::vec3(bc2d.Size * 2.0f, 1.0f);
-
-					glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
-						* glm::rotate(glm::mat4(1.0f), tc.Rotation.z, glm::vec3(0.0f, 0.0f, 1.0f))
-						* glm::scale(glm::mat4(1.0f), scale);
-
-					Renderer2D::DrawRect(transform, glm::vec4(0, 1, 0, 1));
-				}
-			}
-
-			// Circle Colliders
-			{
-				auto view = m_ActiveScene->GetAllEntitiesWith<TransformComponent, CircleCollider2DComponent>();
-				for (auto entity : view)
-				{
-					auto [tc, cc2d] = view.get<TransformComponent, CircleCollider2DComponent>(entity);
-
-					glm::vec3 translation = tc.Translation + glm::vec3(cc2d.Offset, 0.001f);
-					glm::vec3 scale = tc.Scale * glm::vec3(cc2d.Radius * 2.0f);
-
-					glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
-						* glm::scale(glm::mat4(1.0f), scale);
-
-					Renderer2D::DrawCircle(transform, glm::vec4(0, 1, 0, 1), 0.01f);
-				}
-			}
-		}
-
-		Renderer2D::EndScene();
-	}
-
 	void EditorLayer::NewScene()
 	{
 		m_ActiveScene = CreateRef<Scene>();
@@ -869,38 +777,6 @@ namespace Candy {
 		Entity selectedEntity = m_SceneHierarchyPanel.GetSelectedEntity();
 		if (selectedEntity)
 			m_EditorScene->DuplicateEntity(selectedEntity);
-	}
-
-	void EditorLayer::RenderPreviewScene()
-	{
-		auto& cameraComp = m_CameraPreviewEntity.GetComponent<CameraComponent>();
-		auto& cameraTransform = m_CameraPreviewEntity.GetComponent<TransformComponent>();
-
-		// Set camera viewport to match preview framebuffer size
-		uint32_t prevWidth  = m_CameraPreviewFramebuffer->GetWidth();
-		uint32_t prevHeight = m_CameraPreviewFramebuffer->GetHeight();
-
-		// Save and restore camera viewport size
-		auto& sceneCamera = cameraComp.Camera;
-		sceneCamera.SetViewportSize(prevWidth, prevHeight);
-
-		m_CameraPreviewFramebuffer->Bind();
-
-		// Bind the camera-preview framebuffer for this pass (clear happens via
-		// LoadOp::Clear on the first flush after binding).
-		Candy::Renderer2D::SetActiveRenderTarget(m_CameraPreviewFramebuffer);
-
-		m_ActiveScene->RenderSceneFromCamera(cameraComp, cameraTransform.GetTransform());
-
-		m_CameraPreviewFramebuffer->Unbind();
-		m_Framebuffer->Bind(); // Re-bind main FBO for subsequent UI rendering
-
-		// Restore main viewport framebuffer as the active render target.
-		Candy::Renderer2D::SetActiveRenderTarget(m_Framebuffer);
-
-		// Restore camera viewport to main viewport size
-		sceneCamera.SetViewportSize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
-		
 	}
 
 	void EditorLayer::OpenRecent(const std::filesystem::path& path)
