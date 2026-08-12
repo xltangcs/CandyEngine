@@ -54,7 +54,7 @@ namespace Candy {
 					m_ActiveScene->OnViewportResize(w, h);
 
 					// Create SwapChainTarget framebuffer (binds to framebuffer 0)
-					FramebufferSpecification fbSpec;
+					FramebufferDesc fbSpec;
 					fbSpec.Width = w;
 					fbSpec.Height = h;
 					fbSpec.SwapChainTarget = true;
@@ -84,8 +84,7 @@ namespace Candy {
 		auto& window = Application::Get().GetWindow();
 		uint32_t w = window.GetWidth();
 		uint32_t h = window.GetHeight();
-		auto& spec = m_GameFramebuffer->GetSpecification();
-		if (spec.Width != w || spec.Height != h)
+		if (m_GameFramebuffer->GetWidth() != w || m_GameFramebuffer->GetHeight() != h)
 			m_GameFramebuffer->Resize(w, h);
 
 		// Update logic (physics, scripts, audio)
@@ -94,8 +93,7 @@ namespace Candy {
 		// Render scene + UI into SwapChainTarget (framebuffer 0)
 		// Clear first -- RenderSceneTo no longer clears, caller controls clear order.
 		m_GameFramebuffer->Bind();
-		const auto& fbSpec = m_GameFramebuffer->GetSpecification();
-		RenderCommand::SetViewport(0, 0, fbSpec.Width, fbSpec.Height);
+		RenderCommand::SetViewport(0, 0, m_GameFramebuffer->GetWidth(), m_GameFramebuffer->GetHeight());
 		RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1 });
 		RenderCommand::Clear();
 		GameFrameRenderer::RenderSceneTo(*m_GameFramebuffer, *m_ActiveScene, nullptr);

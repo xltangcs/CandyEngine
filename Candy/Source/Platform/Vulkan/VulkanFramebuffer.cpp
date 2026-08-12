@@ -21,16 +21,9 @@ namespace Candy {
 		return 0;
 	}
 
-	VulkanFramebuffer::VulkanFramebuffer(const FramebufferSpecification& spec, VulkanDevice* device)
-		: m_Specification(spec), m_Device(device)
+	VulkanFramebuffer::VulkanFramebuffer(const FramebufferDesc& desc, VulkanDevice* device)
+		: m_Desc(desc), m_Device(device)
 	{
-		for (auto& s : spec.Attachments.Attachments)
-		{
-			if (s.TextureFormat == FramebufferTextureFormat::DEPTH24STENCIL8)
-				m_DepthSpec = s;
-			else
-				m_ColorSpecs.push_back(s);
-		}
 		Invalidate();
 	}
 
@@ -55,24 +48,24 @@ namespace Candy {
 		CANDY_CORE_INFO("VulkanFramebuffer: destroyed");
 	}
 
-	VkFormat VulkanFramebuffer::MapFormat(FramebufferTextureFormat fmt) const
+	VkFormat VulkanFramebuffer::MapFormat(RHIFormat fmt) const
 	{
 		switch (fmt)
 		{
-		case FramebufferTextureFormat::RGBA8:           return VK_FORMAT_R8G8B8A8_UNORM;
-		case FramebufferTextureFormat::RED_INTEGER:     return VK_FORMAT_R32_SINT;
-		case FramebufferTextureFormat::DEPTH24STENCIL8: return VK_FORMAT_D24_UNORM_S8_UINT;
-		default:                                        return VK_FORMAT_R8G8B8A8_UNORM;
+		case RHIFormat::R8G8B8A8Unorm:  return VK_FORMAT_R8G8B8A8_UNORM;
+		case RHIFormat::R32Sint:        return VK_FORMAT_R32_SINT;
+		case RHIFormat::D24UnormS8Uint: return VK_FORMAT_D24_UNORM_S8_UINT;
+		default:                        return VK_FORMAT_R8G8B8A8_UNORM;
 		}
 	}
 
 	void VulkanFramebuffer::Invalidate()
 	{
-		if (m_Specification.SwapChainTarget) return;
+		if (m_Desc.SwapChainTarget) return;
 
 		VkDevice dev = m_Device->GetVkDevice();
-		uint32_t w = m_Specification.Width, h = m_Specification.Height;
-		uint32_t colorCount = static_cast<uint32_t>(m_ColorSpecs.size());
+		uint32_t w = m_Desc.Width, h = m_Desc.Height;
+		uint32_t colorCount = static_cast<uint32_t>(m_Desc.ColorAttachments.size());
 
 		// --- Create color attachment images + views ---
 		m_ColorImages.resize(colorCount);
@@ -81,7 +74,7 @@ namespace Candy {
 
 		for (uint32_t i = 0; i < colorCount; ++i)
 		{
-			VkFormat fmt = MapFormat(m_ColorSpecs[i].TextureFormat);
+			VkFormat fmt = MapFormat(m_Desc.ColorAttachments[i].Format);
 
 			VkImageCreateInfo ici = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
 			ici.imageType     = VK_IMAGE_TYPE_2D;
@@ -115,9 +108,9 @@ namespace Candy {
 		}
 
 		// --- Depth attachment ---
-		if (m_DepthSpec.TextureFormat != FramebufferTextureFormat::None)
+		if (m_Desc.HasDepthStencil)
 		{
-			VkFormat fmt = MapFormat(m_DepthSpec.TextureFormat);
+			VkFormat fmt = MapFormat(m_Desc.DepthStencilAttachment.Format);
 
 			VkImageCreateInfo ici = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
 			ici.imageType     = VK_IMAGE_TYPE_2D;
@@ -158,7 +151,7 @@ namespace Candy {
 		for (uint32_t i = 0; i < colorCount; ++i)
 		{
 			VkAttachmentDescription att = {};
-			att.format         = MapFormat(m_ColorSpecs[i].TextureFormat);
+			att.format         = MapFormat(m_Desc.ColorAttachments[i].Format);
 			att.samples        = VK_SAMPLE_COUNT_1_BIT;
 			att.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			att.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
@@ -172,7 +165,7 @@ namespace Candy {
 		if (m_DepthView != VK_NULL_HANDLE)
 		{
 			VkAttachmentDescription att = {};
-			att.format         = MapFormat(m_DepthSpec.TextureFormat);
+			att.format         = MapFormat(m_Desc.DepthStencilAttachment.Format);
 			att.samples        = VK_SAMPLE_COUNT_1_BIT;
 			att.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			att.storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -225,9 +218,9 @@ namespace Candy {
 	void VulkanFramebuffer::Resize(uint32_t w, uint32_t h)
 	{
 		if (w == 0 || h == 0) return;
-		m_Specification.Width  = w;
-		m_Specification.Height = h;
-		if (!m_Specification.SwapChainTarget) Invalidate();
+		m_Desc.Width  = w;
+		m_Desc.Height = h;
+		if (!m_Desc.SwapChainTarget) Invalidate();
 	}
 
 	int VulkanFramebuffer::ReadPixel(uint32_t, int, int) { return -1; }

@@ -10,12 +10,13 @@ namespace Candy {
 	class VulkanDevice;
 
 	// =========================================================================
+	// [EXPERIMENTAL — FROZEN] Vulkan backend is parked; see AGENTS.md.
 	// VulkanFramebuffer — VkImage + VkRenderPass + VkFramebuffer
 	// =========================================================================
 	class VulkanFramebuffer : public Framebuffer
 	{
 	public:
-		VulkanFramebuffer(const FramebufferSpecification& spec, VulkanDevice* device);
+		VulkanFramebuffer(const FramebufferDesc& desc, VulkanDevice* device);
 		virtual ~VulkanFramebuffer();
 
 		void Bind() override;
@@ -25,23 +26,27 @@ namespace Candy {
 		void ClearAttachment(uint32_t attachmentIndex, int value) override;
 		uint32_t GetColorAttachmentRendererID(uint32_t index = 0) const override;
 		uint64_t GetColorAttachmentGPUHandle(uint32_t index = 0) const override;
-		const FramebufferSpecification& GetSpecification() const override { return m_Specification; }
-		bool IsSwapChainTarget() const { return m_Specification.SwapChainTarget; }
+		bool IsSwapChainTarget() const { return m_Desc.SwapChainTarget; }
+
+		// ---- RHIFramebuffer (via Framebuffer) ---------------------------
+		const FramebufferDesc& GetDesc()        const override { return m_Desc; }
+		uint32_t GetWidth()                     const override { return m_Desc.Width; }
+		uint32_t GetHeight()                    const override { return m_Desc.Height; }
+		uint32_t GetColorAttachmentCount()      const override { return static_cast<uint32_t>(m_ColorViews.size()); }
+		bool     HasDepthStencil()              const override { return m_Desc.HasDepthStencil; }
 
 		// Vulkan-specific accessors
 		[[nodiscard]] VkRenderPass  GetRenderPass()  const { return m_RenderPass; }
 		[[nodiscard]] VkFramebuffer GetFramebuffer() const { return m_Framebuffer; }
-		[[nodiscard]] uint32_t      GetWidth()       const { return m_Specification.Width; }
-		[[nodiscard]] uint32_t      GetHeight()      const { return m_Specification.Height; }
 		[[nodiscard]] uint32_t      GetColorCount()  const { return static_cast<uint32_t>(m_ColorViews.size()); }
 		[[nodiscard]] VkImageView   GetColorView(uint32_t idx) const;
 		[[nodiscard]] bool          HasDepth() const { return m_DepthView != VK_NULL_HANDLE; }
 
 	private:
 		void Invalidate();
-		VkFormat MapFormat(FramebufferTextureFormat fmt) const;
+		VkFormat MapFormat(RHIFormat fmt) const;
 
-		FramebufferSpecification m_Specification;
+		FramebufferDesc          m_Desc;
 		VulkanDevice*            m_Device = nullptr;
 
 		// Color attachments
@@ -56,9 +61,6 @@ namespace Candy {
 
 		VkRenderPass  m_RenderPass  = VK_NULL_HANDLE;
 		VkFramebuffer m_Framebuffer = VK_NULL_HANDLE;
-
-		std::vector<FramebufferTextureSpecification> m_ColorSpecs;
-		FramebufferTextureSpecification              m_DepthSpec = FramebufferTextureFormat::None;
 	};
 
 } // namespace Candy

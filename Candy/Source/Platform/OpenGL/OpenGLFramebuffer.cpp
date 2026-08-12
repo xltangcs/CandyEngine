@@ -67,22 +67,12 @@ namespace Candy {
 			glFramebufferTexture2D(GL_FRAMEBUFFER, attachmentType, TextureTarget(multisampled), id, 0);
 		}
 
-		static bool IsDepthFormat(FramebufferTextureFormat format)
+		static GLenum RHIColorFormatToGL(RHIFormat format)
 		{
 			switch (format)
 			{
-			case FramebufferTextureFormat::DEPTH24STENCIL8:  return true;
-			}
-
-			return false;
-		}
-
-		static GLenum HazelFBTextureFormatToGL(FramebufferTextureFormat format)
-		{
-			switch (format)
-			{
-			case FramebufferTextureFormat::RGBA8:       return GL_RGBA8;
-			case FramebufferTextureFormat::RED_INTEGER: return GL_RED_INTEGER;
+			case RHIFormat::R8G8B8A8Unorm: return GL_RGBA8;
+			case RHIFormat::R32Sint:       return GL_RED_INTEGER;
 			}
 
 			CANDY_CORE_ASSERT(false);
@@ -91,45 +81,15 @@ namespace Candy {
 
 	}
 
-	OpenGLFramebuffer::OpenGLFramebuffer(const FramebufferSpecification& spec)
-		: m_Specification(spec)
+	OpenGLFramebuffer::OpenGLFramebuffer(const FramebufferDesc& desc)
+		: m_Desc(desc)
 	{
-		for (auto spec : m_Specification.Attachments.Attachments)
-		{
-			if (!Utils::IsDepthFormat(spec.TextureFormat))
-				m_ColorAttachmentSpecifications.emplace_back(spec);
-			else
-				m_DepthAttachmentSpecification = spec;
-		}
-
-		// Build the RHI bridge description so RHICommandBuffer::SetFramebufferRenderTarget
-		// can run through the same RHI surface on OpenGL as on D3D12 / Vulkan.
-		m_RHIDesc.Width           = m_Specification.Width;
-		m_RHIDesc.Height          = m_Specification.Height;
-		m_RHIDesc.SampleCount     = m_Specification.Samples;
-		m_RHIDesc.SwapChainTarget = m_Specification.SwapChainTarget;
-		m_RHIDesc.HasDepthStencil = (m_DepthAttachmentSpecification.TextureFormat != FramebufferTextureFormat::None);
-		for (const auto& spec : m_ColorAttachmentSpecifications)
-		{
-			FramebufferAttachmentDesc fa;
-			if (spec.TextureFormat == FramebufferTextureFormat::RED_INTEGER)
-			{
-				fa.Format    = RHIFormat::R32Sint;
-				fa.IsInteger = true;
-			}
-			else
-			{
-				fa.Format = RHIFormat::R8G8B8A8Unorm;
-			}
-			m_RHIDesc.ColorAttachments.push_back(fa);
-		}
-
 		Invalidate();
 	}
 
 	OpenGLFramebuffer::~OpenGLFramebuffer()
 	{
-		if (m_Specification.SwapChainTarget)
+		if (m_Desc.SwapChainTarget)
 			return;
 		glDeleteFramebuffers(1, &m_RendererID);
 		glDeleteTextures(m_ColorAttachments.size(), m_ColorAttachments.data());
@@ -138,7 +98,7 @@ namespace Candy {
 
 	void OpenGLFramebuffer::Invalidate()
 	{
-		if (m_Specification.SwapChainTarget)
+		if (m_Desc.SwapChainTarget)
 		{
 			m_RendererID = 0;
 			m_ColorAttachments.clear();
@@ -158,37 +118,38 @@ namespace Candy {
 		glCreateFramebuffers(1, &m_RendererID);
 		glBindFramebuffer(GL_FRAMEBUFFER, m_RendererID);
 
-		bool multisample = m_Specification.Samples > 1;
+		bool multisample = m_Desc.SampleCount > 1;
 
 		// Attachments
-		if (m_ColorAttachmentSpecifications.size())
+		const auto& colorAttachments = m_Desc.ColorAttachments;
+		if (colorAttachments.size())
 		{
-			m_ColorAttachments.resize(m_ColorAttachmentSpecifications.size());
+			m_ColorAttachments.resize(colorAttachments.size());
 			Utils::CreateTextures(multisample, reinterpret_cast<uint32_t*>(m_ColorAttachments.data()), m_ColorAttachments.size() );
 
 			for (size_t i = 0; i < m_ColorAttachments.size(); i++)
 			{
 				Utils::BindTexture(multisample, m_ColorAttachments[i]);
-				switch (m_ColorAttachmentSpecifications[i].TextureFormat)
+				switch (colorAttachments[i].Format)
 				{
-				case FramebufferTextureFormat::RGBA8:
-					Utils::AttachColorTexture(m_ColorAttachments[i], m_Specification.Samples, GL_RGBA8, GL_RGBA, m_Specification.Width, m_Specification.Height, i);
+				case RHIFormat::R8G8B8A8Unorm:
+					Utils::AttachColorTexture(m_ColorAttachments[i], m_Desc.SampleCount, GL_RGBA8, GL_RGBA, m_Desc.Width, m_Desc.Height, i);
 					break;
-				case FramebufferTextureFormat::RED_INTEGER:
-					Utils::AttachColorTexture(m_ColorAttachments[i], m_Specification.Samples, GL_R32I, GL_RED_INTEGER, m_Specification.Width, m_Specification.Height, i);
+				case RHIFormat::R32Sint:
+					Utils::AttachColorTexture(m_ColorAttachments[i], m_Desc.SampleCount, GL_R32I, GL_RED_INTEGER, m_Desc.Width, m_Desc.Height, i);
 					break;
 				}
 			}
 		}
 
-		if (m_DepthAttachmentSpecification.TextureFormat != FramebufferTextureFormat::None)
+		if (m_Desc.HasDepthStencil)
 		{
 			Utils::CreateTextures(multisample, &m_DepthAttachment, 1);
 			Utils::BindTexture(multisample, m_DepthAttachment);
-			switch (m_DepthAttachmentSpecification.TextureFormat)
+			switch (m_Desc.DepthStencilAttachment.Format)
 			{
-			case FramebufferTextureFormat::DEPTH24STENCIL8:
-				Utils::AttachDepthTexture(m_DepthAttachment, m_Specification.Samples, GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL_ATTACHMENT, m_Specification.Width, m_Specification.Height);
+			case RHIFormat::D24UnormS8Uint:
+				Utils::AttachDepthTexture(m_DepthAttachment, m_Desc.SampleCount, GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL_ATTACHMENT, m_Desc.Width, m_Desc.Height);
 				break;
 			}
 		}
@@ -212,7 +173,7 @@ namespace Candy {
 
 	void OpenGLFramebuffer::Bind()
 	{
-		if (m_Specification.SwapChainTarget)
+		if (m_Desc.SwapChainTarget)
 		{
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
@@ -224,7 +185,7 @@ namespace Candy {
 
 	void OpenGLFramebuffer::Unbind()
 	{
-		if (!m_Specification.SwapChainTarget)
+		if (!m_Desc.SwapChainTarget)
 		{
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
@@ -236,12 +197,10 @@ namespace Candy {
 			CANDY_CORE_WARN("Attempted to rezize framebuffer to {0}, {1}", width, height);
 			return;
 		}
-		m_Specification.Width = width;
-		m_Specification.Height = height;
-		m_RHIDesc.Width  = width;
-		m_RHIDesc.Height = height;
+		m_Desc.Width  = width;
+		m_Desc.Height = height;
 
-		if (m_Specification.SwapChainTarget)
+		if (m_Desc.SwapChainTarget)
 			return;
 
 		Invalidate();
@@ -249,7 +208,7 @@ namespace Candy {
 
 	int OpenGLFramebuffer::ReadPixel(uint32_t attachmentIndex, int x, int y)
 	{
-		CANDY_CORE_ASSERT(!m_Specification.SwapChainTarget);
+		CANDY_CORE_ASSERT(!m_Desc.SwapChainTarget);
 		CANDY_CORE_ASSERT(attachmentIndex < m_ColorAttachments.size());
 
 		glReadBuffer(GL_COLOR_ATTACHMENT0 + attachmentIndex);
@@ -259,11 +218,10 @@ namespace Candy {
 	}
 	void OpenGLFramebuffer::ClearAttachment(uint32_t attachmentIndex, int value)
 	{
-		CANDY_CORE_ASSERT(!m_Specification.SwapChainTarget);
+		CANDY_CORE_ASSERT(!m_Desc.SwapChainTarget);
 		CANDY_CORE_ASSERT(attachmentIndex < m_ColorAttachments.size());
 
-		auto& spec = m_ColorAttachmentSpecifications[attachmentIndex];
 		glClearTexImage(m_ColorAttachments[attachmentIndex], 0,
-			Utils::HazelFBTextureFormatToGL(spec.TextureFormat), GL_INT, &value);
+			Utils::RHIColorFormatToGL(m_Desc.ColorAttachments[attachmentIndex].Format), GL_INT, &value);
 	}
 }

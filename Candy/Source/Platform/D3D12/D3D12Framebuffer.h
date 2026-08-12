@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Runtime/Renderer/Framebuffer.h"
-#include "Runtime/RHI/RHIFramebuffer.h"
 
 #include <d3d12.h>
 #include <wrl/client.h>
@@ -19,10 +18,10 @@ namespace Candy {
 	// in the device's shared CBV_SRV_UAV heap so ImGui_ImplDX12 can display
 	// the color attachment.
 	// =========================================================================
-	class D3D12Framebuffer : public Framebuffer, public RHIFramebuffer
+	class D3D12Framebuffer : public Framebuffer
 	{
 	public:
-		D3D12Framebuffer(const FramebufferSpecification& spec, D3D12Device* device);
+		D3D12Framebuffer(const FramebufferDesc& desc, D3D12Device* device);
 		virtual ~D3D12Framebuffer();
 
 		void Bind() override;
@@ -38,17 +37,15 @@ namespace Candy {
 		/// Returns full 64-bit GPU descriptor handle .ptr for ImGui::Image.
 		uint64_t GetColorAttachmentGPUHandle(uint32_t index = 0) const override;
 
-		const FramebufferSpecification& GetSpecification() const override { return m_Specification; }
+		bool IsSwapChainTarget() const { return m_Desc.SwapChainTarget; }
 
-		bool IsSwapChainTarget() const { return m_Specification.SwapChainTarget; }
+		// ---- RHIFramebuffer (via Framebuffer) ----------------------------
 
-		// ---- RHIFramebuffer bridge (Runtime code reaches through these) ----
-
-		const FramebufferDesc& GetDesc() const override { return m_RHIDesc; }
-		uint32_t GetWidth()                 const override { return m_Specification.Width;  }
-		uint32_t GetHeight()                const override { return m_Specification.Height; }
+		const FramebufferDesc& GetDesc() const override { return m_Desc; }
+		uint32_t GetWidth()                 const override { return m_Desc.Width;  }
+		uint32_t GetHeight()                const override { return m_Desc.Height; }
 		uint32_t GetColorAttachmentCount()  const override { return static_cast<uint32_t>(m_ColorAttachments.size()); }
-		bool     HasDepthStencil()          const override { return HasDepthAttachment(); }
+		bool     HasDepthStencil()          const override { return m_Desc.HasDepthStencil; }
 
 		// ---- D3D12-specific accessors for command buffer integration --------
 
@@ -68,20 +65,17 @@ namespace Candy {
 
 	private:
 		void Invalidate();
-		void CreateColorTexture(uint32_t index, FramebufferTextureFormat format);
+		void CreateColorTexture(uint32_t index, RHIFormat format);
 		void CreateDepthTexture();
 
-		DXGI_FORMAT MapFormat(FramebufferTextureFormat format) const;
+		DXGI_FORMAT MapFormat(RHIFormat format) const;
 
-		FramebufferSpecification m_Specification;
+		FramebufferDesc           m_Desc;
 		D3D12Device*              m_Device = nullptr;
 
 		// Attachment resources
 		std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> m_ColorAttachments;
 		Microsoft::WRL::ComPtr<ID3D12Resource>              m_DepthAttachment;
-
-		std::vector<FramebufferTextureSpecification> m_ColorAttachmentSpecs;
-		FramebufferTextureSpecification              m_DepthAttachmentSpec = FramebufferTextureFormat::None;
 
 		// Descriptor heaps
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_RTVHeap;
@@ -105,9 +99,6 @@ namespace Candy {
 		// Readback buffer for ReadPixel
 		Microsoft::WRL::ComPtr<ID3D12Resource> m_ReadbackBuffer;
 		uint64_t m_ReadbackBufferSize = 0;
-
-		// RHI bridge description kept in sync inside Invalidate/Resize.
-		FramebufferDesc m_RHIDesc;
 	};
 
 } // namespace Candy

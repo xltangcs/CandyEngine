@@ -48,14 +48,18 @@ namespace Candy {
 		m_IconStop = Texture2D::Create("VFS://Engine/Icons/StopButton.png");
 		m_IconSimulate = Texture2D::Create("VFS://Engine/Icons/SimulateButton.png");
 
-		FramebufferSpecification fbSpec;
-		fbSpec.Attachments = { FramebufferTextureFormat::RGBA8, FramebufferTextureFormat::RED_INTEGER, FramebufferTextureFormat::Depth };
+		FramebufferDesc fbSpec;
+		fbSpec.ColorAttachments = { { RHIFormat::R8G8B8A8Unorm, false }, { RHIFormat::R32Sint, true } };
+		fbSpec.HasDepthStencil = true;
+		fbSpec.DepthStencilAttachment.Format = RHIFormat::D24UnormS8Uint;
 		fbSpec.Width = 1280;
 		fbSpec.Height = 720;
 		m_Framebuffer = Framebuffer::Create(fbSpec);
 
-		FramebufferSpecification previewFbSpec;
-		previewFbSpec.Attachments = { FramebufferTextureFormat::RGBA8, FramebufferTextureFormat::Depth };
+		FramebufferDesc previewFbSpec;
+		previewFbSpec.ColorAttachments = { { RHIFormat::R8G8B8A8Unorm, false } };
+		previewFbSpec.HasDepthStencil = true;
+		previewFbSpec.DepthStencilAttachment.Format = RHIFormat::D24UnormS8Uint;
 		previewFbSpec.Width = 480;
 		previewFbSpec.Height = 270;
 		m_CameraPreviewFramebuffer = Framebuffer::Create(previewFbSpec);
@@ -123,9 +127,8 @@ namespace Candy {
 		CANDY_PROFILE_FUNCTION();
 
 		// Resize
-		if (FramebufferSpecification spec = m_Framebuffer->GetSpecification();
-			m_ViewportSize.x > 0.0f && m_ViewportSize.y > 0.0f && // zero sized framebuffer is invalid
-			(spec.Width != m_ViewportSize.x || spec.Height != m_ViewportSize.y))
+		if (m_ViewportSize.x > 0.0f && m_ViewportSize.y > 0.0f && // zero sized framebuffer is invalid
+			(m_Framebuffer->GetWidth() != (uint32_t)m_ViewportSize.x || m_Framebuffer->GetHeight() != (uint32_t)m_ViewportSize.y))
 		{
 			m_Framebuffer->Resize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 			m_CameraController.OnResize(m_ViewportSize.x, m_ViewportSize.y);
@@ -140,14 +143,11 @@ namespace Candy {
 		Candy::Renderer2D::ResetStats();
 
 		m_Framebuffer->Bind();
-		const auto& spec = m_Framebuffer->GetSpecification();
-		Candy::RenderCommand::SetViewport(0, 0, spec.Width, spec.Height);
+		Candy::RenderCommand::SetViewport(0, 0, m_Framebuffer->GetWidth(), m_Framebuffer->GetHeight());
 
 		// Bind the viewport framebuffer as the Renderer2D active render target.
-		// Both OpenGLFramebuffer and D3D12Framebuffer multi-inherit RHIFramebuffer
-		// so the cast is valid across all backends.
-		Candy::Renderer2D::SetActiveRenderTarget(
-			std::dynamic_pointer_cast<Candy::RHIFramebuffer>(m_Framebuffer));
+		// Framebuffer single-inherits RHIFramebuffer, so this is a plain upcast.
+		Candy::Renderer2D::SetActiveRenderTarget(m_Framebuffer);
 
 		// Clear color+depth FIRST, then clear entity-ID attachment to -1.
 		// Order matters: glClear wipes all draw buffers (including RED_INTEGER) with the
@@ -883,9 +883,8 @@ namespace Candy {
 		auto& cameraTransform = m_CameraPreviewEntity.GetComponent<TransformComponent>();
 
 		// Set camera viewport to match preview framebuffer size
-		auto& previewSpec = m_CameraPreviewFramebuffer->GetSpecification();
-		uint32_t prevWidth = previewSpec.Width;
-		uint32_t prevHeight = previewSpec.Height;
+		uint32_t prevWidth  = m_CameraPreviewFramebuffer->GetWidth();
+		uint32_t prevHeight = m_CameraPreviewFramebuffer->GetHeight();
 
 		// Save and restore camera viewport size
 		auto& sceneCamera = cameraComp.Camera;
@@ -897,19 +896,16 @@ namespace Candy {
 		RenderCommand::Clear();
 
 		// Bind the camera-preview framebuffer for this pass.
-		Candy::Renderer2D::SetActiveRenderTarget(
-			std::dynamic_pointer_cast<Candy::RHIFramebuffer>(m_CameraPreviewFramebuffer));
+		Candy::Renderer2D::SetActiveRenderTarget(m_CameraPreviewFramebuffer);
 
 		m_ActiveScene->RenderSceneFromCamera(cameraComp, cameraTransform.GetTransform());
 
 		m_CameraPreviewFramebuffer->Unbind();
 		m_Framebuffer->Bind(); // Re-bind main FBO for subsequent UI rendering
-		const auto& mainSpec = m_Framebuffer->GetSpecification();
-		RenderCommand::SetViewport(0, 0, mainSpec.Width, mainSpec.Height);
+		RenderCommand::SetViewport(0, 0, m_Framebuffer->GetWidth(), m_Framebuffer->GetHeight());
 
 		// Restore main viewport framebuffer as the active render target.
-		Candy::Renderer2D::SetActiveRenderTarget(
-			std::dynamic_pointer_cast<Candy::RHIFramebuffer>(m_Framebuffer));
+		Candy::Renderer2D::SetActiveRenderTarget(m_Framebuffer);
 
 		// Restore camera viewport to main viewport size
 		sceneCamera.SetViewportSize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);

@@ -15,8 +15,7 @@ namespace Candy {
 	void GameFrameRenderer::RenderSceneTo(Framebuffer& target, Scene& scene, EditorCamera* editorCamera)
 	{
 		target.Bind();
-		auto& spec = target.GetSpecification();
-		RenderCommand::SetViewport(0, 0, spec.Width, spec.Height);
+		RenderCommand::SetViewport(0, 0, target.GetWidth(), target.GetHeight());
 		// Note: caller is responsible for SetClearColor/Clear (and ClearAttachment for entity-pick FBO)
 		// so the order between Clear and ClearAttachment(id, -1) is controlled by the caller.
 
@@ -34,10 +33,9 @@ namespace Candy {
 	void GameFrameRenderer::RenderUITo(Framebuffer& target, Scene& scene, float mouseX, float mouseY, bool mouseDown, float deltaTime)
 	{
 		ImGuiLayer* imgui = Application::Get().GetImGuiLayer();
-		auto& spec = target.GetSpecification();
 
 		// Target is already bound by caller
-		imgui->BeginGameUI((float)spec.Width, (float)spec.Height, mouseX, mouseY, mouseDown, deltaTime);
+		imgui->BeginGameUI((float)target.GetWidth(), (float)target.GetHeight(), mouseX, mouseY, mouseDown, deltaTime);
 		UISystem::RenderUI(scene);
 		// Composite the game UI into the target framebuffer (not the swap chain).
 		imgui->EndGameUI(&target); // Render + RenderDrawData + switch back to editor context

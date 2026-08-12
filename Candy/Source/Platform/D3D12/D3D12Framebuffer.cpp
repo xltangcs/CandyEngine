@@ -20,42 +20,22 @@ namespace Candy {
 	static std::atomic<uint32_t> s_NextFramebufferSRVSlot{ 96 };
 
 	// =========================================================================
-	// Helpers
-	// =========================================================================
-
-	static bool IsDepthFormat(FramebufferTextureFormat format)
-	{
-		switch (format)
-		{
-		case FramebufferTextureFormat::DEPTH24STENCIL8: return true;
-		default: return false;
-		}
-	}
-
-	// =========================================================================
 	// Constructor / Destructor
 	// =========================================================================
 
-	D3D12Framebuffer::D3D12Framebuffer(const FramebufferSpecification& spec, D3D12Device* device)
-		: m_Specification(spec), m_Device(device)
+	D3D12Framebuffer::D3D12Framebuffer(const FramebufferDesc& desc, D3D12Device* device)
+		: m_Desc(desc), m_Device(device)
 	{
 		// Allocate this framebuffer's own SRV descriptor region (unique per
 		// instance) so it never collides with another framebuffer's descriptors.
 		m_SRVBaseSlot = s_NextFramebufferSRVSlot.fetch_add(2);
 
-		for (auto& attachmentSpec : m_Specification.Attachments.Attachments)
-		{
-			if (!IsDepthFormat(attachmentSpec.TextureFormat))
-				m_ColorAttachmentSpecs.push_back(attachmentSpec);
-			else
-				m_DepthAttachmentSpec = attachmentSpec;
-		}
 		Invalidate();
 	}
 
 	D3D12Framebuffer::~D3D12Framebuffer()
 	{
-		if (m_Specification.SwapChainTarget)
+		if (m_Desc.SwapChainTarget)
 			return;
 
 		m_ColorAttachments.clear();
@@ -72,14 +52,14 @@ namespace Candy {
 	// Format mapping
 	// =========================================================================
 
-	DXGI_FORMAT D3D12Framebuffer::MapFormat(FramebufferTextureFormat format) const
+	DXGI_FORMAT D3D12Framebuffer::MapFormat(RHIFormat format) const
 	{
 		switch (format)
 		{
-		case FramebufferTextureFormat::RGBA8:           return DXGI_FORMAT_R8G8B8A8_UNORM;
-		case FramebufferTextureFormat::RED_INTEGER:     return DXGI_FORMAT_R32_SINT;
-		case FramebufferTextureFormat::DEPTH24STENCIL8: return DXGI_FORMAT_D24_UNORM_S8_UINT;
-		default:                                        return DXGI_FORMAT_UNKNOWN;
+		case RHIFormat::R8G8B8A8Unorm: return DXGI_FORMAT_R8G8B8A8_UNORM;
+		case RHIFormat::R32Sint:       return DXGI_FORMAT_R32_SINT;
+		case RHIFormat::D24UnormS8Uint: return DXGI_FORMAT_D24_UNORM_S8_UINT;
+		default:                        return DXGI_FORMAT_UNKNOWN;
 		}
 	}
 
@@ -89,7 +69,7 @@ namespace Candy {
 
 	void D3D12Framebuffer::Invalidate()
 	{
-		if (m_Specification.SwapChainTarget)
+		if (m_Desc.SwapChainTarget)
 		{
 			m_ColorAttachments.clear();
 			m_DepthAttachment.Reset();
@@ -122,9 +102,9 @@ namespace Candy {
 		m_ReadbackBuffer.Reset();
 		m_ReadbackBufferSize = 0;
 
-		uint32_t width  = m_Specification.Width;
-		uint32_t height = m_Specification.Height;
-		uint32_t colorCount = static_cast<uint32_t>(m_ColorAttachmentSpecs.size());
+		uint32_t width  = m_Desc.Width;
+		uint32_t height = m_Desc.Height;
+		uint32_t colorCount = static_cast<uint32_t>(m_Desc.ColorAttachments.size());
 
 		// ---- RTV descriptor heap -------------------------------------------
 		{
@@ -145,7 +125,7 @@ namespace Candy {
 		}
 
 		// ---- DSV descriptor heap -------------------------------------------
-		if (m_DepthAttachmentSpec.TextureFormat != FramebufferTextureFormat::None)
+		if (m_Desc.HasDepthStencil)
 		{
 			D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
 			dsvHeapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
@@ -167,22 +147,22 @@ namespace Candy {
 		m_ColorSRVGPUHandles.resize(colorCount);
 
 		for (uint32_t i = 0; i < colorCount; ++i)
-			CreateColorTexture(i, m_ColorAttachmentSpecs[i].TextureFormat);
+			CreateColorTexture(i, m_Desc.ColorAttachments[i].Format);
 
 		// ---- Create depth texture + DSV ------------------------------------
-		if (m_DepthAttachmentSpec.TextureFormat != FramebufferTextureFormat::None)
+		if (m_Desc.HasDepthStencil)
 			CreateDepthTexture();
 
 		CANDY_CORE_INFO("D3D12Framebuffer: created {}x{} with {} color + {} depth attachments",
 		                width, height, colorCount,
-		                (m_DepthAttachmentSpec.TextureFormat != FramebufferTextureFormat::None) ? 1 : 0);
+		                m_Desc.HasDepthStencil ? 1 : 0);
 	}
 
-	void D3D12Framebuffer::CreateColorTexture(uint32_t index, FramebufferTextureFormat format)
+	void D3D12Framebuffer::CreateColorTexture(uint32_t index, RHIFormat format)
 	{
 		ID3D12Device* nativeDevice = m_Device->GetNativeDevice();
-		uint32_t width  = m_Specification.Width;
-		uint32_t height = m_Specification.Height;
+		uint32_t width  = m_Desc.Width;
+		uint32_t height = m_Desc.Height;
 		DXGI_FORMAT dxgiFormat = MapFormat(format);
 
 		// --- Committed resource for the color attachment ---
@@ -198,7 +178,7 @@ namespace Candy {
 		resDesc.DepthOrArraySize   = 1;
 		resDesc.MipLevels          = 1;
 		resDesc.Format             = dxgiFormat;
-		resDesc.SampleDesc.Count   = m_Specification.Samples;
+		resDesc.SampleDesc.Count   = m_Desc.SampleCount;
 		resDesc.SampleDesc.Quality = 0;
 		resDesc.Layout             = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 		resDesc.Flags              = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
@@ -206,7 +186,7 @@ namespace Candy {
 		D3D12_CLEAR_VALUE clearValue = {};
 		clearValue.Format = dxgiFormat;
 		// Default clear to black for color, entity ID clear to -1
-		if (format == FramebufferTextureFormat::RED_INTEGER)
+		if (format == RHIFormat::R32Sint)
 			clearValue.Color[0] = clearValue.Color[1] = clearValue.Color[2] = clearValue.Color[3] = -1.0f;
 
 		HRESULT hr = nativeDevice->CreateCommittedResource(
@@ -261,9 +241,9 @@ namespace Candy {
 	void D3D12Framebuffer::CreateDepthTexture()
 	{
 		ID3D12Device* nativeDevice = m_Device->GetNativeDevice();
-		uint32_t width  = m_Specification.Width;
-		uint32_t height = m_Specification.Height;
-		DXGI_FORMAT dxgiFormat = MapFormat(m_DepthAttachmentSpec.TextureFormat);
+		uint32_t width  = m_Desc.Width;
+		uint32_t height = m_Desc.Height;
+		DXGI_FORMAT dxgiFormat = MapFormat(m_Desc.DepthStencilAttachment.Format);
 
 		D3D12_HEAP_PROPERTIES heapProps = {};
 		heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -273,11 +253,11 @@ namespace Candy {
 		resDesc.Width            = width;
 		resDesc.Height           = height;
 		resDesc.DepthOrArraySize = 1;
-		resDesc.MipLevels        = 1;
-		resDesc.Format           = dxgiFormat;
-		resDesc.SampleDesc.Count   = m_Specification.Samples;
+		resDesc.MipLevels          = 1;
+		resDesc.Format             = dxgiFormat;
+		resDesc.SampleDesc.Count   = m_Desc.SampleCount;
 		resDesc.SampleDesc.Quality = 0;
-		resDesc.Flags            = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+		resDesc.Flags              = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
 		D3D12_CLEAR_VALUE clearValue = {};
 		clearValue.Format               = dxgiFormat;
@@ -335,10 +315,10 @@ namespace Candy {
 			return;
 		}
 
-		m_Specification.Width  = width;
-		m_Specification.Height = height;
+		m_Desc.Width  = width;
+		m_Desc.Height = height;
 
-		if (m_Specification.SwapChainTarget)
+		if (m_Desc.SwapChainTarget)
 			return;
 
 		Invalidate();
@@ -386,7 +366,7 @@ namespace Candy {
 
 	int D3D12Framebuffer::ReadPixel(uint32_t attachmentIndex, int x, int y)
 	{
-		CANDY_CORE_ASSERT(!m_Specification.SwapChainTarget);
+		CANDY_CORE_ASSERT(!m_Desc.SwapChainTarget);
 		if (attachmentIndex >= m_ColorAttachments.size())
 		{
 			// Runtime bound check (NOT just an assert): Invalidate() can bail
@@ -410,14 +390,14 @@ namespace Candy {
 		// Clamp the pick coordinate to the attachment bounds. An out-of-range
 		// x/y would make the copy source box invalid and hang the GPU.
 		if (x < 0 || y < 0 ||
-		    static_cast<uint32_t>(x) >= m_Specification.Width ||
-		    static_cast<uint32_t>(y) >= m_Specification.Height)
+		    static_cast<uint32_t>(x) >= m_Desc.Width ||
+		    static_cast<uint32_t>(y) >= m_Desc.Height)
 			return -1;
 
 		// Determine pixel size. We copy just the single picked pixel into a
 		// row-pitch-aligned readback buffer (256-byte min pitch for a texture
 		// copy footprint), so bufferSize only needs to cover one aligned row.
-		auto& spec = m_ColorAttachmentSpecs[attachmentIndex];
+		RHIFormat attachmentFormat = m_Desc.ColorAttachments[attachmentIndex].Format;
 		uint32_t pixelSize = 4; // RGBA8 = 4 bytes, R32 = 4 bytes
 		uint32_t rowPitch = pixelSize;
 		rowPitch = (rowPitch + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1) & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
@@ -489,7 +469,7 @@ namespace Candy {
 		dstLoc.pResource       = m_ReadbackBuffer.Get();
 		dstLoc.Type            = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
 		dstLoc.PlacedFootprint.Offset    = 0;
-		dstLoc.PlacedFootprint.Footprint.Format   = MapFormat(spec.TextureFormat);
+		dstLoc.PlacedFootprint.Footprint.Format   = MapFormat(attachmentFormat);
 		dstLoc.PlacedFootprint.Footprint.Width    = 1;
 		dstLoc.PlacedFootprint.Footprint.Height   = 1;
 		dstLoc.PlacedFootprint.Footprint.Depth    = 1;
@@ -543,7 +523,7 @@ namespace Candy {
 
 	void D3D12Framebuffer::ClearAttachment(uint32_t attachmentIndex, int value)
 	{
-		CANDY_CORE_ASSERT(!m_Specification.SwapChainTarget);
+		CANDY_CORE_ASSERT(!m_Desc.SwapChainTarget);
 		if (attachmentIndex >= m_ColorAttachments.size())
 		{
 			CANDY_CORE_ERROR("D3D12Framebuffer::ClearAttachment — index {} out of range (colorAttachments={})",
@@ -595,7 +575,7 @@ namespace Candy {
 
 	uint64_t D3D12Framebuffer::GetColorAttachmentGPUHandle(uint32_t index) const
 	{
-		if (m_Specification.SwapChainTarget)
+		if (m_Desc.SwapChainTarget)
 			return 0;
 
 		if (index >= m_ColorSRVGPUHandles.size())
@@ -617,7 +597,7 @@ namespace Candy {
 				CANDY_CORE_ERROR("D3D12Framebuffer::GetRTVHandle — m_RTVHeap null; Invalidate may have failed (device={}, colorCount={}, swapchain={})",
 				                 (bool)m_Device,
 				                 m_ColorAttachments.size(),
-				                 m_Specification.SwapChainTarget);
+				                 m_Desc.SwapChainTarget);
 			}
 			return {};
 		}
@@ -635,7 +615,7 @@ namespace Candy {
 
 	bool D3D12Framebuffer::HasDepthAttachment() const
 	{
-		return m_DepthAttachmentSpec.TextureFormat != FramebufferTextureFormat::None;
+		return m_Desc.HasDepthStencil;
 	}
 
 	D3D12_GPU_DESCRIPTOR_HANDLE D3D12Framebuffer::GetColorSRVGPUHandle(uint32_t index) const
