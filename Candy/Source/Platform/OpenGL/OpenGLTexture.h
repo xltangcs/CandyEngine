@@ -20,6 +20,12 @@ namespace Candy {
 		// RHITexture override
 		const TextureDesc& GetDesc() const override { return m_RHIDesc; }
 
+		// This class already is-a RHITexture — share ourselves via shared_from_this.
+		Ref<RHITexture> GetRHITexture() override
+		{
+			return std::dynamic_pointer_cast<RHITexture>(shared_from_this());
+		}
+
 		virtual void SetData(void* data, uint32_t size) override;
 
 		virtual void Bind(uint32_t slot = 0) const override;

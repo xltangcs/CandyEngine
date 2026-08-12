@@ -773,7 +773,11 @@ float4 main(PSInput input) : SV_TARGET
 
 		// ---- Root signature ------------------------------------------------
 
-		auto rootSig = CreateMinimalRootSignature();
+		// All Renderer2D pipelines share the textured root signature (CBV b0 +
+		// 32-SRV descriptor table t0-t31 + static sampler s0). Shaders that
+		// don't sample textures (circle/line) are still compatible — a root
+		// signature may legally declare more than the shader consumes.
+		auto rootSig = CreateTexturedRootSignature();
 		if (!rootSig)
 		{
 			CANDY_CORE_ERROR("D3D12Device::CreateGraphicsPipeline: root signature failed");

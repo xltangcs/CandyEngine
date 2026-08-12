@@ -3,6 +3,7 @@
 #include "Platform/OpenGL/OpenGLRHICommandBuffer.h"
 #include "Platform/OpenGL/OpenGLRHIResources.h"
 #include "Platform/OpenGL/OpenGLFramebuffer.h"
+#include "Platform/OpenGL/OpenGLTexture.h"
 #include "Runtime/Core/Log.h"
 
 #include <glad/glad.h>
@@ -152,10 +153,17 @@ namespace Candy {
 	void OpenGLRHICommandBuffer::SetTexture(uint32_t slot, uint32_t binding, const Ref<RHITexture>& texture)
 	{
 		(void)slot;
-		auto* gl = dynamic_cast<OpenGLRHITexture2D*>(texture.get());
+		// Accept both RHI-device-created textures (OpenGLRHITexture2D) and the
+		// engine-level OpenGLTexture2D (which is-a RHITexture) — previously only
+		// the former was handled, silently binding texture 0 for engine textures.
+		GLuint id = 0;
+		if (auto* rhiTex = dynamic_cast<OpenGLRHITexture2D*>(texture.get()))
+			id = rhiTex->GetID();
+		else if (auto* engineTex = dynamic_cast<OpenGLTexture2D*>(texture.get()))
+			id = engineTex->GetRendererID();
 		GLenum unit = static_cast<GLenum>(GL_TEXTURE0 + binding);
 		glActiveTexture(unit);
-		glBindTexture(GL_TEXTURE_2D, gl ? gl->GetID() : 0);
+		glBindTexture(GL_TEXTURE_2D, id);
 	}
 
 	void OpenGLRHICommandBuffer::SetSampler(uint32_t slot, uint32_t binding, const Ref<RHISampler>& sampler)

@@ -4,7 +4,10 @@
 #include <Runtime/Core/Base.h>
 
 namespace Candy {
-	class Texture
+
+	class RHITexture;
+
+	class Texture : public std::enable_shared_from_this<Texture>
 	{
 	public:
 		virtual ~Texture() = default;
@@ -22,6 +25,13 @@ namespace Candy {
 		virtual void Bind(uint32_t slot = 0) const = 0;
 		virtual bool IsLoaded() const = 0;
 		virtual bool operator==(const Texture& other) const = 0;
+
+		/// RHI view of this texture, for command-buffer binding
+		/// (RHICommandBuffer::SetTexture). Backends either return themselves
+		/// (when the texture class already is-a RHITexture, e.g. OpenGL) or
+		/// the RHI texture they own (D3D12). May return nullptr on backends
+		/// without RHI texture support (frozen Vulkan path).
+		virtual Ref<RHITexture> GetRHITexture() = 0;
 	};
 
 	class Texture2D : public Texture
@@ -31,4 +41,3 @@ namespace Candy {
 		static Ref<Texture2D> Create(const std::string& path);
 	};
 }
-

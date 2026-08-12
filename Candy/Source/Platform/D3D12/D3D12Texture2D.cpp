@@ -1,4 +1,4 @@
-ï»¿#include "CandyPCH.h"
+#include "CandyPCH.h"
 #include <Windows.h>
 #include <d3d12.h>
 
@@ -14,7 +14,7 @@
 namespace Candy {
 
 	// =========================================================================
-	// SRV slot allocator â€” simple atomic counter, descriptors 160â€“255
+	// SRV slot allocator ¡ª simple atomic counter, descriptors 160¨C255
 	// =========================================================================
 	static std::atomic<uint32_t> s_NextSRVSlot{ 160 };
 
@@ -39,7 +39,7 @@ namespace Candy {
 		desc.Usage  = ResourceUsage::ShaderRead | ResourceUsage::CopyDst;
 		desc.DebugName = "D3D12Texture2D_" + std::to_string(width) + "x" + std::to_string(height);
 
-		m_RHI = std::make_unique<D3D12Texture>(device, desc);
+		m_RHI = CreateRef<D3D12Texture>(device, desc);
 		if (m_RHI->GetResource())
 		{
 			AllocateSRV();
@@ -92,7 +92,7 @@ namespace Candy {
 		desc.MipLevels = 1;
 		desc.DebugName = path;
 
-		m_RHI = std::make_unique<D3D12Texture>(device, desc);
+		m_RHI = CreateRef<D3D12Texture>(device, desc);
 		if (!m_RHI->GetResource())
 		{
 			stbi_image_free(data);
@@ -117,7 +117,7 @@ namespace Candy {
 	}
 
 	// =========================================================================
-	// SRV allocation â€” write SRV descriptor into device CBV_SRV_UAV heap
+	// SRV allocation ¡ª write SRV descriptor into device CBV_SRV_UAV heap
 	// =========================================================================
 
 	void D3D12Texture2D::AllocateSRV()
@@ -139,7 +139,7 @@ namespace Candy {
 	}
 
 	// =========================================================================
-	// SetData â€” update texture data
+	// SetData ¡ª update texture data
 	// =========================================================================
 
 	void D3D12Texture2D::SetData(void* data, uint32_t size)
@@ -153,14 +153,19 @@ namespace Candy {
 	}
 
 	// =========================================================================
-	// Bind â€” set texture on a slot (for Renderer2D batch)
+	// Bind ¡ª set texture on a slot (for Renderer2D batch)
 	// =========================================================================
 
 	void D3D12Texture2D::Bind(uint32_t slot) const
 	{
 		// In D3D12, texture binding happens via descriptor tables set in
 		// the command buffer (SetTexture).  This is a no-op at the engine
-		// level â€” the actual binding is done in Renderer2D::Flush().
+		// level ¡ª the actual binding is done in Renderer2D::Flush().
+	}
+
+	Ref<RHITexture> D3D12Texture2D::GetRHITexture()
+	{
+		return m_RHI;
 	}
 
 } // namespace Candy

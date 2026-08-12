@@ -45,13 +45,16 @@ namespace Candy {
 		[[nodiscard]] D3D12Texture*       GetRHI()       { return m_RHI.get(); }
 		[[nodiscard]] const D3D12Texture* GetRHI() const { return m_RHI.get(); }
 
+		/// RHI view for command-buffer binding (RHICommandBuffer::SetTexture).
+		Ref<RHITexture> GetRHITexture() override;
+
 		[[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE GetSRVGPUHandle() const { return m_SRVGPUHandle; }
 
 	private:
 		void AllocateSRV();
 
 		D3D12Device*                           m_Device = nullptr;
-		std::unique_ptr<D3D12Texture>          m_RHI;
+		Ref<D3D12Texture>                      m_RHI;
 		D3D12_GPU_DESCRIPTOR_HANDLE           m_SRVGPUHandle = {};
 		std::string                           m_Path;
 		bool                                  m_IsLoaded = false;

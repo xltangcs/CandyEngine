@@ -74,18 +74,7 @@ namespace Candy {
 		static const uint32_t MaxIndices = MaxQuads * 6;
 		static const uint32_t MaxTextureSlots = 32; // TODO: RenderCaps
 
-		Ref<VertexArray> QuadVertexArray;
-		Ref<VertexBuffer> QuadVertexBuffer;
-		Ref<Shader> QuadShader;
 		Ref<Texture2D> WhiteTexture;
-
-		Ref<VertexArray> CircleVertexArray;
-		Ref<VertexBuffer> CircleVertexBuffer;
-		Ref<Shader> CircleShader;
-
-		Ref<VertexArray> LineVertexArray;
-		Ref<VertexBuffer> LineVertexBuffer;
-		Ref<Shader> LineShader;
 
 		uint32_t QuadIndexCount = 0;
 		QuadVertex* QuadVertexBufferBase = nullptr;
@@ -111,31 +100,16 @@ namespace Candy {
 			glm::mat4 ViewProjection;
 		};
 		CameraData CameraBuffer;
-		Ref<UniformBuffer> CameraUniformBuffer;
 
-		// ---- D3D12 backend data ----
+		// ---- Unified RHI resources (one set shared by all backends) ----
+		Ref<RHIBuffer>           QuadVB, QuadIB, CircleVB, LineVB;
+		Ref<RHIBuffer>           CameraCB; // constant buffer for ViewProjection
+		Ref<RHIGraphicsPipeline> QuadPipeline, CirclePipeline, LinePipeline;
+
+		// Backend activation flags (exactly one is true; selects the Init branch)
 		bool D3D12Active = false;
-		D3D12Device* D3D12Dev = nullptr;
-
-		// Vertex buffers (upload heap)
-		Ref<RHIBuffer> D3D12QuadVB;
-		Ref<RHIBuffer> D3D12QuadIB;
-		Ref<RHIBuffer> D3D12CircleVB;
-		Ref<RHIBuffer> D3D12LineVB;
-		Ref<RHIBuffer> D3D12CameraCB; // constant buffer for ViewProjection
-
-		// Pipelines
-		Ref<RHIGraphicsPipeline> D3D12QuadPipeline;
-		Ref<RHIGraphicsPipeline> D3D12CirclePipeline;
-		Ref<RHIGraphicsPipeline> D3D12LinePipeline;
-
-		// Shader modules
-		Ref<RHIShaderModule> D3D12QuadVS, D3D12QuadPS;
-		Ref<RHIShaderModule> D3D12CircleVS, D3D12CirclePS;
-		Ref<RHIShaderModule> D3D12LineVS, D3D12LinePS;
-
-		// Textured root signature (shared by quad pipeline)
-		Microsoft::WRL::ComPtr<ID3D12RootSignature> D3D12TexturedRootSig;
+		bool VkActive    = false;
+		bool OL_Active   = false;
 
 		// Active render target for D3D12/OpenGL/Vulkan flushing (RHI-bridged).
 		Ref<RHIFramebuffer> ActiveRenderTarget;
@@ -146,35 +120,11 @@ namespace Candy {
 		// passes already drew into the same target.
 		bool ActiveRenderTargetPendingClear = true;
 
-		// ---- Vulkan backend data ----
-		bool VkActive = false;
+		// ---- Vulkan-only init data ([FROZEN] backend) ----
 		VulkanDevice* VkDev = nullptr;
-
-		// Vulkan vertex/index buffers
-		Ref<RHIBuffer> VkQuadVB, VkQuadIB, VkCircleVB, VkLineVB, VkCameraCB;
-
-		// Vulkan pipelines
-		Ref<RHIGraphicsPipeline> VkQuadPipeline, VkCirclePipeline, VkLinePipeline;
-		Ref<RHIShaderModule>     VkQuadVS, VkQuadPS, VkCircleVS, VkCirclePS, VkLineVS, VkLinePS;
-
-		// Descriptor set
 		VkDescriptorSetLayout VkDescLayout = VK_NULL_HANDLE;
 		VkDescriptorSet       VkDescSet    = VK_NULL_HANDLE;
 		VkDescriptorPool      VkDescPool   = VK_NULL_HANDLE;
-
-		// ---- OpenGL RHI backend data ----
-		bool OL_Active = false;
-		Ref<RHIBuffer>           OL_QuadVB;
-		Ref<RHIBuffer>           OL_QuadIB;
-		Ref<RHIBuffer>           OL_CircleVB;
-		Ref<RHIBuffer>           OL_LineVB;
-		Ref<RHIBuffer>           OL_CameraCB;
-		Ref<RHIGraphicsPipeline> OL_QuadPipeline;
-		Ref<RHIGraphicsPipeline> OL_CirclePipeline;
-		Ref<RHIGraphicsPipeline> OL_LinePipeline;
-		Ref<RHIShaderModule>     OL_QuadShader;
-		Ref<RHIShaderModule>     OL_CircleShader;
-		Ref<RHIShaderModule>     OL_LineShader;
 	};
 
 	static Renderer2DData s_Data;
@@ -207,9 +157,9 @@ namespace Candy {
 				BufferDesc d; d.Size=size; d.Usage=ResourceUsage::VertexBuffer; d.CPUAccessible=true; d.Stride=stride; d.DebugName=name;
 				return dev->CreateBuffer(d);
 			};
-			s_Data.VkQuadVB   = makeUploadVB(s_Data.MaxVertices * sizeof(QuadVertex),  sizeof(QuadVertex),  "Vk2D_QuadVB");
-			s_Data.VkCircleVB = makeUploadVB(s_Data.MaxVertices * sizeof(CircleVertex),sizeof(CircleVertex),"Vk2D_CircleVB");
-			s_Data.VkLineVB   = makeUploadVB(s_Data.MaxVertices * sizeof(LineVertex),  sizeof(LineVertex),  "Vk2D_LineVB");
+			s_Data.QuadVB   = makeUploadVB(s_Data.MaxVertices * sizeof(QuadVertex),  sizeof(QuadVertex),  "Vk2D_QuadVB");
+			s_Data.CircleVB = makeUploadVB(s_Data.MaxVertices * sizeof(CircleVertex),sizeof(CircleVertex),"Vk2D_CircleVB");
+			s_Data.LineVB   = makeUploadVB(s_Data.MaxVertices * sizeof(LineVertex),  sizeof(LineVertex),  "Vk2D_LineVB");
 
 			// Index buffer (with data uploaded)
 			{
@@ -225,26 +175,26 @@ namespace Candy {
 					ibDesc.Usage = ResourceUsage::IndexBuffer;
 					ibDesc.CPUAccessible = true; // host-visible for upload
 					ibDesc.DebugName = "Vk2D_QuadIB";
-					s_Data.VkQuadIB = dev->CreateBuffer(ibDesc);
+					s_Data.QuadIB = dev->CreateBuffer(ibDesc);
 				}
 				// Upload
-				s_Data.VkQuadIB->Write(indices, s_Data.MaxIndices * sizeof(uint32_t));
+				s_Data.QuadIB->Write(indices, s_Data.MaxIndices * sizeof(uint32_t));
 				delete[] indices;
 			}
 
 			// Camera CB
 			{
 				BufferDesc d; d.Size=256; d.Usage=ResourceUsage::ConstantBuffer; d.CPUAccessible=true; d.DebugName="Vk2D_CameraCB";
-				s_Data.VkCameraCB = dev->CreateBuffer(d);
+				s_Data.CameraCB = dev->CreateBuffer(d);
 			}
 
 			// --- Shaders (use built-in triangle SPIR-V) ---
 			auto& vsSpv = dev->GetTriangleVSSPIRV();
 			auto& psSpv = dev->GetTrianglePSSPIRV();
-			s_Data.VkQuadVS = dev->CreateShaderModule(vsSpv.data(), static_cast<uint32_t>(vsSpv.size()*4), "QuadVS");
-			s_Data.VkQuadPS = dev->CreateShaderModule(psSpv.data(), static_cast<uint32_t>(psSpv.size()*4), "QuadPS");
-			s_Data.VkCircleVS = s_Data.VkQuadVS; s_Data.VkCirclePS = s_Data.VkQuadPS;
-			s_Data.VkLineVS   = s_Data.VkQuadVS; s_Data.VkLinePS   = s_Data.VkQuadPS;
+			auto quadVS = dev->CreateShaderModule(vsSpv.data(), static_cast<uint32_t>(vsSpv.size()*4), "QuadVS");
+			auto quadPS = dev->CreateShaderModule(psSpv.data(), static_cast<uint32_t>(psSpv.size()*4), "QuadPS");
+			auto circleVS = quadVS; auto circlePS = quadPS;
+			auto lineVS   = quadVS; auto linePS   = quadPS;
 
 			// --- Descriptor set layout + pool + set ---
 			{
@@ -287,21 +237,21 @@ namespace Candy {
 				  qd.VertexInput.Bindings.push_back(b);
 				  qd.VertexInput.Attributes.push_back({0,0,RHIFormat::R32G32B32Float,0});
 				  qd.VertexInput.Attributes.push_back({1,0,RHIFormat::R32G32B32A32Float,offsetof(QuadVertex,Color)});
-				  s_Data.VkQuadPipeline=dev->CreateGraphicsPipeline(qd,s_Data.VkQuadVS,s_Data.VkQuadPS); }
+				  s_Data.QuadPipeline=dev->CreateGraphicsPipeline(qd,quadVS,quadPS); }
 
 				// Circle
 				{ GraphicsPipelineDesc cd=pd; VertexInputLayout::VertexBinding b; b.Binding=0; b.Stride=sizeof(CircleVertex);
 				  cd.VertexInput.Bindings.push_back(b);
 				  cd.VertexInput.Attributes.push_back({0,0,RHIFormat::R32G32B32Float,0});
 				  cd.VertexInput.Attributes.push_back({2,0,RHIFormat::R32G32B32A32Float,offsetof(CircleVertex,Color)});
-				  s_Data.VkCirclePipeline=dev->CreateGraphicsPipeline(cd,s_Data.VkCircleVS,s_Data.VkCirclePS); }
+				  s_Data.CirclePipeline=dev->CreateGraphicsPipeline(cd,circleVS,circlePS); }
 
 				// Line
 				{ GraphicsPipelineDesc ld=pd; ld.Topology=PrimitiveTopology::Lines; VertexInputLayout::VertexBinding b; b.Binding=0; b.Stride=sizeof(LineVertex);
 				  ld.VertexInput.Bindings.push_back(b);
 				  ld.VertexInput.Attributes.push_back({0,0,RHIFormat::R32G32B32Float,0});
 				  ld.VertexInput.Attributes.push_back({1,0,RHIFormat::R32G32B32A32Float,offsetof(LineVertex,Color)});
-				  s_Data.VkLinePipeline=dev->CreateGraphicsPipeline(ld,s_Data.VkLineVS,s_Data.VkLinePS); }
+				  s_Data.LinePipeline=dev->CreateGraphicsPipeline(ld,lineVS,linePS); }
 			}
 
 			s_Data.WhiteTexture = Texture2D::Create(1, 1);
@@ -309,7 +259,6 @@ namespace Candy {
 			s_Data.TextureSlots[0]=s_Data.WhiteTexture;
 			s_Data.QuadVertexPositions[0]={-0.5f,-0.5f,0.0f,1.0f}; s_Data.QuadVertexPositions[1]={0.5f,-0.5f,0.0f,1.0f};
 			s_Data.QuadVertexPositions[2]={0.5f,0.5f,0.0f,1.0f}; s_Data.QuadVertexPositions[3]={-0.5f,0.5f,0.0f,1.0f};
-			s_Data.CameraUniformBuffer=UniformBuffer::Create(sizeof(Renderer2DData::CameraData),0);
 
 			CANDY_CORE_INFO("Renderer2D: Vulkan backend initialized (colored primitives only)");
 			return;
@@ -328,7 +277,7 @@ namespace Candy {
 				s_Data.D3D12Active = false;
 				return;
 			}
-			s_Data.D3D12Dev = gfxCtx->GetDevice();
+			auto* dev = gfxCtx->GetDevice();
 
 			// --- CPU-side vertex buffers (same as OpenGL path, needed for batching) ---
 			s_Data.QuadVertexBufferBase   = new QuadVertex[s_Data.MaxVertices];
@@ -336,7 +285,6 @@ namespace Candy {
 			s_Data.LineVertexBufferBase   = new LineVertex[s_Data.MaxVertices];
 
 		// --- GPU vertex buffers (upload heap, CPU-writable) ---
-		auto* dev = s_Data.D3D12Dev;
 		{
 			BufferDesc vbDesc;
 			vbDesc.Size          = s_Data.MaxVertices * sizeof(QuadVertex);
@@ -344,7 +292,7 @@ namespace Candy {
 			vbDesc.CPUAccessible = true;
 			vbDesc.Stride        = sizeof(QuadVertex);
 			vbDesc.DebugName     = "Renderer2D_QuadVB";
-			s_Data.D3D12QuadVB = dev->CreateBuffer(vbDesc);
+			s_Data.QuadVB = dev->CreateBuffer(vbDesc);
 		}
 		{
 			BufferDesc vbDesc;
@@ -353,7 +301,7 @@ namespace Candy {
 			vbDesc.CPUAccessible = true;
 			vbDesc.Stride        = sizeof(CircleVertex);
 			vbDesc.DebugName     = "Renderer2D_CircleVB";
-			s_Data.D3D12CircleVB = dev->CreateBuffer(vbDesc);
+			s_Data.CircleVB = dev->CreateBuffer(vbDesc);
 		}
 		{
 			BufferDesc vbDesc;
@@ -362,7 +310,7 @@ namespace Candy {
 			vbDesc.CPUAccessible = true;
 			vbDesc.Stride        = sizeof(LineVertex);
 			vbDesc.DebugName     = "Renderer2D_LineVB";
-			s_Data.D3D12LineVB = dev->CreateBuffer(vbDesc);
+			s_Data.LineVB = dev->CreateBuffer(vbDesc);
 		}
 
 			// --- Index buffer (same pattern for quad + circle) ---
@@ -379,7 +327,7 @@ namespace Candy {
 					quadIndices[i + 5] = offset + 0;
 					offset += 4;
 				}
-				s_Data.D3D12QuadIB = dev->CreateGPUBufferWithData(
+				s_Data.QuadIB = dev->CreateGPUBufferWithData(
 					quadIndices, s_Data.MaxIndices * sizeof(uint32_t),
 					ResourceUsage::IndexBuffer, "Renderer2D_QuadIB");
 				delete[] quadIndices;
@@ -392,10 +340,11 @@ namespace Candy {
 				cbDesc.Usage         = ResourceUsage::ConstantBuffer;
 				cbDesc.CPUAccessible = true;
 				cbDesc.DebugName     = "Renderer2D_CameraCB";
-				s_Data.D3D12CameraCB = dev->CreateBuffer(cbDesc);
+				s_Data.CameraCB = dev->CreateBuffer(cbDesc);
 			}
 
 			// --- Compile HLSL shaders ---
+			Ref<RHIShaderModule> quadVS, quadPS, circleVS, circlePS, lineVS, linePS;
 			// Quad (textured)
 			{
 				static const char* quadVSSrc = R"(
@@ -409,7 +358,7 @@ VSOutput VSMain(VSInput i) { VSOutput o; o.Position = mul(u_ViewProjection, floa
 )";
 				auto blob = dev->CompileHLSL(quadVSSrc, "VSMain", "vs_5_0", "Renderer2D_QuadVS");
 				if (blob)
-					s_Data.D3D12QuadVS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "QuadVS");
+					quadVS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "QuadVS");
 
 				static const char* quadPSSrc = R"(
 Texture2D u_Textures[32] : register(t0);
@@ -436,7 +385,7 @@ PSOutput PSMain(PSInput i)
 )";
 				auto psBlob = dev->CompileHLSL(quadPSSrc, "PSMain", "ps_5_0", "Renderer2D_QuadPS");
 				if (psBlob)
-					s_Data.D3D12QuadPS = dev->CreateShaderModule(psBlob->GetBufferPointer(), static_cast<uint32_t>(psBlob->GetBufferSize()), "QuadPS");
+					quadPS = dev->CreateShaderModule(psBlob->GetBufferPointer(), static_cast<uint32_t>(psBlob->GetBufferSize()), "QuadPS");
 			}
 
 			// Circle
@@ -455,7 +404,7 @@ VSOutput VSMain(VSInput i) { VSOutput o; o.Position=mul(u_ViewProjection,float4(
 )";
 				auto blob = dev->CompileHLSL(circleVSSrc, "VSMain", "vs_5_0", "Renderer2D_CircleVS");
 				if (blob)
-					s_Data.D3D12CircleVS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "CircleVS");
+					circleVS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "CircleVS");
 			}
 			{
 				static const char* circlePSSrc = R"(
@@ -465,7 +414,7 @@ PSOutput PSMain(PSInput i) { float d=1.0-length(i.LocalPosition); float c=smooth
 )";
 				auto blob = dev->CompileHLSL(circlePSSrc, "PSMain", "ps_5_0", "Renderer2D_CirclePS");
 				if (blob)
-					s_Data.D3D12CirclePS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "CirclePS");
+					circlePS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "CirclePS");
 			}
 
 			// Line
@@ -478,7 +427,7 @@ VSOutput VSMain(VSInput i) { VSOutput o; o.Position=mul(u_ViewProjection,float4(
 )";
 				auto blob = dev->CompileHLSL(lineVSSrc, "VSMain", "vs_5_0", "Renderer2D_LineVS");
 				if (blob)
-					s_Data.D3D12LineVS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "LineVS");
+					lineVS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "LineVS");
 			}
 			{
 				static const char* linePSSrc = R"(
@@ -488,13 +437,11 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 )";
 				auto blob = dev->CompileHLSL(linePSSrc, "PSMain", "ps_5_0", "Renderer2D_LinePS");
 				if (blob)
-					s_Data.D3D12LinePS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "LinePS");
+					linePS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "LinePS");
 			}
 
-			// --- Create textured root signature (shared by quad) ---
-			s_Data.D3D12TexturedRootSig = dev->CreateTexturedRootSignature();
-
-			// --- Create pipelines ---
+			// --- Create pipelines (all share the textured root signature created
+			// inside D3D12Device::CreateGraphicsPipeline) ---
 			{
 				GraphicsPipelineDesc pipeDesc;
 				pipeDesc.Topology           = PrimitiveTopology::Triangles;
@@ -509,7 +456,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 				pipeDesc.Blend.WriteMask           = ColorWriteMask::All;
 				pipeDesc.RenderTargetFormats = { RHIFormat::R8G8B8A8Unorm, RHIFormat::R32Sint };
 
-				// Quad pipeline (textured — uses TexturedRootSignature)
+				// Quad pipeline (textured)
 				{
 					GraphicsPipelineDesc qd = pipeDesc;
 					VertexInputLayout::VertexBinding binding;
@@ -524,17 +471,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 					qd.VertexInput.Attributes.push_back({ 4, 0, RHIFormat::R32Float,          offsetof(QuadVertex, TilingFactor) });  // TilingFactor
 					qd.VertexInput.Attributes.push_back({ 5, 0, RHIFormat::R32Sint,           offsetof(QuadVertex, EntityID) });      // EntityID
 
-					if (s_Data.D3D12TexturedRootSig)
-					{
-						// Create pipeline directly with textured root signature
-						s_Data.D3D12QuadPipeline = dev->CreateGraphicsPipelineWithRootSig(
-							qd, s_Data.D3D12QuadVS, s_Data.D3D12QuadPS,
-							s_Data.D3D12TexturedRootSig.Get());
-					}
-					else
-					{
-						s_Data.D3D12QuadPipeline = dev->CreateGraphicsPipeline(qd, s_Data.D3D12QuadVS, s_Data.D3D12QuadPS);
-					}
+					s_Data.QuadPipeline = dev->CreateGraphicsPipeline(qd, quadVS, quadPS);
 				}
 
 				// Circle pipeline
@@ -552,7 +489,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 					cd.VertexInput.Attributes.push_back({ 4, 0, RHIFormat::R32Float,          offsetof(CircleVertex, Fade) });
 					cd.VertexInput.Attributes.push_back({ 5, 0, RHIFormat::R32Sint,           offsetof(CircleVertex, EntityID) });
 
-					s_Data.D3D12CirclePipeline = dev->CreateGraphicsPipeline(cd, s_Data.D3D12CircleVS, s_Data.D3D12CirclePS);
+					s_Data.CirclePipeline = dev->CreateGraphicsPipeline(cd, circleVS, circlePS);
 				}
 
 				// Line pipeline
@@ -569,7 +506,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 					ld.VertexInput.Attributes.push_back({ 1, 0, RHIFormat::R32G32B32A32Float, offsetof(LineVertex, Color) });
 					ld.VertexInput.Attributes.push_back({ 2, 0, RHIFormat::R32Sint,           offsetof(LineVertex, EntityID) });
 
-					s_Data.D3D12LinePipeline = dev->CreateGraphicsPipeline(ld, s_Data.D3D12LineVS, s_Data.D3D12LinePS);
+					s_Data.LinePipeline = dev->CreateGraphicsPipeline(ld, lineVS, linePS);
 				}
 			}
 
@@ -592,7 +529,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 	}
 
 		// =====================================================
-		// OpenGL path — new RHI adapter (OpenGLRHIDevice/RHICommandBuffer)
+		// OpenGL path �?new RHI adapter (OpenGLRHIDevice/RHICommandBuffer)
 		// =====================================================
 		CANDY_CORE_INFO("Renderer2D: initializing OpenGL RHI backend...");
 
@@ -619,9 +556,9 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			d.DebugName     = name;
 			return olDev->CreateBuffer(d);
 		};
-		s_Data.OL_QuadVB   = makeUploadVB(s_Data.MaxVertices * sizeof(QuadVertex),   sizeof(QuadVertex),   "OL_QuadVB");
-		s_Data.OL_CircleVB = makeUploadVB(s_Data.MaxVertices * sizeof(CircleVertex), sizeof(CircleVertex), "OL_CircleVB");
-		s_Data.OL_LineVB   = makeUploadVB(s_Data.MaxVertices * sizeof(LineVertex),   sizeof(LineVertex),   "OL_LineVB");
+		s_Data.QuadVB   = makeUploadVB(s_Data.MaxVertices * sizeof(QuadVertex),   sizeof(QuadVertex),   "OL_QuadVB");
+		s_Data.CircleVB = makeUploadVB(s_Data.MaxVertices * sizeof(CircleVertex), sizeof(CircleVertex), "OL_CircleVB");
+		s_Data.LineVB   = makeUploadVB(s_Data.MaxVertices * sizeof(LineVertex),   sizeof(LineVertex),   "OL_LineVB");
 
 		// Index buffer (quad/circle share)
 		{
@@ -642,8 +579,8 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			ib.Usage         = ResourceUsage::IndexBuffer;
 			ib.CPUAccessible = true;
 			ib.DebugName     = "OL_QuadIB";
-			s_Data.OL_QuadIB = olDev->CreateBuffer(ib);
-			s_Data.OL_QuadIB->Write(quadIndices, static_cast<size_t>(ib.Size));
+			s_Data.QuadIB = olDev->CreateBuffer(ib);
+			s_Data.QuadIB->Write(quadIndices, static_cast<size_t>(ib.Size));
 			delete[] quadIndices;
 		}
 
@@ -654,10 +591,10 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			cb.Usage         = ResourceUsage::ConstantBuffer;
 			cb.CPUAccessible = true;
 			cb.DebugName     = "OL_CameraCB";
-			s_Data.OL_CameraCB = olDev->CreateBuffer(cb);
+			s_Data.CameraCB = olDev->CreateBuffer(cb);
 		}
 
-		// Shaders — load GLSL source via VFS, store as RHI source modules.
+		// Shaders �?load GLSL source via VFS, store as RHI source modules.
 		auto loadShaderModule = [](const char* name, const char* vfsPath) -> Ref<RHIShaderModule> {
 			auto src = FileSystem::Get().ReadText(vfsPath);
 			if (!src)
@@ -668,9 +605,9 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			auto* dev = static_cast<OpenGLRHIDevice*>(RHIContext::GetDevice());
 			return dev->CreateShaderModule(src->data(), static_cast<uint32_t>(src->size()), name);
 		};
-		s_Data.OL_QuadShader   = loadShaderModule("Renderer2D_Quad",   "VFS://Engine/Shaders/Renderer2D_Quad.glsl");
-		s_Data.OL_CircleShader = loadShaderModule("Renderer2D_Circle", "VFS://Engine/Shaders/Renderer2D_Circle.glsl");
-		s_Data.OL_LineShader   = loadShaderModule("Renderer2D_Line",   "VFS://Engine/Shaders/Renderer2D_Line.glsl");
+		Ref<RHIShaderModule> quadShader   = loadShaderModule("Renderer2D_Quad",   "VFS://Engine/Shaders/Renderer2D_Quad.glsl");
+		Ref<RHIShaderModule> circleShader = loadShaderModule("Renderer2D_Circle", "VFS://Engine/Shaders/Renderer2D_Circle.glsl");
+		Ref<RHIShaderModule> lineShader   = loadShaderModule("Renderer2D_Line",   "VFS://Engine/Shaders/Renderer2D_Line.glsl");
 
 		// Pipelines (mirrors D3D12 desc but routes through OpenGLRHIGraphicsPipeline)
 		GraphicsPipelineDesc base;
@@ -694,7 +631,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			pd.VertexInput.Attributes.push_back({ 3, 0, RHIFormat::R32Float,          offsetof(QuadVertex, TexIndex) });
 			pd.VertexInput.Attributes.push_back({ 4, 0, RHIFormat::R32Float,          offsetof(QuadVertex, TilingFactor) });
 			pd.VertexInput.Attributes.push_back({ 5, 0, RHIFormat::R32Sint,           offsetof(QuadVertex, EntityID) });
-			s_Data.OL_QuadPipeline = olDev->CreateGraphicsPipeline(pd, s_Data.OL_QuadShader, s_Data.OL_QuadShader);
+			s_Data.QuadPipeline = olDev->CreateGraphicsPipeline(pd, quadShader, quadShader);
 		}
 		// Circle
 		{
@@ -707,7 +644,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			pd.VertexInput.Attributes.push_back({ 3, 0, RHIFormat::R32Float,         offsetof(CircleVertex, Thickness) });
 			pd.VertexInput.Attributes.push_back({ 4, 0, RHIFormat::R32Float,         offsetof(CircleVertex, Fade) });
 			pd.VertexInput.Attributes.push_back({ 5, 0, RHIFormat::R32Sint,           offsetof(CircleVertex, EntityID) });
-			s_Data.OL_CirclePipeline = olDev->CreateGraphicsPipeline(pd, s_Data.OL_CircleShader, s_Data.OL_CircleShader);
+			s_Data.CirclePipeline = olDev->CreateGraphicsPipeline(pd, circleShader, circleShader);
 		}
 		// Line
 		{
@@ -718,10 +655,10 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			pd.VertexInput.Attributes.push_back({ 0, 0, RHIFormat::R32G32B32Float,    0 });
 			pd.VertexInput.Attributes.push_back({ 1, 0, RHIFormat::R32G32B32A32Float, offsetof(LineVertex, Color) });
 			pd.VertexInput.Attributes.push_back({ 2, 0, RHIFormat::R32Sint,           offsetof(LineVertex, EntityID) });
-			s_Data.OL_LinePipeline = olDev->CreateGraphicsPipeline(pd, s_Data.OL_LineShader, s_Data.OL_LineShader);
+			s_Data.LinePipeline = olDev->CreateGraphicsPipeline(pd, lineShader, lineShader);
 		}
 
-		// White texture (1x1 RGBA8) — use the legacy Texture2D factory which
+		// White texture (1x1 RGBA8) �?use the legacy Texture2D factory which
 		// returns an OpenGLTexture2D that double-inherits RHITexture.
 		s_Data.WhiteTexture = Texture2D::Create(1, 1);
 		uint32_t whiteTextureData = 0xffffffff;
@@ -739,80 +676,48 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 	void Renderer2D::Shutdown()
 	{
 		delete[] s_Data.QuadVertexBufferBase;
-		if (s_Data.D3D12Active)
+		delete[] s_Data.CircleVertexBufferBase;
+		delete[] s_Data.LineVertexBufferBase;
+
+		s_Data.QuadVB.reset();
+		s_Data.QuadIB.reset();
+		s_Data.CircleVB.reset();
+		s_Data.LineVB.reset();
+		s_Data.CameraCB.reset();
+		s_Data.QuadPipeline.reset();
+		s_Data.CirclePipeline.reset();
+		s_Data.LinePipeline.reset();
+
+		if (s_Data.VkActive && s_Data.VkDev)
 		{
-			delete[] s_Data.CircleVertexBufferBase;
-			delete[] s_Data.LineVertexBufferBase;
-			s_Data.D3D12QuadVB.reset();
-			s_Data.D3D12QuadIB.reset();
-			s_Data.D3D12CircleVB.reset();
-			s_Data.D3D12LineVB.reset();
-			s_Data.D3D12CameraCB.reset();
-			s_Data.D3D12QuadPipeline.reset();
-			s_Data.D3D12CirclePipeline.reset();
-			s_Data.D3D12LinePipeline.reset();
-			s_Data.D3D12QuadVS.reset(); s_Data.D3D12QuadPS.reset();
-			s_Data.D3D12CircleVS.reset(); s_Data.D3D12CirclePS.reset();
-			s_Data.D3D12LineVS.reset(); s_Data.D3D12LinePS.reset();
-			s_Data.D3D12TexturedRootSig.Reset();
-		}
-		if (s_Data.VkActive)
-		{
-			delete[] s_Data.CircleVertexBufferBase;
-			delete[] s_Data.LineVertexBufferBase;
-			s_Data.VkQuadVB.reset(); s_Data.VkQuadIB.reset(); s_Data.VkCircleVB.reset();
-			s_Data.VkLineVB.reset(); s_Data.VkCameraCB.reset();
-			s_Data.VkQuadPipeline.reset(); s_Data.VkCirclePipeline.reset(); s_Data.VkLinePipeline.reset();
-			if (s_Data.VkDev)
-			{
-				VkDevice vd = s_Data.VkDev->GetVkDevice();
-				if (s_Data.VkDescSet)  s_Data.VkDev->fnFreeCommandBuffers(vd, VK_NULL_HANDLE, 0, nullptr); // pool auto-frees sets
-				if (s_Data.VkDescPool) s_Data.VkDev->fnDestroyDescriptorPool(vd, s_Data.VkDescPool, nullptr);
-				if (s_Data.VkDescLayout) s_Data.VkDev->fnDestroyDescriptorSetLayout(vd, s_Data.VkDescLayout, nullptr);
-			}
+			VkDevice vd = s_Data.VkDev->GetVkDevice();
+			if (s_Data.VkDescSet)  s_Data.VkDev->fnFreeCommandBuffers(vd, VK_NULL_HANDLE, 0, nullptr); // pool auto-frees sets
+			if (s_Data.VkDescPool) s_Data.VkDev->fnDestroyDescriptorPool(vd, s_Data.VkDescPool, nullptr);
+			if (s_Data.VkDescLayout) s_Data.VkDev->fnDestroyDescriptorSetLayout(vd, s_Data.VkDescLayout, nullptr);
 		}
 	}
 
 		void Renderer2D::BeginScene(const OrthographicCamera& camera)
 	{
-		if (s_Data.D3D12Active || s_Data.VkActive || s_Data.OL_Active)
-		{
-			StartBatch();
-			return;
-		}
-
-		s_Data.QuadShader->Bind();
-		s_Data.QuadShader->SetMat4("u_ViewProjection", camera.GetViewProjectionMatrix());
-
+		// TODO: legacy 2D ortho path �� camera matrix currently unused by the RHI
+		// path (no callers render through this overload on RHI backends).
 		StartBatch();
 	}
 
 	void Renderer2D::BeginScene(const Camera& camera, const glm::mat4& transform)
 	{
 		s_Data.CameraBuffer.ViewProjection = camera.GetProjection() * glm::inverse(transform);
-		if (!s_Data.D3D12Active && !s_Data.VkActive && !s_Data.OL_Active)
-			s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer2DData::CameraData));
-
 		StartBatch();
 	}
 
 	void Renderer2D::BeginScene(const EditorCamera& camera)
 	{
 		s_Data.CameraBuffer.ViewProjection = camera.GetViewProjection();
-		if (!s_Data.D3D12Active && !s_Data.VkActive && !s_Data.OL_Active)
-			s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(Renderer2DData::CameraData));
-
 		StartBatch();
 	}
 
 	void Renderer2D::EndScene()
 	{
-		if (!s_Data.D3D12Active && !s_Data.VkActive && !s_Data.OL_Active)
-		{
-			uint32_t dataSize = (uint32_t)((uint8_t*)s_Data.QuadVertexBufferPtr - (uint8_t*)s_Data.QuadVertexBufferBase);
-			s_Data.QuadVertexBuffer->SetData(s_Data.QuadVertexBufferBase, dataSize);
-		}
-
 		Flush();
 	}
 
@@ -835,133 +740,36 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 		if (s_FirstFlush)
 		{
 			s_FirstFlush = false;
-			CANDY_CORE_INFO("Renderer2D::Flush FIRST CALL — D3D12Active={}, VkActive={}, OL_Active={}, activeRT={} QuadIdx={} CircleIdx={} LineVtx={}",
-			                s_Data.D3D12Active, s_Data.VkActive, s_Data.OL_Active,
+			CANDY_CORE_INFO("Renderer2D::Flush FIRST CALL — API={}, activeRT={} QuadIdx={} CircleIdx={} LineVtx={}",
+			                RendererAPI::StringFromAPI(Renderer::GetAPI()),
 			                (bool)s_Data.ActiveRenderTarget,
 			                s_Data.QuadIndexCount, s_Data.CircleIndexCount, s_Data.LineVertexCount);
 		}
 
-		if (s_Data.VkActive)
+		auto* dev = RHIContext::GetDevice();
+		if (!dev)
 		{
-			auto* dev = s_Data.VkDev;
-			if (!dev) return;
-
-			// Upload camera CB
-			s_Data.VkCameraCB->Write(&s_Data.CameraBuffer, sizeof(s_Data.CameraBuffer));
-
-			// Update descriptor set
-			{
-				auto* vkCB = dynamic_cast<VulkanBuffer*>(s_Data.VkCameraCB.get());
-				if (vkCB)
-				{
-					VkDescriptorBufferInfo bufInfo = {};
-					bufInfo.buffer = vkCB->GetVkBuffer();
-					bufInfo.offset = 0;
-					bufInfo.range  = VK_WHOLE_SIZE;
-
-					VkWriteDescriptorSet write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-					write.dstSet          = s_Data.VkDescSet;
-					write.dstBinding      = 0;
-					write.descriptorCount = 1;
-					write.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-					write.pBufferInfo     = &bufInfo;
-					dev->fnUpdateDescriptorSets(dev->GetVkDevice(), 1, &write, 0, nullptr);
-				}
-			}
-
-			auto& queue = dev->GetCommandQueue();
-			auto  cmd   = queue.CreateCommandBuffer();
-			if (!cmd) return;
-
-			cmd->Begin();
-
-		// Clear only on the first Flush after the target was bound (see D3D12 path).
-		const LoadOp vkLoadOp = (!s_Data.ActiveRenderTarget || s_Data.ActiveRenderTargetPendingClear)
-			? LoadOp::Clear : LoadOp::Load;
-
-		RenderPassDesc rpDesc;
-		rpDesc.ColorAttachments.push_back({RHIFormat::R8G8B8A8Unorm, vkLoadOp, StoreOp::Store, {0.1f,0.1f,0.15f,1.0f}});
-		cmd->BeginRenderPass(s_Data.ActiveRenderTarget.get(), rpDesc);
-		s_Data.ActiveRenderTargetPendingClear = false;
-			cmd->SetViewport(0,0,1280.f,720.f); cmd->SetScissor(0,0,1280,720);
-
-			VkDevice vd = dev->GetVkDevice();
-
-			auto uploadVkVB = [&](Ref<RHIBuffer>& vb, const void* data, uint32_t size) -> bool {
-				return vb && vb->Write(data, size);
-			};
-
-			// Quad batch
-			if (s_Data.QuadIndexCount)
-			{
-				uint32_t sz = static_cast<uint32_t>((uint8_t*)s_Data.QuadVertexBufferPtr - (uint8_t*)s_Data.QuadVertexBufferBase);
-				uploadVkVB(s_Data.VkQuadVB, s_Data.QuadVertexBufferBase, sz);
-				cmd->SetPipeline(s_Data.VkQuadPipeline);
-				cmd->SetConstantBuffer(0, 0, s_Data.VkCameraCB);
-				cmd->SetVertexBuffer(s_Data.VkQuadVB);
-				cmd->SetIndexBuffer(s_Data.VkQuadIB);
-				cmd->DrawIndexed(s_Data.QuadIndexCount);
-				s_Data.Stats.DrawCalls++;
-			}
-
-			// Circle batch
-			if (s_Data.CircleIndexCount)
-			{
-				uint32_t sz = static_cast<uint32_t>((uint8_t*)s_Data.CircleVertexBufferPtr - (uint8_t*)s_Data.CircleVertexBufferBase);
-				uploadVkVB(s_Data.VkCircleVB, s_Data.CircleVertexBufferBase, sz);
-				cmd->SetPipeline(s_Data.VkCirclePipeline);
-				cmd->SetConstantBuffer(0, 0, s_Data.VkCameraCB);
-				cmd->SetVertexBuffer(s_Data.VkCircleVB);
-				cmd->SetIndexBuffer(s_Data.VkQuadIB);
-				cmd->DrawIndexed(s_Data.CircleIndexCount);
-				s_Data.Stats.DrawCalls++;
-			}
-
-			// Line batch
-			if (s_Data.LineVertexCount)
-			{
-				uint32_t sz = static_cast<uint32_t>((uint8_t*)s_Data.LineVertexBufferPtr - (uint8_t*)s_Data.LineVertexBufferBase);
-				uploadVkVB(s_Data.VkLineVB, s_Data.LineVertexBufferBase, sz);
-				cmd->SetPipeline(s_Data.VkLinePipeline);
-				cmd->SetConstantBuffer(0, 0, s_Data.VkCameraCB);
-				cmd->SetVertexBuffer(s_Data.VkLineVB);
-				cmd->Draw(s_Data.LineVertexCount);
-				s_Data.Stats.DrawCalls++;
-			}
-
-			cmd->EndRenderPass();
-			cmd->End();
-			queue.Submit({cmd.get()});
-			dev->WaitIdle();
+			CANDY_CORE_ERROR("Renderer2D::Flush — no RHI device published");
 			return;
 		}
 
-		if (s_Data.D3D12Active)
+		// Upload camera constant buffer
+		if (!s_Data.CameraCB->Write(&s_Data.CameraBuffer, sizeof(s_Data.CameraBuffer)))
 		{
-			// =====================================================
-			// D3D12 path — upload vertex data + record draws
-			// =====================================================
-			auto* dev = s_Data.D3D12Dev;
-			if (!dev) return;
+			CANDY_CORE_ERROR("Renderer2D::Flush — CameraCB upload failed; skipping this frame");
+			return;
+		}
 
-			// Upload camera constant buffer
-			if (!s_Data.D3D12CameraCB->Write(&s_Data.CameraBuffer, sizeof(s_Data.CameraBuffer)))
-			{
-				CANDY_CORE_ERROR("Renderer2D::Flush (D3D12) — CameraCB upload failed; skipping this frame");
-				return;
-			}
+		auto& queue = dev->GetCommandQueue();
+		auto  cmd   = queue.CreateCommandBuffer();
+		if (!cmd) return;
 
-			auto& queue = dev->GetCommandQueue();
-			auto  cmd   = queue.CreateCommandBuffer();
-			if (!cmd) return;
-			auto* d3d12cb = static_cast<D3D12CommandBuffer*>(cmd.get());
-
-			cmd->Begin();
+		cmd->Begin();
 
 		// Clear only on the first Flush after the target was bound; later passes
 		// in the same frame (overlay, camera preview restore, ...) load instead,
 		// so an empty overlay pass can't erase the scene that was just rendered.
-		// Swap-chain rendering (no active target) always clears, as before.
+		// Swap-chain rendering (no active target) always clears.
 		const LoadOp loadOp = (!s_Data.ActiveRenderTarget || s_Data.ActiveRenderTargetPendingClear)
 			? LoadOp::Clear : LoadOp::Load;
 
@@ -976,8 +784,8 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			colorAttachment.ClearColor[3] = 1.0f;
 			rpDesc.ColorAttachments.push_back(colorAttachment);
 
-		// Entity ID attachment
-		if (s_Data.ActiveRenderTarget && s_Data.ActiveRenderTarget->GetColorAttachmentCount() > 1)
+			// Entity ID attachment
+			if (s_Data.ActiveRenderTarget && s_Data.ActiveRenderTarget->GetColorAttachmentCount() > 1)
 			{
 				RenderPassColorAttachment idAttachment;
 				idAttachment.Format = RHIFormat::R32Sint;
@@ -992,232 +800,87 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 		cmd->BeginRenderPass(s_Data.ActiveRenderTarget.get(), rpDesc);
 		s_Data.ActiveRenderTargetPendingClear = false;
 
-			// Viewport + scissor
-			uint32_t vpW = 1280, vpH = 720;
-			if (s_Data.ActiveRenderTarget)
-			{
-				vpW = s_Data.ActiveRenderTarget->GetWidth();
-				vpH = s_Data.ActiveRenderTarget->GetHeight();
-			}
-			cmd->SetViewport(0, 0, static_cast<float>(vpW), static_cast<float>(vpH));
-			cmd->SetScissor(0, 0, vpW, vpH);
-
-			// --- Quad batch (textured) ---
-			if (s_Data.QuadIndexCount && s_Data.D3D12QuadPipeline)
-			{
-				uint32_t dataSize = static_cast<uint32_t>(
-					reinterpret_cast<uint8_t*>(s_Data.QuadVertexBufferPtr) -
-					reinterpret_cast<uint8_t*>(s_Data.QuadVertexBufferBase));
-
-				if (!s_Data.D3D12QuadVB->Write(s_Data.QuadVertexBufferBase, dataSize))
-					CANDY_CORE_WARN("Renderer2D::Flush (D3D12) — QuadVB upload failed; stale data used");
-
-				cmd->SetPipeline(s_Data.D3D12QuadPipeline);
-				cmd->SetConstantBuffer(0, 0, s_Data.D3D12CameraCB);
-				cmd->SetVertexBuffer(s_Data.D3D12QuadVB);
-				cmd->SetIndexBuffer(s_Data.D3D12QuadIB);
-
-				// --- Bind textures via descriptor table ---
-				ID3D12DescriptorHeap* srvHeap = dev->GetCBVSRVUAVHeap();
-				uint32_t descSize = dev->GetCBVSRVDescriptorSize();
-				if (srvHeap && s_Data.D3D12TexturedRootSig)
-				{
-					// Allocate 32 SRV slots at descriptor range start (slot 0)
-					constexpr uint32_t kBaseSlot = 0;
-					D3D12_CPU_DESCRIPTOR_HANDLE cpuBase = srvHeap->GetCPUDescriptorHandleForHeapStart();
-					cpuBase.ptr += static_cast<SIZE_T>(kBaseSlot) * descSize;
-
-					// Write SRV descriptors for each texture slot
-					for (uint32_t i = 0; i < Renderer2DData::MaxTextureSlots; ++i)
-					{
-						D3D12_CPU_DESCRIPTOR_HANDLE dstCPU = cpuBase;
-						dstCPU.ptr += static_cast<SIZE_T>(i) * descSize;
-
-						auto* d3d12Tex = dynamic_cast<D3D12Texture2D*>(s_Data.TextureSlots[i].get());
-						if (d3d12Tex && d3d12Tex->GetRHI() && d3d12Tex->GetRHI()->GetResource())
-						{
-							// Copy SRV descriptor from the texture's slot
-							D3D12_CPU_DESCRIPTOR_HANDLE srcCPU = srvHeap->GetCPUDescriptorHandleForHeapStart();
-							srcCPU.ptr += static_cast<SIZE_T>(d3d12Tex->GetRHI() ? 160 : 0) * descSize;
-
-							// Rather than copy, just re-create the SRV at the target slot
-							d3d12Tex->GetRHI()->CreateSRV(srvHeap, kBaseSlot + i, descSize);
-						}
-						else
-						{
-							// White texture fallback: use the first Texture2D (slot 0)
-							auto* whiteTex = dynamic_cast<D3D12Texture2D*>(s_Data.TextureSlots[0].get());
-							if (whiteTex && whiteTex->GetRHI())
-								whiteTex->GetRHI()->CreateSRV(srvHeap, kBaseSlot + i, descSize);
-						}
-					}
-
-					// Bind descriptor table (root parameter 1)
-					D3D12_GPU_DESCRIPTOR_HANDLE gpuTable = srvHeap->GetGPUDescriptorHandleForHeapStart();
-					gpuTable.ptr += static_cast<SIZE_T>(kBaseSlot) * descSize;
-					d3d12cb->GetNativeCommandList()->SetGraphicsRootDescriptorTable(1, gpuTable);
-				}
-
-				cmd->DrawIndexed(s_Data.QuadIndexCount);
-				s_Data.Stats.DrawCalls++;
-			}
-
-			// --- Circle batch ---
-			if (s_Data.CircleIndexCount && s_Data.D3D12CirclePipeline)
-			{
-				uint32_t dataSize = static_cast<uint32_t>(
-					reinterpret_cast<uint8_t*>(s_Data.CircleVertexBufferPtr) -
-					reinterpret_cast<uint8_t*>(s_Data.CircleVertexBufferBase));
-
-				if (!s_Data.D3D12CircleVB->Write(s_Data.CircleVertexBufferBase, dataSize))
-					CANDY_CORE_WARN("Renderer2D::Flush (D3D12) — CircleVB upload failed; stale data used");
-
-				cmd->SetPipeline(s_Data.D3D12CirclePipeline);
-				cmd->SetConstantBuffer(0, 0, s_Data.D3D12CameraCB);
-				cmd->SetVertexBuffer(s_Data.D3D12CircleVB);
-				cmd->SetIndexBuffer(s_Data.D3D12QuadIB); // reuse quad IB
-				cmd->DrawIndexed(s_Data.CircleIndexCount);
-				s_Data.Stats.DrawCalls++;
-			}
-
-			// --- Line batch ---
-			if (s_Data.LineVertexCount && s_Data.D3D12LinePipeline)
-			{
-				uint32_t dataSize = static_cast<uint32_t>(
-					reinterpret_cast<uint8_t*>(s_Data.LineVertexBufferPtr) -
-					reinterpret_cast<uint8_t*>(s_Data.LineVertexBufferBase));
-
-				if (!s_Data.D3D12LineVB->Write(s_Data.LineVertexBufferBase, dataSize))
-					CANDY_CORE_WARN("Renderer2D::Flush (D3D12) — LineVB upload failed; stale data used");
-
-				cmd->SetPipeline(s_Data.D3D12LinePipeline);
-				cmd->SetConstantBuffer(0, 0, s_Data.D3D12CameraCB);
-				cmd->SetVertexBuffer(s_Data.D3D12LineVB);
-				cmd->Draw(s_Data.LineVertexCount);
-				s_Data.Stats.DrawCalls++;
-			}
-
-			cmd->EndRenderPass();
-			cmd->End();
-
-			queue.Submit({ cmd.get() });
-			// No Present when targeting a framebuffer
-			dev->WaitIdle();
-			return;
-		}
-
-		// =====================================================
-		// OpenGL RHI path — record via OpenGLRHICommandBuffer
-		// =====================================================
+		// Viewport + scissor follow the render target
+		uint32_t vpW = 1280, vpH = 720;
+		if (s_Data.ActiveRenderTarget)
 		{
-			auto* olDev = static_cast<OpenGLRHIDevice*>(RHIContext::GetDevice());
-			if (!olDev)
-			{
-				CANDY_CORE_ERROR("Renderer2D::Flush (OpenGL): no OpenGLRHIDevice");
-				return;
-			}
+			vpW = s_Data.ActiveRenderTarget->GetWidth();
+			vpH = s_Data.ActiveRenderTarget->GetHeight();
+		}
+		cmd->SetViewport(0, 0, static_cast<float>(vpW), static_cast<float>(vpH));
+		cmd->SetScissor(0, 0, vpW, vpH);
 
-			auto& queue = olDev->GetCommandQueue();
-			auto  cmd   = queue.CreateCommandBuffer(); // Scope<RHICommandBuffer>
-			auto* gl    = static_cast<OpenGLRHICommandBuffer*>(cmd.get());
-
-			// Viewport size follows the render target (default 1280x720 for the
-			// swap-chain path used by the title-bar area).
-			uint32_t vpW = 1280, vpH = 720;
-			if (s_Data.ActiveRenderTarget)
-			{
-				vpW = s_Data.ActiveRenderTarget->GetWidth();
-				vpH = s_Data.ActiveRenderTarget->GetHeight();
-			}
-
-		gl->Begin();
-
-		// Clear only on the first Flush after the target was bound (see D3D12 path).
-		const LoadOp glLoadOp = (!s_Data.ActiveRenderTarget || s_Data.ActiveRenderTargetPendingClear)
-			? LoadOp::Clear : LoadOp::Load;
-
-		RenderPassDesc rpDesc;
+		// --- Quad batch (textured) ---
+		if (s_Data.QuadIndexCount && s_Data.QuadPipeline)
 		{
-			RenderPassColorAttachment colorAttachment;
-			colorAttachment.Format = RHIFormat::R8G8B8A8Unorm;
-			colorAttachment.LoadOp = glLoadOp;
-			colorAttachment.ClearColor[0] = 0.1f;
-			colorAttachment.ClearColor[1] = 0.1f;
-			colorAttachment.ClearColor[2] = 0.1f;
-			colorAttachment.ClearColor[3] = 1.0f;
-			rpDesc.ColorAttachments.push_back(colorAttachment);
-		}
-		gl->BeginRenderPass(s_Data.ActiveRenderTarget.get(), rpDesc);
-		s_Data.ActiveRenderTargetPendingClear = false;
-			gl->SetViewport(0.0f, 0.0f, static_cast<float>(vpW), static_cast<float>(vpH));
-			gl->SetScissor(0, 0, vpW, vpH);
+			uint32_t dataSize = static_cast<uint32_t>(
+				reinterpret_cast<uint8_t*>(s_Data.QuadVertexBufferPtr) -
+				reinterpret_cast<uint8_t*>(s_Data.QuadVertexBufferBase));
 
-			// Upload camera CB
-			s_Data.OL_CameraCB->Write(&s_Data.CameraBuffer, sizeof(Renderer2DData::CameraData));
+			if (!s_Data.QuadVB->Write(s_Data.QuadVertexBufferBase, dataSize))
+				CANDY_CORE_WARN("Renderer2D::Flush — QuadVB upload failed; stale data used");
 
-			// Quad batch (textured)
-			if (s_Data.QuadIndexCount && s_Data.OL_QuadPipeline)
+			cmd->SetPipeline(s_Data.QuadPipeline);
+			cmd->SetConstantBuffer(0, 0, s_Data.CameraCB);
+			cmd->SetVertexBuffer(s_Data.QuadVB);
+			cmd->SetIndexBuffer(s_Data.QuadIB);
+
+			// Bind used textures; unfilled slots fall back to the white texture.
+			for (uint32_t i = 0; i < s_Data.MaxTextureSlots; ++i)
 			{
-				uint32_t dataSize = static_cast<uint32_t>(
-				    reinterpret_cast<uint8_t*>(s_Data.QuadVertexBufferPtr) -
-				    reinterpret_cast<uint8_t*>(s_Data.QuadVertexBufferBase));
-				s_Data.OL_QuadVB->Write(s_Data.QuadVertexBufferBase, dataSize);
-
-				gl->SetPipeline(s_Data.OL_QuadPipeline);
-				gl->SetConstantBuffer(0, 0, s_Data.OL_CameraCB);
-				gl->SetVertexBuffer(s_Data.OL_QuadVB, 0, 0);
-				gl->SetIndexBuffer(s_Data.OL_QuadIB, IndexFormat::UInt32, 0);
-
-				// Bind used textures (TextureSlots[i] are OpenGLTexture2D which
-				// double-inherit RHITexture), unfilled slots fall back to white.
-				for (uint32_t i = 0; i < s_Data.MaxTextureSlots; ++i)
+				Ref<Texture2D> src = (i < s_Data.TextureSlotIndex) ? s_Data.TextureSlots[i] : s_Data.TextureSlots[0];
+				if (src)
 				{
-					Ref<Texture2D> src = (i < s_Data.TextureSlotIndex) ? s_Data.TextureSlots[i] : s_Data.TextureSlots[0];
-					if (auto rhiTex = std::dynamic_pointer_cast<RHITexture>(src))
-						gl->SetTexture(1, i, rhiTex);
+					if (auto rhiTex = src->GetRHITexture())
+						cmd->SetTexture(1, i, rhiTex);
 				}
-
-				gl->DrawIndexed(s_Data.QuadIndexCount, 1, 0, 0, 0);
-				s_Data.Stats.DrawCalls++;
 			}
 
-			// Circle batch
-			if (s_Data.CircleIndexCount && s_Data.OL_CirclePipeline)
-			{
-				uint32_t dataSize = static_cast<uint32_t>(
-				    reinterpret_cast<uint8_t*>(s_Data.CircleVertexBufferPtr) -
-				    reinterpret_cast<uint8_t*>(s_Data.CircleVertexBufferBase));
-				s_Data.OL_CircleVB->Write(s_Data.CircleVertexBufferBase, dataSize);
-
-				gl->SetPipeline(s_Data.OL_CirclePipeline);
-				gl->SetConstantBuffer(0, 0, s_Data.OL_CameraCB);
-				gl->SetVertexBuffer(s_Data.OL_CircleVB, 0, 0);
-				gl->SetIndexBuffer(s_Data.OL_QuadIB, IndexFormat::UInt32, 0);
-				gl->DrawIndexed(s_Data.CircleIndexCount, 1, 0, 0, 0);
-				s_Data.Stats.DrawCalls++;
-			}
-
-			// Line batch
-			if (s_Data.LineVertexCount && s_Data.OL_LinePipeline)
-			{
-				uint32_t dataSize = static_cast<uint32_t>(
-				    reinterpret_cast<uint8_t*>(s_Data.LineVertexBufferPtr) -
-				    reinterpret_cast<uint8_t*>(s_Data.LineVertexBufferBase));
-				s_Data.OL_LineVB->Write(s_Data.LineVertexBufferBase, dataSize);
-
-				gl->SetPipeline(s_Data.OL_LinePipeline);
-				gl->SetConstantBuffer(0, 0, s_Data.OL_CameraCB);
-				gl->SetVertexBuffer(s_Data.OL_LineVB, 0, 0);
-				gl->Draw(s_Data.LineVertexCount, 1, 0, 0);
-				s_Data.Stats.DrawCalls++;
-			}
-
-			gl->EndRenderPass();
-			gl->End();
-			queue.Submit({ cmd.get() });
-			olDev->WaitIdle();
-			return;
+			cmd->DrawIndexed(s_Data.QuadIndexCount);
+			s_Data.Stats.DrawCalls++;
 		}
+
+		// --- Circle batch ---
+		if (s_Data.CircleIndexCount && s_Data.CirclePipeline)
+		{
+			uint32_t dataSize = static_cast<uint32_t>(
+				reinterpret_cast<uint8_t*>(s_Data.CircleVertexBufferPtr) -
+				reinterpret_cast<uint8_t*>(s_Data.CircleVertexBufferBase));
+
+			if (!s_Data.CircleVB->Write(s_Data.CircleVertexBufferBase, dataSize))
+				CANDY_CORE_WARN("Renderer2D::Flush — CircleVB upload failed; stale data used");
+
+			cmd->SetPipeline(s_Data.CirclePipeline);
+			cmd->SetConstantBuffer(0, 0, s_Data.CameraCB);
+			cmd->SetVertexBuffer(s_Data.CircleVB);
+			cmd->SetIndexBuffer(s_Data.QuadIB); // reuse quad IB
+			cmd->DrawIndexed(s_Data.CircleIndexCount);
+			s_Data.Stats.DrawCalls++;
+		}
+
+		// --- Line batch ---
+		if (s_Data.LineVertexCount && s_Data.LinePipeline)
+		{
+			uint32_t dataSize = static_cast<uint32_t>(
+				reinterpret_cast<uint8_t*>(s_Data.LineVertexBufferPtr) -
+				reinterpret_cast<uint8_t*>(s_Data.LineVertexBufferBase));
+
+			if (!s_Data.LineVB->Write(s_Data.LineVertexBufferBase, dataSize))
+				CANDY_CORE_WARN("Renderer2D::Flush — LineVB upload failed; stale data used");
+
+			cmd->SetPipeline(s_Data.LinePipeline);
+			cmd->SetConstantBuffer(0, 0, s_Data.CameraCB);
+			cmd->SetVertexBuffer(s_Data.LineVB);
+			cmd->Draw(s_Data.LineVertexCount);
+			s_Data.Stats.DrawCalls++;
+		}
+
+		cmd->EndRenderPass();
+		cmd->End();
+
+		queue.Submit({ cmd.get() });
+		// No Present when targeting a framebuffer
+		dev->WaitIdle();
 	}
 
 	void Renderer2D::NextBatch()

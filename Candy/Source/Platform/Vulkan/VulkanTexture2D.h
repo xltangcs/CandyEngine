@@ -32,6 +32,9 @@ namespace Candy {
 			return m_ImageView == static_cast<const VulkanTexture2D&>(other).m_ImageView;
 		}
 
+		// [FROZEN] no RHITexture wrapper on the Vulkan path yet.
+		Ref<RHITexture> GetRHITexture() override { return nullptr; }
+
 		[[nodiscard]] VkImageView GetImageView() const { return m_ImageView; }
 		[[nodiscard]] VkSampler   GetSampler()   const { return m_Sampler; }
 
