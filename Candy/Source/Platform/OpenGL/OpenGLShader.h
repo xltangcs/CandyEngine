@@ -1,10 +1,8 @@
 #pragma once
 
 #include "Runtime/Renderer/Shader.h"
+#include "Runtime/RHI/RHITypes.h"
 #include <glm/glm.hpp>
-
-// TODO: REMOVE!
-typedef unsigned int GLenum;
 
 namespace Candy {
 
@@ -28,6 +26,7 @@ namespace Candy {
 		virtual void SetMat4(const std::string& name, const glm::mat4& value) override;
 
 		virtual const std::string& GetName() const override { return m_Name; }
+		virtual ShaderLanguage GetLanguage() const override { return ShaderLanguage::GLSL; }
 
 		void UploadUniformInt(const std::string& name, int value);
 		void UploadUniformIntArray(const std::string& name, int* values, uint32_t count);
@@ -40,8 +39,7 @@ namespace Candy {
 		void UploadUniformMat4(const std::string& name, const glm::mat4& matrix);
 	private:
 		std::string ReadFile(const std::string& filepath);
-		std::unordered_map<GLenum, std::string> PreProcess(const std::string& source);
-		void Compile(const std::unordered_map<GLenum, std::string>& shaderSources);
+		void Compile(const std::unordered_map<ShaderStage, std::string>& shaderSources);
 	private:
 		uint32_t m_RendererID;
 		std::string m_Name;

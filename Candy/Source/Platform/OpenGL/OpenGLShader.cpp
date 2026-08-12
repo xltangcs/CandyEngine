@@ -2,6 +2,8 @@
 
 #include "Platform/OpenGL/OpenGLShader.h"
 
+#include "Runtime/RHI/RHIShaderSource.h"
+
 #include <fstream>
 #include <glad/glad.h>
 
@@ -9,21 +11,22 @@
 
 namespace Candy {
 
-	static GLenum ShaderTypeFromString(const std::string& type)
+	static GLenum ShaderStageToGL(ShaderStage stage)
 	{
-		if (type == "vertex")
-			return GL_VERTEX_SHADER;
-		if (type == "fragment" || type == "pixel")
-			return GL_FRAGMENT_SHADER;
-
-		CANDY_CORE_ASSERT(false, "Unknown shader type!");
-		return 0;
+		switch (stage)
+		{
+		case ShaderStage::Vertex:    return GL_VERTEX_SHADER;
+		case ShaderStage::Fragment:  return GL_FRAGMENT_SHADER;
+		default:
+			CANDY_CORE_ASSERT(false, "Unsupported shader stage for OpenGL!");
+			return 0;
+		}
 	}
 
 	OpenGLShader::OpenGLShader(const std::string& filepath)
 	{
 		std::string source = ReadFile(filepath);
-		auto shaderSources = PreProcess(source);
+		auto shaderSources = RHIShaderSource::Parse(source);
 		Compile(shaderSources);
 
 		// Extract name from filepath
@@ -37,16 +40,16 @@ namespace Candy {
 	OpenGLShader::OpenGLShader(const std::string& name, const std::string& vertexSrc, const std::string& fragmentSrc)
 		: m_Name(name)
 	{
-		std::unordered_map<GLenum, std::string> sources;
-		sources[GL_VERTEX_SHADER] = vertexSrc;
-		sources[GL_FRAGMENT_SHADER] = fragmentSrc;
+		std::unordered_map<ShaderStage, std::string> sources;
+		sources[ShaderStage::Vertex] = vertexSrc;
+		sources[ShaderStage::Fragment] = fragmentSrc;
 		Compile(sources);
 	}
 
 	OpenGLShader::OpenGLShader(const std::string& name, const std::string& source)
 		: m_Name(name)
 	{
-		auto shaderSources = PreProcess(source);
+		auto shaderSources = RHIShaderSource::Parse(source);
 		Compile(shaderSources);
 	}
 
@@ -81,32 +84,7 @@ namespace Candy {
 		return result;
 	}
 
-	std::unordered_map<GLenum, std::string> OpenGLShader::PreProcess(const std::string& source)
-	{
-		std::unordered_map<GLenum, std::string> shaderSources;
-
-		const char* typeToken = "#type";
-		size_t typeTokenLength = strlen(typeToken);
-		size_t pos = source.find(typeToken, 0); //Start of shader type declaration line
-		while (pos != std::string::npos)
-		{
-			size_t eol = source.find_first_of("\r\n", pos); //End of shader type declaration line
-			CANDY_CORE_ASSERT(eol != std::string::npos, "Syntax error");
-			size_t begin = pos + typeTokenLength + 1; //Start of shader type name (after "#type " keyword)
-			std::string type = source.substr(begin, eol - begin);
-			CANDY_CORE_ASSERT(ShaderTypeFromString(type), "Invalid shader type specified");
-
-			size_t nextLinePos = source.find_first_not_of("\r\n", eol); //Start of shader code after shader type declaration line
-			CANDY_CORE_ASSERT(nextLinePos != std::string::npos, "Syntax error");
-			pos = source.find(typeToken, nextLinePos); //Start of next shader type declaration line
-
-			shaderSources[ShaderTypeFromString(type)] = (pos == std::string::npos) ? source.substr(nextLinePos) : source.substr(nextLinePos, pos - nextLinePos);
-		}
-
-		return shaderSources;
-	}
-
-	void OpenGLShader::Compile(const std::unordered_map<GLenum, std::string>& shaderSources)
+	void OpenGLShader::Compile(const std::unordered_map<ShaderStage, std::string>& shaderSources)
 	{
 		GLuint program = glCreateProgram();
 		CANDY_CORE_ASSERT(shaderSources.size() <= 2, "We only support 2 shaders for now");
@@ -114,7 +92,7 @@ namespace Candy {
 		int glShaderIDIndex = 0;
 		for (auto& kv : shaderSources)
 		{
-			GLenum type = kv.first;
+			GLenum type = ShaderStageToGL(kv.first);
 			const std::string& source = kv.second;
 
 			GLuint shader = glCreateShader(type);
