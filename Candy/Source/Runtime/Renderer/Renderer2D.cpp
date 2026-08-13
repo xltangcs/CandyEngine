@@ -1,36 +1,23 @@
 #include "CandyPCH.h"
 
-#include "Runtime/Renderer/Shader.h"
 #include "Runtime/Renderer/Renderer2D.h"
-#include "Runtime/Renderer/VertexArray.h"
-#include "Runtime/Renderer/UniformBuffer.h"
 #include "Runtime/Renderer/Renderer.h"
 #include "Runtime/Renderer/GraphicsContext.h"
 #include "Runtime/Core/FileSystem.h"
 #include "Runtime/Core/Application.h"
 #include "Runtime/RHI/RHICommandQueue.h"
+#include "Runtime/RHI/RHIContext.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-// D3D12 backend includes
+// Backend includes — used ONLY by the per-backend Init branches (shader
+// source compilation differs per API: inline HLSL / inline SPIR-V / VFS GLSL).
+// Flush() itself is backend-agnostic and touches only RHI interfaces.
 #include "Platform/D3D12/D3D12Device.h"
 #include "Platform/D3D12/D3D12GraphicsContext.h"
-#include "Platform/D3D12/D3D12Buffer.h"
-#include "Platform/D3D12/D3D12PipelineState.h"
-#include "Platform/D3D12/D3D12Framebuffer.h"
-#include "Platform/D3D12/D3D12CommandBuffer.h"
-#include "Platform/D3D12/D3D12Texture2D.h"
-#include "Platform/D3D12/D3D12Texture.h"
 #include "Platform/Vulkan/VulkanDevice.h"
 #include "Platform/Vulkan/VulkanGraphicsContext.h"
-#include "Platform/Vulkan/VulkanBuffer.h"
-#include "Platform/Vulkan/VulkanPipelineState.h"
-
-// OpenGL RHI backend includes
 #include "Platform/OpenGL/OpenGLRHIDevice.h"
-#include "Platform/OpenGL/OpenGLRHICommandBuffer.h"
-#include "Platform/OpenGL/OpenGLRHIResources.h"
-#include "Runtime/RHI/RHIContext.h"
 
 
 namespace Candy {
@@ -521,8 +508,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			s_Data.QuadVertexPositions[2] = {  0.5f,  0.5f, 0.0f, 1.0f };
 			s_Data.QuadVertexPositions[3] = { -0.5f,  0.5f, 0.0f, 1.0f };
 
-		// No legacy UniformBuffer needed for D3D12; the per-frame camera CB
-		// is updated inline via D3D12Buffer::Map/Unmap inside Flush().
+		// The per-frame camera CB is uploaded via RHIBuffer::Write inside Flush().
 
 		CANDY_CORE_INFO("Renderer2D: D3D12 backend initialized");
 		return;

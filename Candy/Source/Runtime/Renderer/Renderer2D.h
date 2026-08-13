@@ -59,9 +59,9 @@ namespace Candy {
 		static Statistics GetStats();
 
 		/// Sets the active render-target framebuffer for the next Flush() call.
-		/// Replaces the old backend-specific SetD3D12ActiveFramebuffer(); the
-		/// framebuffer is expected to also surface-compatible with RHIFramebuffer
-		/// (both OpenGLFramebuffer and D3D12Framebuffer do via multi-inheritance).
+		/// Framebuffer single-inherits RHIFramebuffer, so a Ref<Framebuffer>
+		/// upcasts here directly. The first Flush after (re-)binding clears the
+		/// target (LoadOp::Clear); subsequent same-frame passes accumulate (Load).
 		static void SetActiveRenderTarget(const Ref<RHIFramebuffer>& fb);
 
 	private:

@@ -28,10 +28,7 @@
 //-------------- Renderer ---------------
 #include "Runtime/Renderer/Renderer.h"
 #include "Runtime/Renderer/Renderer2D.h"
-#include "Runtime/Renderer/Buffer.h"
-#include "Runtime/Renderer/Shader.h"
 #include "Runtime/Renderer/Texture.h"
-#include "Runtime/Renderer/VertexArray.h"
 #include "Runtime/Renderer/Framebuffer.h"
 #include "Runtime/Renderer/OrthographicCamera.h"
 #include "Runtime/Renderer/OrthographicCameraController.h"
