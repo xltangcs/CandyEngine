@@ -494,6 +494,17 @@ float4 main(PSInput input) : SV_TARGET
 		return bytecode;
 	}
 
+	Ref<RHIShaderModule> D3D12Device::CreateShaderModuleFromSource(
+		const char* source, ShaderStage stage, const std::string& entryPoint, const std::string& debugName)
+	{
+		const char* target = (stage == ShaderStage::Vertex) ? "vs_5_0" : "ps_5_0";
+		auto blob = CompileHLSL(source, entryPoint.c_str(), target, debugName);
+		if (!blob)
+			return nullptr;
+		return CreateShaderModule(blob->GetBufferPointer(),
+		                          static_cast<uint32_t>(blob->GetBufferSize()), debugName);
+	}
+
 	const std::vector<uint8_t>& D3D12Device::GetTriangleVSBytecode()
 	{
 		if (m_TriangleVS.empty())

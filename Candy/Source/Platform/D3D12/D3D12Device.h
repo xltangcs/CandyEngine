@@ -29,6 +29,7 @@ namespace Candy {
 		Candy::Ref<RHISampler>  CreateSampler(const SamplerDesc& desc) override;
 
 		Candy::Ref<RHIShaderModule> CreateShaderModule(const void* bytecode, uint32_t byteSize, const std::string& debugName = "") override;
+		Candy::Ref<RHIShaderModule> CreateShaderModuleFromSource(const char* source, ShaderStage stage, const std::string& entryPoint, const std::string& debugName = "") override;
 
 		Candy::Ref<RHIGraphicsPipeline> CreateGraphicsPipeline(const GraphicsPipelineDesc& desc, const Candy::Ref<RHIShaderModule>& vs, const Candy::Ref<RHIShaderModule>& fs) override;
 

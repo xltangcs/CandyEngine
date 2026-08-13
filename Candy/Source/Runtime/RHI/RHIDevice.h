@@ -133,6 +133,12 @@ namespace Candy {
 
 		virtual Ref<RHIShaderModule> CreateShaderModule(const void* spirvBytecode, uint32_t byteSize, const std::string& debugName = "") = 0;
 
+		/// Compile/create a shader module from source text. `stage` + `entryPoint`
+		/// matter for per-stage compiled APIs (D3D12 HLSL: entryPoint selects
+		/// VSMain/PSMain within one file); OpenGL consumes the whole multi-stage
+		/// file at pipeline creation and ignores both.
+		virtual Ref<RHIShaderModule> CreateShaderModuleFromSource(const char* source, ShaderStage stage, const std::string& entryPoint, const std::string& debugName = "") = 0;
+
 		virtual Ref<RHIGraphicsPipeline> CreateGraphicsPipeline(const GraphicsPipelineDesc& desc, const Ref<RHIShaderModule>& vs, const Ref<RHIShaderModule>& fs) = 0;
 
 		virtual Ref<RHISwapChain> CreateSwapChain(const SwapChainDesc& desc) = 0;

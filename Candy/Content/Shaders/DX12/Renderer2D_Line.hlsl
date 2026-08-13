@@ -7,9 +7,9 @@ cbuffer TransformCB : register(b0)
 
 struct VSInput
 {
-	float3 Position : POSITION;
-	float4 Color    : COLOR;
-	int    EntityID : ENTITYID;
+	float3 Position : TEXCOORD0;
+	float4 Color    : TEXCOORD1;
+	int    EntityID : TEXCOORD2;
 };
 
 struct VSOutput

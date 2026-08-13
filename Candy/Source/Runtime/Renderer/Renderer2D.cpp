@@ -10,14 +10,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-// Backend includes — used ONLY by the per-backend Init branches (shader
-// source compilation differs per API: inline HLSL / inline SPIR-V / VFS GLSL).
-// Flush() itself is backend-agnostic and touches only RHI interfaces.
-#include "Platform/D3D12/D3D12Device.h"
-#include "Platform/D3D12/D3D12GraphicsContext.h"
+// Backend includes — needed only by the [FROZEN] Vulkan init branch.
+// The unified D3D12/OpenGL init and Flush() go through RHIContext + RHI interfaces.
 #include "Platform/Vulkan/VulkanDevice.h"
 #include "Platform/Vulkan/VulkanGraphicsContext.h"
-#include "Platform/OpenGL/OpenGLRHIDevice.h"
 
 
 namespace Candy {
@@ -251,288 +247,23 @@ namespace Candy {
 			return;
 		}
 
-		if (s_Data.D3D12Active)
-		{
-			CANDY_CORE_INFO("Renderer2D: initializing D3D12 backend...");
-
-			// Get D3D12Device
-			auto* gfxCtx = dynamic_cast<D3D12GraphicsContext*>(
-				Application::Get().GetWindow().GetGraphicsContext());
-			if (!gfxCtx)
-			{
-				CANDY_CORE_ERROR("Renderer2D: D3D12 API selected but no D3D12GraphicsContext");
-				s_Data.D3D12Active = false;
-				return;
-			}
-			auto* dev = gfxCtx->GetDevice();
-
-			// --- CPU-side vertex buffers (same as OpenGL path, needed for batching) ---
-			s_Data.QuadVertexBufferBase   = new QuadVertex[s_Data.MaxVertices];
-			s_Data.CircleVertexBufferBase = new CircleVertex[s_Data.MaxVertices];
-			s_Data.LineVertexBufferBase   = new LineVertex[s_Data.MaxVertices];
-
-		// --- GPU vertex buffers (upload heap, CPU-writable) ---
-		{
-			BufferDesc vbDesc;
-			vbDesc.Size          = s_Data.MaxVertices * sizeof(QuadVertex);
-			vbDesc.Usage         = ResourceUsage::VertexBuffer | ResourceUsage::CopyDst;
-			vbDesc.CPUAccessible = true;
-			vbDesc.Stride        = sizeof(QuadVertex);
-			vbDesc.DebugName     = "Renderer2D_QuadVB";
-			s_Data.QuadVB = dev->CreateBuffer(vbDesc);
-		}
-		{
-			BufferDesc vbDesc;
-			vbDesc.Size          = s_Data.MaxVertices * sizeof(CircleVertex);
-			vbDesc.Usage         = ResourceUsage::VertexBuffer | ResourceUsage::CopyDst;
-			vbDesc.CPUAccessible = true;
-			vbDesc.Stride        = sizeof(CircleVertex);
-			vbDesc.DebugName     = "Renderer2D_CircleVB";
-			s_Data.CircleVB = dev->CreateBuffer(vbDesc);
-		}
-		{
-			BufferDesc vbDesc;
-			vbDesc.Size          = s_Data.MaxVertices * sizeof(LineVertex);
-			vbDesc.Usage         = ResourceUsage::VertexBuffer | ResourceUsage::CopyDst;
-			vbDesc.CPUAccessible = true;
-			vbDesc.Stride        = sizeof(LineVertex);
-			vbDesc.DebugName     = "Renderer2D_LineVB";
-			s_Data.LineVB = dev->CreateBuffer(vbDesc);
-		}
-
-			// --- Index buffer (same pattern for quad + circle) ---
-			{
-				uint32_t* quadIndices = new uint32_t[s_Data.MaxIndices];
-				uint32_t offset = 0;
-				for (uint32_t i = 0; i < s_Data.MaxIndices; i += 6)
-				{
-					quadIndices[i + 0] = offset + 0;
-					quadIndices[i + 1] = offset + 1;
-					quadIndices[i + 2] = offset + 2;
-					quadIndices[i + 3] = offset + 2;
-					quadIndices[i + 4] = offset + 3;
-					quadIndices[i + 5] = offset + 0;
-					offset += 4;
-				}
-				s_Data.QuadIB = dev->CreateGPUBufferWithData(
-					quadIndices, s_Data.MaxIndices * sizeof(uint32_t),
-					ResourceUsage::IndexBuffer, "Renderer2D_QuadIB");
-				delete[] quadIndices;
-			}
-
-			// --- Camera constant buffer ---
-			{
-				BufferDesc cbDesc;
-				cbDesc.Size          = 256; // 256-byte aligned
-				cbDesc.Usage         = ResourceUsage::ConstantBuffer;
-				cbDesc.CPUAccessible = true;
-				cbDesc.DebugName     = "Renderer2D_CameraCB";
-				s_Data.CameraCB = dev->CreateBuffer(cbDesc);
-			}
-
-			// --- Compile HLSL shaders ---
-			Ref<RHIShaderModule> quadVS, quadPS, circleVS, circlePS, lineVS, linePS;
-			// Quad (textured)
-			{
-				static const char* quadVSSrc = R"(
-cbuffer TransformCB : register(b0) { float4x4 u_ViewProjection; };
-struct VSInput {
-	float3 Position : TEXCOORD0; float4 Color : TEXCOORD1; float2 TexCoord : TEXCOORD2;
-	float  TexIndex : TEXCOORD3; float TilingFactor : TEXCOORD4; int EntityID : TEXCOORD5;
-};
-struct VSOutput { float4 Position : SV_POSITION; float4 Color : COLOR; float2 TexCoord : TEXCOORD; float TexIndex : TEXINDEX; float TilingFactor : TILINGFACTOR; int EntityID : ENTITYID; };
-VSOutput VSMain(VSInput i) { VSOutput o; o.Position = mul(u_ViewProjection, float4(i.Position,1)); o.Color=i.Color; o.TexCoord=i.TexCoord; o.TexIndex=i.TexIndex; o.TilingFactor=i.TilingFactor; o.EntityID=i.EntityID; return o; }
-)";
-				auto blob = dev->CompileHLSL(quadVSSrc, "VSMain", "vs_5_0", "Renderer2D_QuadVS");
-				if (blob)
-					quadVS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "QuadVS");
-
-				static const char* quadPSSrc = R"(
-Texture2D u_Textures[32] : register(t0);
-SamplerState u_Sampler : register(s0);
-struct PSInput { float4 Position : SV_POSITION; float4 Color : COLOR; float2 TexCoord : TEXCOORD; float TexIndex : TEXINDEX; float TilingFactor : TILINGFACTOR; int EntityID : ENTITYID; };
-struct PSOutput { float4 Color : SV_TARGET0; int EntityID : SV_TARGET1; };
-PSOutput PSMain(PSInput i)
-{
-	float2 uv = i.TexCoord * i.TilingFactor;
-	int idx = max(0, min(31, int(i.TexIndex)));
-	float4 texColor = i.Color;
-	// SM5.0 forbids dynamic indexing into Texture2D[32]; unroll into 32
-	// literal-indexed Sample calls so the bindless-ish pattern is valid.
-	[unroll] for (int t = 0; t < 32; ++t)
+	// =====================================================
+	// Unified D3D12 / OpenGL init (Vulkan branch above is [FROZEN])
+	// =====================================================
 	{
-		[unroll] if (t == idx)
-			texColor = i.Color * u_Textures[t].Sample(u_Sampler, uv);
-	}
-	PSOutput o;
-	o.Color = texColor;
-	o.EntityID = i.EntityID;
-	return o;
-}
-)";
-				auto psBlob = dev->CompileHLSL(quadPSSrc, "PSMain", "ps_5_0", "Renderer2D_QuadPS");
-				if (psBlob)
-					quadPS = dev->CreateShaderModule(psBlob->GetBufferPointer(), static_cast<uint32_t>(psBlob->GetBufferSize()), "QuadPS");
-			}
-
-			// Circle
-			{
-				static const char* circleVSSrc = R"(
-cbuffer TransformCB : register(b0) { float4x4 u_ViewProjection; };
-struct VSInput {
-	float3 WorldPosition : TEXCOORD0; float3 LocalPosition : TEXCOORD1; float4 Color : TEXCOORD2;
-	float Thickness : TEXCOORD3; float Fade : TEXCOORD4; int EntityID : TEXCOORD5;
-};
-struct VSOutput {
-	float4 Position : SV_POSITION; float3 LocalPosition : LOCALPOS; float4 Color : COLOR;
-	float Thickness : THICKNESS; float Fade : FADE; int EntityID : ENTITYID;
-};
-VSOutput VSMain(VSInput i) { VSOutput o; o.Position=mul(u_ViewProjection,float4(i.WorldPosition,1)); o.LocalPosition=i.LocalPosition; o.Color=i.Color; o.Thickness=i.Thickness; o.Fade=i.Fade; o.EntityID=i.EntityID; return o; }
-)";
-				auto blob = dev->CompileHLSL(circleVSSrc, "VSMain", "vs_5_0", "Renderer2D_CircleVS");
-				if (blob)
-					circleVS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "CircleVS");
-			}
-			{
-				static const char* circlePSSrc = R"(
-struct PSInput { float4 Position:SV_POSITION; float3 LocalPosition:LOCALPOS; float4 Color:COLOR; float Thickness:THICKNESS; float Fade:FADE; int EntityID:ENTITYID; };
-struct PSOutput { float4 Color:SV_TARGET0; int EntityID:SV_TARGET1; };
-PSOutput PSMain(PSInput i) { float d=1.0-length(i.LocalPosition); float c=smoothstep(0,i.Fade,d); c*=smoothstep(i.Thickness+i.Fade,i.Thickness,d); if(c==0)discard; PSOutput o; o.Color=i.Color; o.Color.a*=c; o.EntityID=i.EntityID; return o; }
-)";
-				auto blob = dev->CompileHLSL(circlePSSrc, "PSMain", "ps_5_0", "Renderer2D_CirclePS");
-				if (blob)
-					circlePS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "CirclePS");
-			}
-
-			// Line
-			{
-				static const char* lineVSSrc = R"(
-cbuffer TransformCB : register(b0) { float4x4 u_ViewProjection; };
-struct VSInput { float3 Position:TEXCOORD0; float4 Color:TEXCOORD1; int EntityID:TEXCOORD2; };
-struct VSOutput { float4 Position:SV_POSITION; float4 Color:COLOR; int EntityID:ENTITYID; };
-VSOutput VSMain(VSInput i) { VSOutput o; o.Position=mul(u_ViewProjection,float4(i.Position,1)); o.Color=i.Color; o.EntityID=i.EntityID; return o; }
-)";
-				auto blob = dev->CompileHLSL(lineVSSrc, "VSMain", "vs_5_0", "Renderer2D_LineVS");
-				if (blob)
-					lineVS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "LineVS");
-			}
-			{
-				static const char* linePSSrc = R"(
-struct PSInput { float4 Position:SV_POSITION; float4 Color:COLOR; int EntityID:ENTITYID; };
-struct PSOutput { float4 Color:SV_TARGET0; int EntityID:SV_TARGET1; };
-PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID; return o; }
-)";
-				auto blob = dev->CompileHLSL(linePSSrc, "PSMain", "ps_5_0", "Renderer2D_LinePS");
-				if (blob)
-					linePS = dev->CreateShaderModule(blob->GetBufferPointer(), static_cast<uint32_t>(blob->GetBufferSize()), "LinePS");
-			}
-
-			// --- Create pipelines (all share the textured root signature created
-			// inside D3D12Device::CreateGraphicsPipeline) ---
-			{
-				GraphicsPipelineDesc pipeDesc;
-				pipeDesc.Topology           = PrimitiveTopology::Triangles;
-				pipeDesc.Rasterizer.Cull    = CullMode::None;
-				pipeDesc.Rasterizer.Fill    = FillMode::Solid;
-				pipeDesc.DepthStencil.DepthTestEnable  = false;
-				pipeDesc.DepthStencil.DepthWriteEnable = false;
-				pipeDesc.DepthStencilFormat = RHIFormat::D24UnormS8Uint; // viewport framebuffer has D24S8 depth
-				pipeDesc.Blend.BlendEnable         = true;
-				pipeDesc.Blend.SrcColorBlendFactor = BlendState::BlendFactor::SrcAlpha;
-				pipeDesc.Blend.DstColorBlendFactor = BlendState::BlendFactor::OneMinusSrcAlpha;
-				pipeDesc.Blend.WriteMask           = ColorWriteMask::All;
-				pipeDesc.RenderTargetFormats = { RHIFormat::R8G8B8A8Unorm, RHIFormat::R32Sint };
-
-				// Quad pipeline (textured)
-				{
-					GraphicsPipelineDesc qd = pipeDesc;
-					VertexInputLayout::VertexBinding binding;
-					binding.Binding = 0;
-					binding.Stride  = sizeof(QuadVertex);
-					qd.VertexInput.Bindings.push_back(binding);
-
-					qd.VertexInput.Attributes.push_back({ 0, 0, RHIFormat::R32G32B32Float,    0 });                       // Position
-					qd.VertexInput.Attributes.push_back({ 1, 0, RHIFormat::R32G32B32A32Float, offsetof(QuadVertex, Color) });         // Color
-					qd.VertexInput.Attributes.push_back({ 2, 0, RHIFormat::R32G32Float,       offsetof(QuadVertex, TexCoord) });      // TexCoord
-					qd.VertexInput.Attributes.push_back({ 3, 0, RHIFormat::R32Float,          offsetof(QuadVertex, TexIndex) });      // TexIndex
-					qd.VertexInput.Attributes.push_back({ 4, 0, RHIFormat::R32Float,          offsetof(QuadVertex, TilingFactor) });  // TilingFactor
-					qd.VertexInput.Attributes.push_back({ 5, 0, RHIFormat::R32Sint,           offsetof(QuadVertex, EntityID) });      // EntityID
-
-					s_Data.QuadPipeline = dev->CreateGraphicsPipeline(qd, quadVS, quadPS);
-				}
-
-				// Circle pipeline
-				{
-					GraphicsPipelineDesc cd = pipeDesc;
-					VertexInputLayout::VertexBinding binding;
-					binding.Binding = 0;
-					binding.Stride  = sizeof(CircleVertex);
-					cd.VertexInput.Bindings.push_back(binding);
-
-					cd.VertexInput.Attributes.push_back({ 0, 0, RHIFormat::R32G32B32Float,    0 });
-					cd.VertexInput.Attributes.push_back({ 1, 0, RHIFormat::R32G32B32Float,    offsetof(CircleVertex, LocalPosition) });
-					cd.VertexInput.Attributes.push_back({ 2, 0, RHIFormat::R32G32B32A32Float, offsetof(CircleVertex, Color) });
-					cd.VertexInput.Attributes.push_back({ 3, 0, RHIFormat::R32Float,          offsetof(CircleVertex, Thickness) });
-					cd.VertexInput.Attributes.push_back({ 4, 0, RHIFormat::R32Float,          offsetof(CircleVertex, Fade) });
-					cd.VertexInput.Attributes.push_back({ 5, 0, RHIFormat::R32Sint,           offsetof(CircleVertex, EntityID) });
-
-					s_Data.CirclePipeline = dev->CreateGraphicsPipeline(cd, circleVS, circlePS);
-				}
-
-				// Line pipeline
-				{
-					GraphicsPipelineDesc ld = pipeDesc;
-					ld.Topology = PrimitiveTopology::Lines;
-
-					VertexInputLayout::VertexBinding binding;
-					binding.Binding = 0;
-					binding.Stride  = sizeof(LineVertex);
-					ld.VertexInput.Bindings.push_back(binding);
-
-					ld.VertexInput.Attributes.push_back({ 0, 0, RHIFormat::R32G32B32Float,    0 });
-					ld.VertexInput.Attributes.push_back({ 1, 0, RHIFormat::R32G32B32A32Float, offsetof(LineVertex, Color) });
-					ld.VertexInput.Attributes.push_back({ 2, 0, RHIFormat::R32Sint,           offsetof(LineVertex, EntityID) });
-
-					s_Data.LinePipeline = dev->CreateGraphicsPipeline(ld, lineVS, linePS);
-				}
-			}
-
-			// --- White texture (1x1 white pixel) ---
-			s_Data.WhiteTexture = Texture2D::Create(1, 1);
-			uint32_t whiteTextureData = 0xffffffff;
-			s_Data.WhiteTexture->SetData(&whiteTextureData, sizeof(uint32_t));
-			s_Data.TextureSlots[0] = s_Data.WhiteTexture;
-
-			s_Data.QuadVertexPositions[0] = { -0.5f, -0.5f, 0.0f, 1.0f };
-			s_Data.QuadVertexPositions[1] = {  0.5f, -0.5f, 0.0f, 1.0f };
-			s_Data.QuadVertexPositions[2] = {  0.5f,  0.5f, 0.0f, 1.0f };
-			s_Data.QuadVertexPositions[3] = { -0.5f,  0.5f, 0.0f, 1.0f };
-
-		// The per-frame camera CB is uploaded via RHIBuffer::Write inside Flush().
-
-		CANDY_CORE_INFO("Renderer2D: D3D12 backend initialized");
-		return;
-	}
-
-		// =====================================================
-		// OpenGL path �?new RHI adapter (OpenGLRHIDevice/RHICommandBuffer)
-		// =====================================================
-		CANDY_CORE_INFO("Renderer2D: initializing OpenGL RHI backend...");
-
-		auto* olDev = static_cast<OpenGLRHIDevice*>(RHIContext::GetDevice());
-		if (!olDev)
+		auto* dev = RHIContext::GetDevice();
+		if (!dev)
 		{
-			CANDY_CORE_ERROR("Renderer2D: OpenGL API selected but no OpenGLRHIDevice published");
-			s_Data.OL_Active = false;
+			CANDY_CORE_ERROR("Renderer2D: no RHI device published");
 			return;
 		}
 
-		// CPU-side vertex buffers (batched CPU writes each frame)
+		// --- CPU-side vertex buffers (batched CPU writes each frame) ---
 		s_Data.QuadVertexBufferBase   = new QuadVertex[s_Data.MaxVertices];
 		s_Data.CircleVertexBufferBase = new CircleVertex[s_Data.MaxVertices];
 		s_Data.LineVertexBufferBase   = new LineVertex[s_Data.MaxVertices];
 
-		// GPU upload-heap vertex buffers (CPU-writable via Map/Unmap)
+		// --- GPU upload-heap vertex buffers ---
 		auto makeUploadVB = [&](uint64_t size, uint32_t stride, const char* name) -> Ref<RHIBuffer> {
 			BufferDesc d;
 			d.Size          = size;
@@ -540,69 +271,79 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			d.CPUAccessible = true;
 			d.Stride        = stride;
 			d.DebugName     = name;
-			return olDev->CreateBuffer(d);
+			return dev->CreateBuffer(d);
 		};
-		s_Data.QuadVB   = makeUploadVB(s_Data.MaxVertices * sizeof(QuadVertex),   sizeof(QuadVertex),   "OL_QuadVB");
-		s_Data.CircleVB = makeUploadVB(s_Data.MaxVertices * sizeof(CircleVertex), sizeof(CircleVertex), "OL_CircleVB");
-		s_Data.LineVB   = makeUploadVB(s_Data.MaxVertices * sizeof(LineVertex),   sizeof(LineVertex),   "OL_LineVB");
+		s_Data.QuadVB   = makeUploadVB(s_Data.MaxVertices * sizeof(QuadVertex),   sizeof(QuadVertex),   "Renderer2D_QuadVB");
+		s_Data.CircleVB = makeUploadVB(s_Data.MaxVertices * sizeof(CircleVertex), sizeof(CircleVertex), "Renderer2D_CircleVB");
+		s_Data.LineVB   = makeUploadVB(s_Data.MaxVertices * sizeof(LineVertex),   sizeof(LineVertex),   "Renderer2D_LineVB");
 
-		// Index buffer (quad/circle share)
+		// --- Index buffer (quad/circle share) ---
 		{
 			uint32_t* quadIndices = new uint32_t[s_Data.MaxIndices];
-			uint32_t off = 0;
+			uint32_t offset = 0;
 			for (uint32_t i = 0; i < s_Data.MaxIndices; i += 6)
 			{
-				quadIndices[i + 0] = off + 0;
-				quadIndices[i + 1] = off + 1;
-				quadIndices[i + 2] = off + 2;
-				quadIndices[i + 3] = off + 2;
-				quadIndices[i + 4] = off + 3;
-				quadIndices[i + 5] = off + 0;
-				off += 4;
+				quadIndices[i + 0] = offset + 0;
+				quadIndices[i + 1] = offset + 1;
+				quadIndices[i + 2] = offset + 2;
+				quadIndices[i + 3] = offset + 2;
+				quadIndices[i + 4] = offset + 3;
+				quadIndices[i + 5] = offset + 0;
+				offset += 4;
 			}
 			BufferDesc ib;
 			ib.Size          = s_Data.MaxIndices * sizeof(uint32_t);
 			ib.Usage         = ResourceUsage::IndexBuffer;
 			ib.CPUAccessible = true;
-			ib.DebugName     = "OL_QuadIB";
-			s_Data.QuadIB = olDev->CreateBuffer(ib);
+			ib.DebugName     = "Renderer2D_QuadIB";
+			s_Data.QuadIB = dev->CreateBuffer(ib);
 			s_Data.QuadIB->Write(quadIndices, static_cast<size_t>(ib.Size));
 			delete[] quadIndices;
 		}
 
-		// Camera CB (UBO binding 0)
+		// --- Camera constant buffer ---
 		{
 			BufferDesc cb;
-			cb.Size          = sizeof(Renderer2DData::CameraData);
+			cb.Size          = 256; // 256-byte aligned (D3D12 CBV requirement)
 			cb.Usage         = ResourceUsage::ConstantBuffer;
 			cb.CPUAccessible = true;
-			cb.DebugName     = "OL_CameraCB";
-			s_Data.CameraCB = olDev->CreateBuffer(cb);
+			cb.DebugName     = "Renderer2D_CameraCB";
+			s_Data.CameraCB = dev->CreateBuffer(cb);
 		}
 
-		// Shaders �?load GLSL source via VFS, store as RHI source modules.
-		auto loadShaderModule = [](const char* name, const char* vfsPath) -> Ref<RHIShaderModule> {
-			auto src = FileSystem::Get().ReadText(vfsPath);
+		// --- Shader modules: per-API source directory; one multi-stage file per primitive ---
+		const char* shaderDir = s_Data.D3D12Active ? "DX12" : "OpenGL";
+		const char* shaderExt = s_Data.D3D12Active ? "hlsl" : "glsl";
+		auto loadModule = [&](const char* file, ShaderStage stage, const char* entry) -> Ref<RHIShaderModule> {
+			std::string path = std::string("VFS://Engine/Shaders/") + shaderDir + "/" + file + "." + shaderExt;
+			auto src = FileSystem::Get().ReadText(path);
 			if (!src)
 			{
-				CANDY_CORE_ERROR("Renderer2D (OpenGL): failed to load shader '{}'", vfsPath);
+				CANDY_CORE_ERROR("Renderer2D: failed to load shader '{}'", path);
 				return nullptr;
 			}
-			auto* dev = static_cast<OpenGLRHIDevice*>(RHIContext::GetDevice());
-			return dev->CreateShaderModule(src->data(), static_cast<uint32_t>(src->size()), name);
+			return dev->CreateShaderModuleFromSource(src->c_str(), stage, entry, file);
 		};
-		Ref<RHIShaderModule> quadShader   = loadShaderModule("Renderer2D_Quad",   "VFS://Engine/Shaders/Renderer2D_Quad.glsl");
-		Ref<RHIShaderModule> circleShader = loadShaderModule("Renderer2D_Circle", "VFS://Engine/Shaders/Renderer2D_Circle.glsl");
-		Ref<RHIShaderModule> lineShader   = loadShaderModule("Renderer2D_Line",   "VFS://Engine/Shaders/Renderer2D_Line.glsl");
+		// OpenGL ignores stage/entry and returns a whole-file module; the same
+		// module is passed as both vs and fs and split at pipeline creation.
+		Ref<RHIShaderModule> quadVS   = loadModule("Renderer2D_Quad",   ShaderStage::Vertex,   "VSMain");
+		Ref<RHIShaderModule> quadPS   = loadModule("Renderer2D_Quad",   ShaderStage::Fragment, "PSMain");
+		Ref<RHIShaderModule> circleVS = loadModule("Renderer2D_Circle", ShaderStage::Vertex,   "VSMain");
+		Ref<RHIShaderModule> circlePS = loadModule("Renderer2D_Circle", ShaderStage::Fragment, "PSMain");
+		Ref<RHIShaderModule> lineVS   = loadModule("Renderer2D_Line",   ShaderStage::Vertex,   "VSMain");
+		Ref<RHIShaderModule> linePS   = loadModule("Renderer2D_Line",   ShaderStage::Fragment, "PSMain");
 
-		// Pipelines (mirrors D3D12 desc but routes through OpenGLRHIGraphicsPipeline)
+		// --- Pipelines ---
 		GraphicsPipelineDesc base;
 		base.Topology                  = PrimitiveTopology::Triangles;
 		base.Rasterizer.Cull           = CullMode::None;
 		base.Rasterizer.Fill           = FillMode::Solid;
 		base.DepthStencil.DepthTestEnable  = false;
 		base.DepthStencil.DepthWriteEnable = false;
+		base.DepthStencilFormat        = RHIFormat::D24UnormS8Uint; // viewport framebuffer has D24S8 depth
 		base.Blend.BlendEnable         = true;
+		base.Blend.SrcColorBlendFactor = BlendState::BlendFactor::SrcAlpha;
+		base.Blend.DstColorBlendFactor = BlendState::BlendFactor::OneMinusSrcAlpha;
 		base.Blend.WriteMask           = ColorWriteMask::All;
 		base.RenderTargetFormats       = { RHIFormat::R8G8B8A8Unorm, RHIFormat::R32Sint };
 
@@ -617,7 +358,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			pd.VertexInput.Attributes.push_back({ 3, 0, RHIFormat::R32Float,          offsetof(QuadVertex, TexIndex) });
 			pd.VertexInput.Attributes.push_back({ 4, 0, RHIFormat::R32Float,          offsetof(QuadVertex, TilingFactor) });
 			pd.VertexInput.Attributes.push_back({ 5, 0, RHIFormat::R32Sint,           offsetof(QuadVertex, EntityID) });
-			s_Data.QuadPipeline = olDev->CreateGraphicsPipeline(pd, quadShader, quadShader);
+			s_Data.QuadPipeline = dev->CreateGraphicsPipeline(pd, quadVS, quadPS);
 		}
 		// Circle
 		{
@@ -630,7 +371,7 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			pd.VertexInput.Attributes.push_back({ 3, 0, RHIFormat::R32Float,         offsetof(CircleVertex, Thickness) });
 			pd.VertexInput.Attributes.push_back({ 4, 0, RHIFormat::R32Float,         offsetof(CircleVertex, Fade) });
 			pd.VertexInput.Attributes.push_back({ 5, 0, RHIFormat::R32Sint,           offsetof(CircleVertex, EntityID) });
-			s_Data.CirclePipeline = olDev->CreateGraphicsPipeline(pd, circleShader, circleShader);
+			s_Data.CirclePipeline = dev->CreateGraphicsPipeline(pd, circleVS, circlePS);
 		}
 		// Line
 		{
@@ -641,11 +382,10 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 			pd.VertexInput.Attributes.push_back({ 0, 0, RHIFormat::R32G32B32Float,    0 });
 			pd.VertexInput.Attributes.push_back({ 1, 0, RHIFormat::R32G32B32A32Float, offsetof(LineVertex, Color) });
 			pd.VertexInput.Attributes.push_back({ 2, 0, RHIFormat::R32Sint,           offsetof(LineVertex, EntityID) });
-			s_Data.LinePipeline = olDev->CreateGraphicsPipeline(pd, lineShader, lineShader);
+			s_Data.LinePipeline = dev->CreateGraphicsPipeline(pd, lineVS, linePS);
 		}
 
-		// White texture (1x1 RGBA8) �?use the legacy Texture2D factory which
-		// returns an OpenGLTexture2D that double-inherits RHITexture.
+		// --- White texture + quad corner positions ---
 		s_Data.WhiteTexture = Texture2D::Create(1, 1);
 		uint32_t whiteTextureData = 0xffffffff;
 		s_Data.WhiteTexture->SetData(&whiteTextureData, sizeof(uint32_t));
@@ -656,7 +396,8 @@ PSOutput PSMain(PSInput i) { PSOutput o; o.Color=i.Color; o.EntityID=i.EntityID;
 		s_Data.QuadVertexPositions[2] = {  0.5f,  0.5f, 0.0f, 1.0f };
 		s_Data.QuadVertexPositions[3] = { -0.5f,  0.5f, 0.0f, 1.0f };
 
-		CANDY_CORE_INFO("Renderer2D: OpenGL RHI backend initialized");
+		CANDY_CORE_INFO("Renderer2D: {} backend initialized", RendererAPI::StringFromAPI(Renderer::GetAPI()));
+	}
 	}
 
 	void Renderer2D::Shutdown()

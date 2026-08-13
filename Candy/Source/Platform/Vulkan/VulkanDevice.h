@@ -40,6 +40,8 @@ namespace Candy {
 		Candy::Ref<RHITexture>  CreateTexture(const TextureDesc& desc) override;
 		Candy::Ref<RHISampler>  CreateSampler(const SamplerDesc& desc) override;
 		Candy::Ref<RHIShaderModule> CreateShaderModule(const void* spirvBytecode, uint32_t byteSize, const std::string& debugName = "") override;
+		// [FROZEN] source-level shader compilation is not wired on this backend.
+		Candy::Ref<RHIShaderModule> CreateShaderModuleFromSource(const char*, ShaderStage, const std::string&, const std::string& = "") override { return nullptr; }
 		Candy::Ref<RHIGraphicsPipeline> CreateGraphicsPipeline(const GraphicsPipelineDesc& desc, const Candy::Ref<RHIShaderModule>& vs, const Candy::Ref<RHIShaderModule>& fs) override;
 		Candy::Ref<RHISwapChain> CreateSwapChain(const SwapChainDesc& desc) override;
 

@@ -26,6 +26,14 @@ namespace Candy {
 		Ref<RHIShaderModule> CreateShaderModule(const void* sourceBytes, uint32_t byteSize,
 		                                         const std::string& debugName) override;
 
+		// GLSL modules carry the whole multi-stage file; `stage`/`entryPoint`
+		// are ignored (CreateGraphicsPipeline parses #type markers itself).
+		Ref<RHIShaderModule> CreateShaderModuleFromSource(const char* source, ShaderStage stage, const std::string& entryPoint, const std::string& debugName = "") override
+		{
+			(void)stage; (void)entryPoint;
+			return CreateShaderModule(source, static_cast<uint32_t>(strlen(source)), debugName);
+		}
+
 		Ref<RHIGraphicsPipeline> CreateGraphicsPipeline(const GraphicsPipelineDesc& desc,
 		                                                 const Ref<RHIShaderModule>& vs,
 		                                                 const Ref<RHIShaderModule>& fs) override;

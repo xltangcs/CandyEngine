@@ -7,12 +7,12 @@ cbuffer TransformCB : register(b0)
 
 struct VSInput
 {
-	float3 WorldPosition  : POSITION;
-	float3 LocalPosition  : TEXCOORD0;
-	float4 Color          : COLOR;
-	float  Thickness      : TEXCOORD1;
-	float  Fade           : TEXCOORD2;
-	int    EntityID       : ENTITYID;
+	float3 WorldPosition  : TEXCOORD0;
+	float3 LocalPosition  : TEXCOORD1;
+	float4 Color          : TEXCOORD2;
+	float  Thickness      : TEXCOORD3;
+	float  Fade           : TEXCOORD4;
+	int    EntityID       : TEXCOORD5;
 };
 
 struct VSOutput
