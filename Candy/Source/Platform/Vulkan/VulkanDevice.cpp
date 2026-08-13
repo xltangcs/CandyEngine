@@ -343,14 +343,20 @@ namespace Candy {
 	{
 		if (!spirv || size == 0) return nullptr;
 
-		VkShaderModuleCreateInfo ci = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
-		ci.codeSize = size;
-		ci.pCode    = static_cast<const uint32_t*>(spirv);
+		// [FROZEN] Dedup via the IR shader library (bytecode content hash).
+		const uint64_t key = IR::IRShaderLibrary::MakeKey(
+			IR::IRShaderLibrary::HashBytes(spirv, size), ShaderStage::None, "");
 
-		VkShaderModule sm;
-		if (fnCreateShaderModule(m_Device, &ci, nullptr, &sm) != VK_SUCCESS) return nullptr;
+		return GetShaderLibrary().GetOrCreate(key, ShaderStage::None, "", [&]() -> Ref<RHIShaderModule> {
+			VkShaderModuleCreateInfo ci = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+			ci.codeSize = size;
+			ci.pCode    = static_cast<const uint32_t*>(spirv);
 
-		return CreateRef<VkShaderHolder>(m_Device, sm, ShaderStage::None, std::string(), fnDestroyShaderModule);
+			VkShaderModule sm;
+			if (fnCreateShaderModule(m_Device, &ci, nullptr, &sm) != VK_SUCCESS) return nullptr;
+
+			return CreateRef<VkShaderHolder>(m_Device, sm, ShaderStage::None, std::string(), fnDestroyShaderModule);
+		});
 	}
 
 	Ref<RHIGraphicsPipeline> VulkanDevice::CreateGraphicsPipeline(

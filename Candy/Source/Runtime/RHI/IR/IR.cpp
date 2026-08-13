@@ -480,85 +480,55 @@ uint64_t IRMemoryAllocator::GetBlockCount(MemoryType type) const
 
 IRShaderLibrary::~IRShaderLibrary() = default;
 
-Candy::RHIHandle IRShaderLibrary::LoadShader(Candy::RHIDevice& device,
-                                             std::span<const uint32_t> spirvBytecode,
-                                             Candy::ShaderStage stage,
-                                             std::string_view debugName)
+Candy::Ref<Candy::RHIShaderModule> IRShaderLibrary::GetOrCreate(
+	uint64_t contentHash,
+	Candy::ShaderStage stage,
+	std::string_view debugName,
+	const std::function<Candy::Ref<Candy::RHIShaderModule>()>& factory)
 {
-	uint64_t hash = HashBytecode(spirvBytecode);
+	auto it = m_Cache.find(contentHash);
+	if (it != m_Cache.end())
+		return it->second.Module;
 
-	// Dedup: identical bytecode → reuse existing handle.
-	auto hashIt = m_HashToHandle.find(hash);
-	if (hashIt != m_HashToHandle.end())
-		return hashIt->second;
+	auto module = factory();
+	if (!module)
+		return nullptr;
 
-	auto module = device.CreateShaderModule(
-		spirvBytecode.data(),
-		static_cast<uint32_t>(spirvBytecode.size_bytes()),
-		std::string(debugName));
-
-	Candy::RHIHandle handle{ m_NextHandle++ };
-	ShaderEntry entry;
-	entry.Module     = std::move(module);
-	entry.Stage      = stage;
-	entry.DebugName  = std::string(debugName);
-	entry.Hash       = hash;
-	m_Shaders[handle]   = std::move(entry);
-	m_HashToHandle[hash] = handle;
-	return handle;
+	Entry entry;
+	entry.Module    = module;
+	entry.Stage     = stage;
+	entry.DebugName = std::string(debugName);
+	m_Cache.emplace(contentHash, std::move(entry));
+	return module;
 }
 
-Candy::RHIHandle IRShaderLibrary::LoadShader(Candy::RHIDevice& device,
-                                             std::span<const std::byte> spirvRaw,
-                                             Candy::ShaderStage stage,
-                                             std::string_view debugName)
+uint64_t IRShaderLibrary::HashBytes(const void* data, size_t size)
 {
-	// Reinterpret raw bytes as uint32_t span (SPIR-V is always 4-byte aligned).
-	auto words = std::span<const uint32_t>(
-		reinterpret_cast<const uint32_t*>(spirvRaw.data()),
-		spirvRaw.size_bytes() / sizeof(uint32_t));
-	return LoadShader(device, words, stage, debugName);
-}
-
-Candy::Ref<Candy::RHIShaderModule> IRShaderLibrary::GetShader(Candy::RHIHandle handle) const
-{
-	auto it = m_Shaders.find(handle);
-	return it != m_Shaders.end() ? it->second.Module : nullptr;
-}
-
-Candy::ShaderStage IRShaderLibrary::GetStage(Candy::RHIHandle handle) const
-{
-	auto it = m_Shaders.find(handle);
-	return it != m_Shaders.end() ? it->second.Stage : Candy::ShaderStage::None;
-}
-
-void IRShaderLibrary::ReleaseShader(Candy::RHIHandle handle)
-{
-	auto it = m_Shaders.find(handle);
-	if (it == m_Shaders.end()) return;
-	m_HashToHandle.erase(it->second.Hash);
-	m_Shaders.erase(it);
-}
-
-void IRShaderLibrary::Clear()
-{
-	m_Shaders.clear();
-	m_HashToHandle.clear();
-	m_NextHandle = 1;
-}
-
-uint64_t IRShaderLibrary::HashBytecode(std::span<const uint32_t> spirv)
-{
-	// FNV-1a over the raw bytes of the SPIR-V.
+	// FNV-1a over the raw bytes.
 	uint64_t hash = 14695981039346656037ULL;
-	const auto* bytes = reinterpret_cast<const uint8_t*>(spirv.data());
-	size_t byteCount = spirv.size_bytes();
-	for (size_t i = 0; i < byteCount; ++i)
+	const auto* bytes = static_cast<const uint8_t*>(data);
+	for (size_t i = 0; i < size; ++i)
 	{
 		hash ^= bytes[i];
 		hash *= 1099511628211ULL;
 	}
 	return hash;
+}
+
+uint64_t IRShaderLibrary::MakeKey(uint64_t contentHash, Candy::ShaderStage stage, std::string_view entryPoint)
+{
+	// Fold stage and entry point into the content hash so identical source
+	// compiled as different stages/entries maps to distinct cache entries.
+	uint64_t key = contentHash;
+	key ^= static_cast<uint64_t>(stage) + 0x9e3779b97f4a7c15ULL + (key << 6) + (key >> 2);
+	uint64_t entryHash = entryPoint.empty() ? 0 : HashBytes(entryPoint.data(), entryPoint.size());
+	key ^= entryHash + 0x9e3779b97f4a7c15ULL + (key << 6) + (key >> 2);
+	return key;
+}
+
+void IRShaderLibrary::Clear()
+{
+	m_Cache.clear();
 }
 
 } // namespace Candy::IR

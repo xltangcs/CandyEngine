@@ -4,77 +4,58 @@
 #include "Runtime/RHI/RHIShader.h"
 #include "Runtime/Core/Base.h"
 
-#include <unordered_map>
+#include <functional>
 #include <string>
-#include <span>
-#include <cstddef>
-
-namespace Candy {
-	class RHIDevice;
-} // namespace Candy
+#include <unordered_map>
 
 namespace Candy::IR {
 
 	// =========================================================================
-	// IRShaderLibrary — manages compiled SPIR-V shader modules
+	// IRShaderLibrary — content-hash dedup cache for shader modules
 	//
-	// Provides:
-	//  - Deduplication: identical bytecode → same shader module handle
-	//  - Caching: avoid redundant driver calls for CreateShaderModule()
-	//  - Future: SPIR-V → HLSL / MSL cross-compilation (via SPIRV-Cross)
+	// Backend-agnostic by design: modules may originate from HLSL source
+	// (D3D12), GLSL source (OpenGL), or SPIR-V bytecode (Vulkan) — this library
+	// never inspects the payload. Callers supply a content key (hash of
+	// source/bytecode + stage + entry point) and a factory invoked only on
+	// cache miss, so the same shader is never compiled/created twice.
+	//
+	// NOTE: CandyEngine intentionally does NOT use SPIR-V as a cross-backend
+	// shader IR (per-API source files are the strategy; Slang is the future
+	// migration candidate). See AGENTS.md.
 	// =========================================================================
 	class IRShaderLibrary
 	{
 	public:
-		struct ShaderEntry
-		{
-			Candy::Ref<Candy::RHIShaderModule> Module;
-			Candy::ShaderStage                 Stage     = Candy::ShaderStage::None;
-			std::string                        DebugName;
-			uint64_t                           Hash      = 0;
-		};
-
 		IRShaderLibrary() = default;
 		~IRShaderLibrary();
 
-		// ---- Load from SPIR-V ----------------------------------------------
+		/// Returns the cached module for `contentHash`, or invokes `factory`
+		/// once to create, cache, and return it.
+		Candy::Ref<Candy::RHIShaderModule> GetOrCreate(
+			uint64_t                                contentHash,
+			Candy::ShaderStage                      stage,
+			std::string_view                        debugName,
+			const std::function<Candy::Ref<Candy::RHIShaderModule>()>& factory);
 
-		/// Creates (or retrieves a cached) shader module from SPIR-V bytecode.
-		/// 'device' is used to create the underlying RHIShaderModule.
-		[[nodiscard]] Candy::RHIHandle LoadShader(
-			Candy::RHIDevice&              device,
-			std::span<const uint32_t>      spirvBytecode,
-			Candy::ShaderStage             stage,
-			std::string_view               debugName = "");
+		/// FNV-1a over raw bytes — the content part of the cache key.
+		static uint64_t HashBytes(const void* data, size_t size);
 
-		/// Loads SPIR-V from raw 8-bit bytes (e.g. from file).
-		[[nodiscard]] Candy::RHIHandle LoadShader(
-			Candy::RHIDevice&              device,
-			std::span<const std::byte>     spirvRaw,
-			Candy::ShaderStage             stage,
-			std::string_view               debugName = "");
-
-		// ---- Lookup --------------------------------------------------------
-
-		[[nodiscard]] Candy::Ref<Candy::RHIShaderModule> GetShader(Candy::RHIHandle handle) const;
-		[[nodiscard]] Candy::ShaderStage                 GetStage(Candy::RHIHandle handle) const;
-
-		void ReleaseShader(Candy::RHIHandle handle);
-
-		// ---- Cache ---------------------------------------------------------
+		/// Combine content hash with stage/entry so the same file compiled as
+		/// different stages/entries yields distinct cache entries.
+		static uint64_t MakeKey(uint64_t contentHash, Candy::ShaderStage stage, std::string_view entryPoint);
 
 		void Clear();
-		[[nodiscard]] size_t GetShaderCount() const { return m_Shaders.size(); }
-
-		// ---- Utilities -----------------------------------------------------
-
-		/// Computes a content hash from SPIR-V bytecode.
-		static uint64_t HashBytecode(std::span<const uint32_t> spirv);
+		[[nodiscard]] size_t GetShaderCount() const { return m_Cache.size(); }
 
 	private:
-		std::unordered_map<Candy::RHIHandle, ShaderEntry> m_Shaders;
-		std::unordered_map<uint64_t, Candy::RHIHandle>     m_HashToHandle; ///< dedup lookup
-		uint32_t m_NextHandle = 1;
+		struct Entry
+		{
+			Candy::Ref<Candy::RHIShaderModule> Module;
+			Candy::ShaderStage                 Stage = Candy::ShaderStage::None;
+			std::string                        DebugName;
+		};
+
+		std::unordered_map<uint64_t, Entry> m_Cache; ///< key = MakeKey(content, stage, entry)
 	};
 
 } // namespace Candy::IR

@@ -498,12 +498,19 @@ float4 main(PSInput input) : SV_TARGET
 	Ref<RHIShaderModule> D3D12Device::CreateShaderModuleFromSource(
 		const char* source, ShaderStage stage, const std::string& entryPoint, const std::string& debugName)
 	{
-		const char* target = (stage == ShaderStage::Vertex) ? "vs_5_0" : "ps_5_0";
-		auto blob = CompileHLSL(source, entryPoint.c_str(), target, debugName);
-		if (!blob)
-			return nullptr;
-		return CreateShaderModule(blob->GetBufferPointer(),
-		                          static_cast<uint32_t>(blob->GetBufferSize()), debugName);
+		// Dedup via the IR shader library: identical (source, stage, entry) never
+		// compiles twice. The factory runs only on cache miss.
+		const uint64_t key = IR::IRShaderLibrary::MakeKey(
+			IR::IRShaderLibrary::HashBytes(source, strlen(source)), stage, entryPoint);
+
+		return GetShaderLibrary().GetOrCreate(key, stage, debugName, [&]() -> Ref<RHIShaderModule> {
+			const char* target = (stage == ShaderStage::Vertex) ? "vs_5_0" : "ps_5_0";
+			auto blob = CompileHLSL(source, entryPoint.c_str(), target, debugName);
+			if (!blob)
+				return nullptr;
+			return CreateShaderModule(blob->GetBufferPointer(),
+			                          static_cast<uint32_t>(blob->GetBufferSize()), debugName);
+		});
 	}
 
 	const std::vector<uint8_t>& D3D12Device::GetTriangleVSBytecode()

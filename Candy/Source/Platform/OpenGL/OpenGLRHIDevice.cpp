@@ -56,8 +56,15 @@ namespace Candy {
 			CANDY_CORE_ERROR("OpenGLRHIDevice::CreateShaderModule: null source for '{}'", debugName);
 			return nullptr;
 		}
-		std::string source(static_cast<const char*>(sourceBytes), byteSize);
-		return CreateRef<OpenGLRHIShaderModule>(ShaderStage::None, std::move(source), debugName);
+
+		// Dedup via the IR shader library: identical source never creates two modules.
+		const uint64_t key = IR::IRShaderLibrary::MakeKey(
+			IR::IRShaderLibrary::HashBytes(sourceBytes, byteSize), ShaderStage::None, debugName);
+
+		return GetShaderLibrary().GetOrCreate(key, ShaderStage::None, debugName, [&]() -> Ref<RHIShaderModule> {
+			std::string source(static_cast<const char*>(sourceBytes), byteSize);
+			return CreateRef<OpenGLRHIShaderModule>(ShaderStage::None, std::move(source), debugName);
+		});
 	}
 
 	Ref<RHIGraphicsPipeline> OpenGLRHIDevice::CreateGraphicsPipeline(
