@@ -695,12 +695,18 @@ float4 main(PSInput input) : SV_TARGET
 
 	Ref<RHIBuffer> D3D12Device::CreateBuffer(const BufferDesc& desc)
 	{
-		return CreateRef<D3D12Buffer>(m_NativeDevice.Get(), desc);
+		auto buf = CreateRef<D3D12Buffer>(m_NativeDevice.Get(), desc);
+		buf->SetIRTracking(&GetResourceManager(),
+			GetResourceManager().Register(IR::ResourceType::Buffer, buf.get(), desc.DebugName));
+		return buf;
 	}
 
 	Ref<RHITexture> D3D12Device::CreateTexture(const TextureDesc& desc)
 	{
-		return CreateRef<D3D12Texture>(this, desc);
+		auto tex = CreateRef<D3D12Texture>(this, desc);
+		tex->SetIRTracking(&GetResourceManager(),
+			GetResourceManager().Register(IR::ResourceType::Texture, tex.get(), desc.DebugName));
+		return tex;
 	}
 
 	Ref<RHISampler> D3D12Device::CreateSampler(const SamplerDesc& desc)
@@ -944,6 +950,8 @@ float4 main(PSInput input) : SV_TARGET
 		pipeline->SetNativePipeline(std::move(pso), std::move(rootSig));
 
 		GetPipelineCache().Insert(desc, pipeline);
+		pipeline->SetIRTracking(&GetResourceManager(),
+			GetResourceManager().Register(IR::ResourceType::GraphicsPipeline, pipeline.get(), "GraphicsPipeline"));
 
 		CANDY_CORE_INFO("D3D12Device::CreateGraphicsPipeline: pipeline created ({} attributes, {} RT format(s))",
 		                desc.VertexInput.Attributes.size(), desc.RenderTargetFormats.size());
@@ -1085,7 +1093,10 @@ float4 main(PSInput input) : SV_TARGET
 
 	Ref<RHIFramebuffer> D3D12Device::CreateFramebuffer(const FramebufferDesc& desc)
 	{
-		return CreateRef<D3D12Framebuffer>(desc, this);
+		auto fb = CreateRef<D3D12Framebuffer>(desc, this);
+		fb->SetIRTracking(&GetResourceManager(),
+			GetResourceManager().Register(IR::ResourceType::Framebuffer, fb.get(), "Framebuffer"));
+		return fb;
 	}
 
 	// ---- Command submission -------------------------------------------------

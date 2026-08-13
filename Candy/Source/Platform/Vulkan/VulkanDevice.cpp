@@ -311,7 +311,10 @@ namespace Candy {
 
 	Ref<RHIBuffer> VulkanDevice::CreateBuffer(const BufferDesc& desc)
 	{
-		return CreateRef<VulkanBuffer>(this, desc);
+		auto buf = CreateRef<VulkanBuffer>(this, desc);
+		buf->SetIRTracking(&GetResourceManager(),
+			GetResourceManager().Register(IR::ResourceType::Buffer, buf.get(), desc.DebugName));
+		return buf;
 	}
 
 	Ref<RHITexture> VulkanDevice::CreateTexture(const TextureDesc&)
@@ -489,7 +492,10 @@ namespace Candy {
 	Ref<RHIFramebuffer> VulkanDevice::CreateFramebuffer(const FramebufferDesc& desc)
 	{
 		// [FROZEN] minimal implementation ¡ª kept compiling only.
-		return CreateRef<VulkanFramebuffer>(desc, this);
+		auto fb = CreateRef<VulkanFramebuffer>(desc, this);
+		fb->SetIRTracking(&GetResourceManager(),
+			GetResourceManager().Register(IR::ResourceType::Framebuffer, fb.get(), "Framebuffer"));
+		return fb;
 	}
 
 	RHICommandQueue& VulkanDevice::GetCommandQueue() { return *m_CommandQueue; }

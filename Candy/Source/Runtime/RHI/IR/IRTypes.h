@@ -20,6 +20,7 @@ namespace Candy::IR {
 		Sampler,
 		ShaderModule,
 		GraphicsPipeline,
+		Framebuffer,
 		SwapChain,
 		Fence,
 		Semaphore,

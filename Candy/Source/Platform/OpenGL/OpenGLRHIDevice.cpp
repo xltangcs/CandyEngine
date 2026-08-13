@@ -31,12 +31,18 @@ namespace Candy {
 
 	Ref<RHIBuffer> OpenGLRHIDevice::CreateBuffer(const BufferDesc& desc)
 	{
-		return CreateRef<OpenGLRHIBuffer>(desc);
+		auto buf = CreateRef<OpenGLRHIBuffer>(desc);
+		buf->SetIRTracking(&GetResourceManager(),
+			GetResourceManager().Register(IR::ResourceType::Buffer, buf.get(), desc.DebugName));
+		return buf;
 	}
 
 	Ref<RHITexture> OpenGLRHIDevice::CreateTexture(const TextureDesc& desc)
 	{
-		return CreateRef<OpenGLRHITexture2D>(desc);
+		auto tex = CreateRef<OpenGLRHITexture2D>(desc);
+		tex->SetIRTracking(&GetResourceManager(),
+			GetResourceManager().Register(IR::ResourceType::Texture, tex.get(), desc.DebugName));
+		return tex;
 	}
 
 	Ref<RHISampler> OpenGLRHIDevice::CreateSampler(const SamplerDesc& desc)
@@ -151,6 +157,8 @@ namespace Candy {
 
 		auto pipeline = CreateRef<OpenGLRHIGraphicsPipeline>(desc);
 		pipeline->SetProgram(program);
+		pipeline->SetIRTracking(&GetResourceManager(),
+			GetResourceManager().Register(IR::ResourceType::GraphicsPipeline, pipeline.get(), "GraphicsPipeline"));
 		return pipeline;
 	}
 
@@ -161,7 +169,10 @@ namespace Candy {
 
 	Ref<RHIFramebuffer> OpenGLRHIDevice::CreateFramebuffer(const FramebufferDesc& desc)
 	{
-		return CreateRef<OpenGLFramebuffer>(desc);
+		auto fb = CreateRef<OpenGLFramebuffer>(desc);
+		fb->SetIRTracking(&GetResourceManager(),
+			GetResourceManager().Register(IR::ResourceType::Framebuffer, fb.get(), "Framebuffer"));
+		return fb;
 	}
 
 	RHICommandQueue& OpenGLRHIDevice::GetCommandQueue()

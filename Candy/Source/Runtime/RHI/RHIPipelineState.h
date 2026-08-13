@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Runtime/RHI/RHITypes.h"
+#include "Runtime/RHI/IR/IRTracking.h"
 
 #include <vector>
 
@@ -114,7 +115,7 @@ namespace Candy {
 	// =========================================================================
 	// RHIGraphicsPipeline — opaque graphics pipeline state object
 	// =========================================================================
-	class RHIGraphicsPipeline
+	class RHIGraphicsPipeline : public IRTrackable
 	{
 	public:
 		virtual ~RHIGraphicsPipeline() = default;
