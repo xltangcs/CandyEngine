@@ -1,4 +1,4 @@
-ï»¿#include "CandyPCH.h"
+#include "CandyPCH.h"
 #include <Windows.h>
 #include <d3d12.h>
 #include <d3d12sdklayers.h>
@@ -10,6 +10,7 @@
 #include "Platform/D3D12/D3D12Buffer.h"
 #include "Platform/D3D12/D3D12CommandBuffer.h"
 #include "Platform/D3D12/D3D12SwapChain.h"
+#include "Platform/D3D12/D3D12Framebuffer.h"
 #include "Platform/D3D12/D3D12PipelineState.h"
 #include "Platform/D3D12/D3D12Texture.h"
 #include "Runtime/RHI/RHICommandQueue.h"
@@ -181,7 +182,7 @@ float4 main(PSInput input) : SV_TARGET
 
 		void WaitIdle() override
 		{
-			CANDY_CORE_WARN("TODO: D3D12CommandQueue::WaitIdle â€” use D3D12Device::WaitIdle");
+			CANDY_CORE_WARN("TODO: D3D12CommandQueue::WaitIdle ¡ª use D3D12Device::WaitIdle");
 		}
 
 		[[nodiscard]] ID3D12CommandQueue*   GetNativeQueue()   const { return m_Queue.Get(); }
@@ -201,7 +202,7 @@ float4 main(PSInput input) : SV_TARGET
 	};
 
 	// =========================================================================
-	// D3D12Device â€” Constructor
+	// D3D12Device ¡ª Constructor
 	// =========================================================================
 
 	D3D12Device::D3D12Device()
@@ -281,7 +282,7 @@ float4 main(PSInput input) : SV_TARGET
 #if defined(CANDY_DEBUG)
 		// GPU-based validation catches resource-state violations / OOB descriptor
 		// reads at the GPU level, which the debug layer alone can miss (they hang
-		// the GPU â†’ TDR â†’ device removed).
+		// the GPU ¡ú TDR ¡ú device removed).
 #ifndef D3D12_DEBUG_FEATURE_GPU_BASED_VALIDATION
 #define D3D12_DEBUG_FEATURE_GPU_BASED_VALIDATION 0x00000002
 #endif
@@ -489,7 +490,7 @@ float4 main(PSInput input) : SV_TARGET
 			return nullptr;
 		}
 
-		CANDY_CORE_INFO("D3D12Device: compiled '{}' ({}) â€” {} bytes",
+		CANDY_CORE_INFO("D3D12Device: compiled '{}' ({}) ¡ª {} bytes",
 		                debugName, target, bytecode->GetBufferSize());
 		return bytecode;
 	}
@@ -535,7 +536,7 @@ float4 main(PSInput input) : SV_TARGET
 
 	ComPtr<ID3D12RootSignature> D3D12Device::CreateMinimalRootSignature()
 	{
-		// Root parameter 0: CBV (b0) â€” transform / per-draw constants
+		// Root parameter 0: CBV (b0) ¡ª transform / per-draw constants
 		D3D12_ROOT_PARAMETER rootParams[2] = {};
 
 		// Parameter 0: CBV
@@ -633,7 +634,7 @@ float4 main(PSInput input) : SV_TARGET
 		rootParams[1].DescriptorTable.pDescriptorRanges   = &srvRange;
 		rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-		// Static sampler (s0) â€” linear wrap
+		// Static sampler (s0) ¡ª linear wrap
 		D3D12_STATIC_SAMPLER_DESC staticSampler = {};
 		staticSampler.Filter           = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
 		staticSampler.AddressU         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -703,7 +704,7 @@ float4 main(PSInput input) : SV_TARGET
 
 	Ref<RHIShaderModule> D3D12Device::CreateShaderModule(const void* bytecode, uint32_t byteSize, const std::string& debugName)
 	{
-		// Store the bytecode for pipeline creation â€” the actual shader module
+		// Store the bytecode for pipeline creation ¡ª the actual shader module
 		// is not a D3D12 runtime object; D3D12 pipelines consume bytecode directly.
 		// We wrap it in a simple blob holder.
 		struct D3D12ShaderModule : public RHIShaderModule
@@ -753,7 +754,7 @@ float4 main(PSInput input) : SV_TARGET
 
 		std::vector<D3D12_INPUT_ELEMENT_DESC> inputElements;
 
-		// Map RHIFormat â†’ DXGI_FORMAT for common vertex attribute formats
+		// Map RHIFormat ¡ú DXGI_FORMAT for common vertex attribute formats
 		static const auto MapFormat = [](RHIFormat fmt) -> DXGI_FORMAT
 		{
 			switch (fmt)
@@ -791,7 +792,7 @@ float4 main(PSInput input) : SV_TARGET
 
 		// All Renderer2D pipelines share the textured root signature (CBV b0 +
 		// 32-SRV descriptor table t0-t31 + static sampler s0). Shaders that
-		// don't sample textures (circle/line) are still compatible â€” a root
+		// don't sample textures (circle/line) are still compatible ¡ª a root
 		// signature may legally declare more than the shader consumes.
 		auto rootSig = CreateTexturedRootSignature();
 		if (!rootSig)
@@ -823,7 +824,7 @@ float4 main(PSInput input) : SV_TARGET
 		depthStencil.DepthWriteMask   = desc.DepthStencil.DepthWriteEnable
 		                                ? D3D12_DEPTH_WRITE_MASK_ALL
 		                                : D3D12_DEPTH_WRITE_MASK_ZERO;
-		// Map CompareOp â†’ D3D12_COMPARISON_FUNC
+		// Map CompareOp ¡ú D3D12_COMPARISON_FUNC
 		static const D3D12_COMPARISON_FUNC compMap[] = {
 			D3D12_COMPARISON_FUNC_NEVER,        // Never
 			D3D12_COMPARISON_FUNC_LESS,          // Less
@@ -840,7 +841,7 @@ float4 main(PSInput input) : SV_TARGET
 
 		D3D12_BLEND_DESC blend = {};
 		// Per-RT blend allowed: RT0 (color) blends alpha, RT1 (R32_SINT
-		// entity-id) must NOT blend under any circumstances â€” D3D12 otherwise
+		// entity-id) must NOT blend under any circumstances ¡ª D3D12 otherwise
 		// rejects PSO creation ("R32_SINT does not support blending").
 		blend.IndependentBlendEnable   = TRUE;
 		blend.RenderTarget[0].BlendEnable   = desc.Blend.BlendEnable;
@@ -880,7 +881,7 @@ float4 main(PSInput input) : SV_TARGET
 		                                 ? 1u
 		                                 : static_cast<UINT>(desc.RenderTargetFormats.size());
 
-		// Map RHIFormats â†’ RTVFormats[i] (driver requires one entry per RT
+		// Map RHIFormats ¡ú RTVFormats[i] (driver requires one entry per RT
 		// declared on the PS output signature; falling short triggers PSO
 		// creation failure on pipelines that write SV_TARGET1, etc.).
 		static const auto MapRenderTargetFormat = [](RHIFormat fmt) -> DXGI_FORMAT
@@ -996,7 +997,7 @@ float4 main(PSInput input) : SV_TARGET
 
 		D3D12_BLEND_DESC blend = {};
 		// Per-RT blend allowed: RT0 (color) blends alpha, RT1 (R32_SINT
-		// entity-id) must NOT blend under any circumstances â€” D3D12 otherwise
+		// entity-id) must NOT blend under any circumstances ¡ª D3D12 otherwise
 		// rejects PSO creation ("R32_SINT does not support blending").
 		blend.IndependentBlendEnable   = TRUE;
 		blend.RenderTarget[0].BlendEnable   = desc.Blend.BlendEnable;
@@ -1075,6 +1076,11 @@ float4 main(PSInput input) : SV_TARGET
 			GetNativeQueue(), desc);
 	}
 
+	Ref<RHIFramebuffer> D3D12Device::CreateFramebuffer(const FramebufferDesc& desc)
+	{
+		return CreateRef<D3D12Framebuffer>(desc, this);
+	}
+
 	// ---- Command submission -------------------------------------------------
 
 	RHICommandQueue& D3D12Device::GetCommandQueue()
@@ -1094,9 +1100,9 @@ float4 main(PSInput input) : SV_TARGET
 	{
 		// Single triangle: 3 vertices, each Position(3 floats) + Color(4 floats)
 		VertexPosColor vertices[] = {
-			{ {  0.0f,  0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } }, // top    â€” red
-			{ { -0.5f, -0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } }, // left   â€” green
-			{ {  0.5f, -0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }, // right  â€” blue
+			{ {  0.0f,  0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } }, // top    ¡ª red
+			{ { -0.5f, -0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } }, // left   ¡ª green
+			{ {  0.5f, -0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }, // right  ¡ª blue
 		};
 
 		return CreateGPUBufferWithData(vertices, sizeof(vertices),
@@ -1156,7 +1162,7 @@ float4 main(PSInput input) : SV_TARGET
 			return nullptr;
 		}
 
-		// 3. Use a temporary command list to copy upload â†’ GPU
+		// 3. Use a temporary command list to copy upload ¡ú GPU
 		ComPtr<ID3D12CommandAllocator> tempAllocator;
 		HRESULT hr = m_NativeDevice->CreateCommandAllocator(
 			D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&tempAllocator));

@@ -39,6 +39,7 @@ namespace Candy {
 		                                                 const Ref<RHIShaderModule>& fs) override;
 
 		Ref<RHISwapChain> CreateSwapChain(const SwapChainDesc& desc) override;
+	Ref<RHIFramebuffer> CreateFramebuffer(const FramebufferDesc& desc) override;
 
 		RHICommandQueue& GetCommandQueue() override;
 		void WaitIdle() override;

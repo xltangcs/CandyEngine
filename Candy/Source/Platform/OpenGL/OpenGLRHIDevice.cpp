@@ -2,6 +2,7 @@
 
 #include "Platform/OpenGL/OpenGLRHIDevice.h"
 #include "Platform/OpenGL/OpenGLRHIResources.h"
+#include "Platform/OpenGL/OpenGLFramebuffer.h"
 #include "Platform/OpenGL/OpenGLRHICommandQueue.h"
 #include "Runtime/Core/Log.h"
 #include "Runtime/RHI/RHIShaderSource.h"
@@ -149,6 +150,11 @@ namespace Candy {
 	Ref<RHISwapChain> OpenGLRHIDevice::CreateSwapChain(const SwapChainDesc& desc)
 	{
 		return CreateRef<OpenGLRHISwapChain>(desc);
+	}
+
+	Ref<RHIFramebuffer> OpenGLRHIDevice::CreateFramebuffer(const FramebufferDesc& desc)
+	{
+		return CreateRef<OpenGLFramebuffer>(desc);
 	}
 
 	RHICommandQueue& OpenGLRHIDevice::GetCommandQueue()

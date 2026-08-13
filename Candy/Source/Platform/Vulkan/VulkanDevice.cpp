@@ -1,4 +1,4 @@
-ï»¿#include "CandyPCH.h"
+#include "CandyPCH.h"
 #include <Windows.h>
 #define VK_NO_PROTOTYPES
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -9,6 +9,7 @@
 #include "Platform/Vulkan/VulkanBuffer.h"
 #include "Platform/Vulkan/VulkanCommandBuffer.h"
 #include "Platform/Vulkan/VulkanSwapChain.h"
+#include "Platform/Vulkan/VulkanFramebuffer.h"
 #include "Platform/Vulkan/VulkanPipelineState.h"
 #include "Platform/Vulkan/VulkanSPIRV.h"
 #include "Runtime/RHI/RHICommandQueue.h"
@@ -477,6 +478,12 @@ namespace Candy {
 	Ref<RHISwapChain> VulkanDevice::CreateSwapChain(const SwapChainDesc& desc)
 	{
 		return CreateRef<VulkanSwapChain>(this, desc);
+	}
+
+	Ref<RHIFramebuffer> VulkanDevice::CreateFramebuffer(const FramebufferDesc& desc)
+	{
+		// [FROZEN] minimal implementation ¡ª kept compiling only.
+		return CreateRef<VulkanFramebuffer>(desc, this);
 	}
 
 	RHICommandQueue& VulkanDevice::GetCommandQueue() { return *m_CommandQueue; }

@@ -4,6 +4,7 @@
 #include "Runtime/RHI/RHITypes.h"
 #include "Runtime/RHI/RHIPipelineState.h"
 #include "Runtime/RHI/RHISwapChain.h"
+#include "Runtime/RHI/RHIFramebuffer.h"
 
 #include <cstdint>
 #include <cstring>
@@ -142,6 +143,11 @@ namespace Candy {
 		virtual Ref<RHIGraphicsPipeline> CreateGraphicsPipeline(const GraphicsPipelineDesc& desc, const Ref<RHIShaderModule>& vs, const Ref<RHIShaderModule>& fs) = 0;
 
 		virtual Ref<RHISwapChain> CreateSwapChain(const SwapChainDesc& desc) = 0;
+
+		/// Create an off-screen render target. The concrete object is the
+		/// backend's Framebuffer subclass (which is-a RHIFramebuffer through
+		/// the Framebuffer base class).
+		virtual Ref<RHIFramebuffer> CreateFramebuffer(const FramebufferDesc& desc) = 0;
 
 		// ---- Command submission --------------------------------------------
 

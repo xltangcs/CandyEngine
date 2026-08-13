@@ -3,20 +3,29 @@
 #include "Runtime/Renderer/Texture.h"
 #include "Runtime/Renderer/Renderer.h"
 
+#include "Runtime/RHI/RHIContext.h"
+#include "Runtime/RHI/RHIDevice.h"
+
 #include "Platform/OpenGL/OpenGLTexture.h"
+#include "Platform/D3D12/D3D12Device.h"
 #include "Platform/D3D12/D3D12Texture2D.h"
-#include "Platform/D3D12/D3D12GraphicsContext.h"
+#include "Platform/Vulkan/VulkanDevice.h"
 #include "Platform/Vulkan/VulkanTexture2D.h"
-#include "Platform/Vulkan/VulkanGraphicsContext.h"
-#include "Runtime/Core/Application.h"
 
 namespace Candy {
 
+	// Engine-level Texture2D subclasses are created here (they carry file
+	// loading + ImGui SRV concerns that don't belong in the RHI layer); the
+	// active backend's device comes from RHIContext — no GraphicsContext
+	// downcasts needed.
 	static D3D12Device* GetD3D12Device()
 	{
-		auto* ctx = Application::Get().GetWindow().GetGraphicsContext();
-		auto* d3d12Ctx = dynamic_cast<D3D12GraphicsContext*>(ctx);
-		return d3d12Ctx ? d3d12Ctx->GetDevice() : nullptr;
+		return static_cast<D3D12Device*>(RHIContext::GetDevice());
+	}
+
+	static VulkanDevice* GetVulkanDevice()
+	{
+		return static_cast<VulkanDevice*>(RHIContext::GetDevice());
 	}
 
 	Ref<Texture2D> Texture2D::Create(uint32_t width, uint32_t height)
@@ -33,9 +42,8 @@ namespace Candy {
 		}
 		case RendererAPI::API::Vulkan:
 		{
-			auto* ctx = Application::Get().GetWindow().GetGraphicsContext();
-			auto* vkCtx = dynamic_cast<VulkanGraphicsContext*>(ctx);
-			if (vkCtx) return CreateRef<VulkanTexture2D>(vkCtx->GetDevice(), width, height);
+			auto* dev = GetVulkanDevice();
+			if (dev) return CreateRef<VulkanTexture2D>(dev, width, height);
 			return nullptr;
 		}
 		}
@@ -57,9 +65,8 @@ namespace Candy {
 		}
 		case RendererAPI::API::Vulkan:
 		{
-			auto* ctx = Application::Get().GetWindow().GetGraphicsContext();
-			auto* vkCtx = dynamic_cast<VulkanGraphicsContext*>(ctx);
-			if (vkCtx) return CreateRef<VulkanTexture2D>(vkCtx->GetDevice(), path);
+			auto* dev = GetVulkanDevice();
+			if (dev) return CreateRef<VulkanTexture2D>(dev, path);
 			return nullptr;
 		}
 		}

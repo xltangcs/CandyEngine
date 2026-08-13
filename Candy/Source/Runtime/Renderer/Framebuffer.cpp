@@ -1,48 +1,27 @@
 #include "CandyPCH.h"
 
 #include "Runtime/Renderer/Framebuffer.h"
-#include "Runtime/Renderer/Renderer.h"
 
-#include "Runtime/Core/Application.h"
-#include "Platform/OpenGL/OpenGLFramebuffer.h"
-#include <Windows.h>
-#include "Platform/D3D12/D3D12Framebuffer.h"
-#include "Platform/D3D12/D3D12GraphicsContext.h"
-#include "Platform/Vulkan/VulkanFramebuffer.h"
-#include "Platform/Vulkan/VulkanGraphicsContext.h"
+#include "Runtime/RHI/RHIContext.h"
+#include "Runtime/RHI/RHIDevice.h"
 
 namespace Candy {
 
 	Ref<Framebuffer> Framebuffer::Create(const FramebufferDesc& desc)
 	{
-		switch (Renderer::GetAPI())
+		// The RHI device is the resource factory — no backend headers or
+		// GraphicsContext downcasts needed here. The returned object is the
+		// backend's Framebuffer subclass (is-a RHIFramebuffer via the
+		// Framebuffer base), so the downcast is only a type-level adjustment.
+		auto* dev = RHIContext::GetDevice();
+		if (!dev)
 		{
-		case RendererAPI::API::None:    CANDY_CORE_ASSERT(false, "RendererAPI::None is currently not supported!"); return nullptr;
-		case RendererAPI::API::OpenGL:  return CreateRef<OpenGLFramebuffer>(desc);
-		case RendererAPI::API::D3D12:
-		{
-			// D3D12Framebuffer needs the D3D12Device for resource creation.
-			// Try to get it from the active GraphicsContext.
-			auto* ctx = Application::Get().GetWindow().GetGraphicsContext();
-			auto* d3d12Ctx = dynamic_cast<D3D12GraphicsContext*>(ctx);
-			if (d3d12Ctx)
-				return CreateRef<D3D12Framebuffer>(desc, d3d12Ctx->GetDevice());
-			CANDY_CORE_ERROR("Framebuffer::Create: D3D12 API selected but no D3D12GraphicsContext found");
+			CANDY_CORE_ERROR("Framebuffer::Create: no RHI device published");
 			return nullptr;
-		}
-		case RendererAPI::API::Vulkan:
-		{
-			auto* ctx = Application::Get().GetWindow().GetGraphicsContext();
-			auto* vkCtx = dynamic_cast<VulkanGraphicsContext*>(ctx);
-			if (vkCtx)
-				return CreateRef<VulkanFramebuffer>(desc, vkCtx->GetDevice());
-			CANDY_CORE_ERROR("Framebuffer::Create: Vulkan API selected but no VulkanGraphicsContext found");
-			return nullptr;
-		}
 		}
 
-		CANDY_CORE_ASSERT(false, "Unknown RendererAPI!");
-		return nullptr;
+		auto fb = dev->CreateFramebuffer(desc);
+		return std::dynamic_pointer_cast<Framebuffer>(fb);
 	}
 
 }

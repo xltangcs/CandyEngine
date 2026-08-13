@@ -40,6 +40,7 @@ namespace Candy {
 			ID3D12RootSignature* rootSig);
 
 		Candy::Ref<RHISwapChain> CreateSwapChain(const SwapChainDesc& desc) override;
+		Candy::Ref<RHIFramebuffer> CreateFramebuffer(const FramebufferDesc& desc) override;
 
 		// ---- Command submission --------------------------------------------
 

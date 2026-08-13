@@ -44,6 +44,7 @@ namespace Candy {
 		Candy::Ref<RHIShaderModule> CreateShaderModuleFromSource(const char*, ShaderStage, const std::string&, const std::string& = "") override { return nullptr; }
 		Candy::Ref<RHIGraphicsPipeline> CreateGraphicsPipeline(const GraphicsPipelineDesc& desc, const Candy::Ref<RHIShaderModule>& vs, const Candy::Ref<RHIShaderModule>& fs) override;
 		Candy::Ref<RHISwapChain> CreateSwapChain(const SwapChainDesc& desc) override;
+		Candy::Ref<RHIFramebuffer> CreateFramebuffer(const FramebufferDesc& desc) override;
 
 		RHICommandQueue& GetCommandQueue() override;
 		void WaitIdle() override;
