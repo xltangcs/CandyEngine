@@ -38,7 +38,7 @@ msbuild CandyEngine.sln /p:Configuration=Debug
 | **构建系统** | premake5 生成工程，支持 Debug / Release / Dist 三套配置 |
 | **Layer Stack** | 普通图层 + 叠加层（ImGui 始终为叠加层），事件 LIFO 反向传播 |
 | **ECS** | 基于 EnTT，`Scene` 持有 `entt::registry`，`Entity = entt::entity + Scene*` |
-| **渲染** | OpenGL 后端，`RendererAPI` 抽象接口；`Renderer2D` 批量绘制四边形 / 圆 / 线 / 精灵 |
+| **渲染** | RHI 分层架构（`RHIDevice` / `RHICommandBuffer` / `RHIFramebuffer`），D3D12 主后端 + OpenGL 参考后端；`Renderer2D` 单一路径批量绘制四边形 / 圆 / 线 / 精灵；ImGui 经 `ImGuiBackend` 接口与渲染后端解耦 |
 | **物理** | Box2D 集成：`Rigidbody2DComponent`（Static/Dynamic/Kinematic）、`BoxCollider2DComponent`、`CircleCollider2DComponent`，仅在 Play / Simulate 运行 |
 | **原生脚本** | C++ `ScriptableEntity` 基类 + `NativeScriptComponent::Bind<T>()` |
 | **Python 脚本** | pybind11 已接入，提供 `candy.ScriptObject`（`on_construct` / `on_tick` / `on_destroy` 生命周期）；示例项目 JumpGame 即纯 Python 实现 |
@@ -59,7 +59,9 @@ msbuild CandyEngine.sln /p:Configuration=Debug
 - **Python 脚本落地**：将 pybind11 骨架真正接入引擎运行时，支持在编辑器中热重载 Python 逻辑。
 - **资源管线**：实现类 Godot / UE 的资源导入与管理系统（Content Browser 增强、`.import` 流程）。
 - **场景继承与实例化**：让 `.candy` 场景支持继承与实例化。
-- **渲染后端扩展**：在 `RendererAPI` 抽象之上增加 Vulkan / Metal / D3D 后端。
+- **帧同步（Frames in Flight）**：消除 `Renderer2D::Flush` 末尾的 `WaitIdle` 全 GPU 等待——相机 CB / 顶点 VB 按帧槽（2~3 套）轮换，Fence 栅栏在槽位复用前确认 GPU 已消费完毕，让 CPU 准备下一帧与 GPU 渲染当前帧并行，释放帧率上限。
+- **Dirty Tracking（脏状态追踪）**：命令缓冲缓存当前 PSO / 顶点缓冲 / 纹理 / 常量缓冲绑定，重复设置直接跳过、真正变化才下发 GPU 命令；draw call 增多后显著降低 CPU 提交开销（对齐 UE `FRHICommandList` 的做法）。
+- **渲染后端扩展**：重新启用 Vulkan 后端（当前冻结，按 D3D12↔Vulkan 概念映射平移）；远期考虑 Metal。
 - **可视化脚本**：类 UE Blueprint 的节点化脚本系统。
 - **SerializeRuntime**：补全运行时场景的序列化能力。
 
