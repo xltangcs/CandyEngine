@@ -455,7 +455,12 @@ float4 main(PSInput input) : SV_TARGET
 		ComPtr<ID3DBlob> bytecode;
 		ComPtr<ID3DBlob> errors;
 
-		UINT compileFlags = D3DCOMPILE_PACK_MATRIX_ROW_MAJOR;
+		// GLM stores matrices column-major in memory; pack cbuffer matrices
+		// column-major to match, so a float4x4 can be uploaded with a plain
+		// memcpy and used as mul(M, v). Row-major packing transposes the matrix,
+		// which breaks clip-space Z for perspective projections on D3D12's [0,1]
+		// NDC range (ortho happened to survive it, perspective got clipped).
+		UINT compileFlags = D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR;
 #if defined(CANDY_DEBUG)
 		compileFlags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #else
