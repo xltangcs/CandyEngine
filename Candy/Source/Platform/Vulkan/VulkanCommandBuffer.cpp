@@ -1,4 +1,4 @@
-ï»¿#include "CandyPCH.h"
+#include "CandyPCH.h"
 #include <Windows.h>
 #define VK_NO_PROTOTYPES
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -19,6 +19,7 @@ namespace Candy {
 
 	void VulkanCommandBuffer::Begin()
 	{
+		m_Validator.OnBegin();
 		VkCommandBufferBeginInfo beginInfo = {};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		m_DevicePtr->fnBeginCommandBuffer(m_CommandBuffer, &beginInfo);
@@ -26,6 +27,7 @@ namespace Candy {
 
 	void VulkanCommandBuffer::End()
 	{
+		m_Validator.OnEnd();
 		m_DevicePtr->fnEndCommandBuffer(m_CommandBuffer);
 	}
 
@@ -43,7 +45,8 @@ namespace Candy {
 
 	void VulkanCommandBuffer::BeginRenderPass(RHIFramebuffer* target, const RenderPassDesc& desc)
 	{
-		// [EXPERIMENTAL â€” FROZEN] off-screen framebuffer targets are not wired;
+		m_Validator.OnBeginRenderPass(desc);
+		// [EXPERIMENTAL ¡ª FROZEN] off-screen framebuffer targets are not wired;
 		// the pass uses whatever render pass/framebuffer SetRenderPassInfo set.
 		(void)target;
 		if (!m_ActiveRenderPass)
@@ -76,11 +79,13 @@ namespace Candy {
 
 	void VulkanCommandBuffer::EndRenderPass()
 	{
+		m_Validator.OnEndRenderPass();
 		m_DevicePtr->fnCmdEndRenderPass(m_CommandBuffer);
 	}
 
 	void VulkanCommandBuffer::SetPipeline(const Ref<RHIGraphicsPipeline>& pipeline)
 	{
+		m_Validator.OnSetPipeline(pipeline);
 		auto* vkp = dynamic_cast<VulkanGraphicsPipeline*>(pipeline.get());
 		if (vkp && vkp->GetVkPipeline())
 			m_DevicePtr->fnCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkp->GetVkPipeline());
@@ -100,6 +105,7 @@ namespace Candy {
 
 	void VulkanCommandBuffer::SetVertexBuffer(const Ref<RHIBuffer>& buffer, uint32_t slot, uint64_t offset)
 	{
+		m_Validator.OnSetVertexBuffer(slot);
 		auto* vkb = dynamic_cast<VulkanBuffer*>(buffer.get());
 		if (vkb)
 		{
@@ -111,6 +117,7 @@ namespace Candy {
 
 	void VulkanCommandBuffer::SetIndexBuffer(const Ref<RHIBuffer>& buffer, IndexFormat format, uint64_t offset)
 	{
+		m_Validator.OnSetIndexBuffer();
 		auto* vkb = dynamic_cast<VulkanBuffer*>(buffer.get());
 		if (vkb)
 		{
@@ -121,7 +128,7 @@ namespace Candy {
 
 	void VulkanCommandBuffer::SetConstantBuffer(uint32_t slot, uint32_t binding, const Ref<RHIBuffer>&)
 	{
-		CANDY_CORE_WARN("TODO: Vulkan SetConstantBuffer â€” descriptor set binding must be done at submit time");
+		CANDY_CORE_WARN("TODO: Vulkan SetConstantBuffer ¡ª descriptor set binding must be done at submit time");
 	}
 
 	void VulkanCommandBuffer::SetTexture(uint32_t slot, uint32_t binding, const Ref<RHITexture>&)
@@ -137,12 +144,14 @@ namespace Candy {
 	void VulkanCommandBuffer::Draw(uint32_t vertexCount, uint32_t instanceCount,
 	                               uint32_t firstVertex, uint32_t firstInstance)
 	{
+		m_Validator.OnDraw(vertexCount);
 		m_DevicePtr->fnCmdDraw(m_CommandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 	}
 
 	void VulkanCommandBuffer::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
 	                                      uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance)
 	{
+		m_Validator.OnDrawIndexed(indexCount);
 		m_DevicePtr->fnCmdDrawIndexed(m_CommandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 	}
 

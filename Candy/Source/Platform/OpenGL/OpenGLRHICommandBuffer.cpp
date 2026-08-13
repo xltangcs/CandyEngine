@@ -12,17 +12,20 @@ namespace Candy {
 
 	void OpenGLRHICommandBuffer::Begin()
 	{
+		m_Validator.OnBegin();
 		// Modern OpenGL needs a bound VAO before any vertex attribute / draw.
 		glBindVertexArray(m_DefaultVAO);
 	}
 
 	void OpenGLRHICommandBuffer::End()
 	{
+		m_Validator.OnEnd();
 		glBindVertexArray(0);
 	}
 
 	void OpenGLRHICommandBuffer::BeginRenderPass(RHIFramebuffer* target, const RenderPassDesc& desc)
 	{
+		m_Validator.OnBeginRenderPass(desc);
 		// Resolve the render target: an explicit framebuffer's native FBO, or the
 		// default framebuffer (0) when target is null (swap chain path).
 		if (target)
@@ -74,11 +77,13 @@ namespace Candy {
 
 	void OpenGLRHICommandBuffer::EndRenderPass()
 	{
+		m_Validator.OnEndRenderPass();
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
 	void OpenGLRHICommandBuffer::SetPipeline(const Ref<RHIGraphicsPipeline>& pipeline)
 	{
+		m_Validator.OnSetPipeline(pipeline);
 		m_Pipeline = pipeline;
 		auto* gl = static_cast<OpenGLRHIGraphicsPipeline*>(pipeline.get());
 		if (gl)
@@ -110,6 +115,7 @@ namespace Candy {
 
 	void OpenGLRHICommandBuffer::SetVertexBuffer(const Ref<RHIBuffer>& buffer, uint32_t slot, uint64_t offset)
 	{
+		m_Validator.OnSetVertexBuffer(slot);
 		(void)slot;
 		auto* gl = dynamic_cast<OpenGLRHIBuffer*>(buffer.get());
 		if (!gl) return;
@@ -135,6 +141,7 @@ namespace Candy {
 
 	void OpenGLRHICommandBuffer::SetIndexBuffer(const Ref<RHIBuffer>& buffer, IndexFormat format, uint64_t offset)
 	{
+		m_Validator.OnSetIndexBuffer();
 		(void)offset;
 		auto* gl = dynamic_cast<OpenGLRHIBuffer*>(buffer.get());
 		if (!gl) return;
@@ -154,7 +161,7 @@ namespace Candy {
 	{
 		(void)slot;
 		// Accept both RHI-device-created textures (OpenGLRHITexture2D) and the
-		// engine-level OpenGLTexture2D (which is-a RHITexture) â€” previously only
+		// engine-level OpenGLTexture2D (which is-a RHITexture) â€?previously only
 		// the former was handled, silently binding texture 0 for engine textures.
 		GLuint id = 0;
 		if (auto* rhiTex = dynamic_cast<OpenGLRHITexture2D*>(texture.get()))
@@ -176,11 +183,25 @@ namespace Candy {
 	void OpenGLRHICommandBuffer::Draw(uint32_t vertexCount, uint32_t instanceCount,
 	                                  uint32_t firstVertex, uint32_t firstInstance)
 	{
+		m_Validator.OnDraw(vertexCount);
 		(void)firstInstance;
+		GLuint topology = GL_TRIANGLES;
+		if (m_Pipeline)
+		{
+			const GraphicsPipelineDesc& desc = static_cast<OpenGLRHIGraphicsPipeline*>(m_Pipeline.get())->GetDesc();
+			switch (desc.Topology)
+			{
+			case PrimitiveTopology::Triangles:      topology = GL_TRIANGLES;      break;
+			case PrimitiveTopology::Lines:          topology = GL_LINES;          break;
+			case PrimitiveTopology::Points:         topology = GL_POINTS;         break;
+			case PrimitiveTopology::TriangleStrip:  topology = GL_TRIANGLE_STRIP; break;
+			case PrimitiveTopology::LineStrip:      topology = GL_LINE_STRIP;     break;
+			}
+		}
 		if (instanceCount <= 1)
-			glDrawArrays(GL_TRIANGLES, static_cast<GLint>(firstVertex), static_cast<GLsizei>(vertexCount));
+			glDrawArrays(topology, static_cast<GLint>(firstVertex), static_cast<GLsizei>(vertexCount));
 		else
-			glDrawArraysInstanced(GL_TRIANGLES, static_cast<GLint>(firstVertex),
+			glDrawArraysInstanced(topology, static_cast<GLint>(firstVertex),
 			                      static_cast<GLsizei>(vertexCount), static_cast<GLsizei>(instanceCount));
 	}
 
@@ -188,6 +209,7 @@ namespace Candy {
 	                                          uint32_t firstIndex, int32_t vertexOffset,
 	                                          uint32_t firstInstance)
 	{
+		m_Validator.OnDrawIndexed(indexCount);
 		(void)firstInstance;
 		GLuint topology = GL_TRIANGLES;
 		if (m_Pipeline)

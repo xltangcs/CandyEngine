@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Runtime/RHI/RHICommandBuffer.h"
+#include "Runtime/RHI/IR/IRCommandValidator.h"
 
 #include <glad/glad.h>
 
@@ -61,6 +62,9 @@ namespace Candy {
 		GLenum m_IBType   = GL_UNSIGNED_INT;
 
 		GLuint                  m_Framebuffer = 0; ///< 0 = default framebuffer
+
+		// Debug-time recording-state validator (per command buffer — never shared).
+		IR::IRCommandValidator m_Validator;
 	};
 
 } // namespace Candy

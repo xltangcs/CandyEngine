@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Runtime/RHI/RHICommandBuffer.h"
+#include "Runtime/RHI/IR/IRCommandValidator.h"
 #include "Runtime/RHI/RHIFramebuffer.h"
 
 #include <d3d12.h>
@@ -12,7 +13,7 @@ namespace Candy {
 	class D3D12Framebuffer;
 
 	// =========================================================================
-	// D3D12CommandBuffer â€” wraps ID3D12GraphicsCommandList recording
+	// D3D12CommandBuffer â€?wraps ID3D12GraphicsCommandList recording
 	// =========================================================================
 	class D3D12CommandBuffer : public RHICommandBuffer
 	{
@@ -77,7 +78,7 @@ namespace Candy {
 		// Each command buffer owns its own allocator so multiple command buffers
 		// (Renderer2D scene + overlay Flush) never share one and reset it while
 		// another is still recording ("allocator cannot be reset while a command
-		// list is recording" â†’ GPU hang).
+		// list is recording" â†?GPU hang).
 		Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_Allocator;
 		ID3D12Device*                                  m_Device = nullptr;
 
@@ -92,6 +93,9 @@ namespace Candy {
 
 		// Simple linear descriptor allocator
 		D3D12_CPU_DESCRIPTOR_HANDLE m_NextCBVSRVHandle = {};
+
+		// Debug-time recording-state validator (per command buffer ¡ª never shared).
+		IR::IRCommandValidator m_Validator;
 	};
 
 } // namespace Candy

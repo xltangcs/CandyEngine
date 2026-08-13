@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Runtime/RHI/RHICommandBuffer.h"
+#include "Runtime/RHI/IR/IRCommandValidator.h"
 
 #ifndef VK_NO_PROTOTYPES
 #define VK_NO_PROTOTYPES
@@ -48,6 +49,9 @@ namespace Candy {
 		VkFramebuffer    m_ActiveFramebuffer = VK_NULL_HANDLE;
 		VkExtent2D       m_ActiveExtent      = {};
 		float            m_ClearColor[4]     = { 0,0,0,1 };
+
+		// Debug-time recording-state validator (per command buffer ¡ª never shared).
+		IR::IRCommandValidator m_Validator;
 	};
 
 } // namespace Candy

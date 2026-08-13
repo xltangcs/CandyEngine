@@ -49,6 +49,7 @@ namespace Candy {
 
 	void D3D12CommandBuffer::Begin()
 	{
+		m_Validator.OnBegin();
 		HRESULT hr = m_Allocator->Reset();
 		if (FAILED(hr))
 		{
@@ -74,6 +75,7 @@ namespace Candy {
 
 	void D3D12CommandBuffer::End()
 	{
+		m_Validator.OnEnd();
 		HRESULT hr = m_CommandList->Close();
 		if (FAILED(hr))
 			CANDY_CORE_ERROR("D3D12CommandBuffer::End: Close failed");
@@ -83,6 +85,8 @@ namespace Candy {
 
 	void D3D12CommandBuffer::BeginRenderPass(RHIFramebuffer* target, const RenderPassDesc& desc)
 	{
+		m_Validator.OnBeginRenderPass(desc);
+
 		// Resolve the render target: an explicit framebuffer, or the swap chain
 		// published in RHIContext when target is null.
 		if (target)
@@ -186,6 +190,8 @@ namespace Candy {
 
 	void D3D12CommandBuffer::EndRenderPass()
 	{
+		m_Validator.OnEndRenderPass();
+
 		if (m_CurrentFramebuffer)
 		{
 			// Transition color attachment 0 to PIXEL_SHADER_RESOURCE so the editor's
@@ -219,6 +225,7 @@ namespace Candy {
 
 	void D3D12CommandBuffer::SetPipeline(const Ref<RHIGraphicsPipeline>& pipeline)
 	{
+		m_Validator.OnSetPipeline(pipeline);
 		auto* d3d12pso = dynamic_cast<D3D12GraphicsPipeline*>(pipeline.get());
 		if (d3d12pso && d3d12pso->GetNativePipelineState())
 		{
@@ -257,6 +264,7 @@ namespace Candy {
 
 	void D3D12CommandBuffer::SetVertexBuffer(const Ref<RHIBuffer>& buffer, uint32_t slot, uint64_t offset)
 	{
+		m_Validator.OnSetVertexBuffer(slot);
 		auto* d3d12buffer = dynamic_cast<D3D12Buffer*>(buffer.get());
 		if (d3d12buffer)
 		{
@@ -279,6 +287,7 @@ namespace Candy {
 
 	void D3D12CommandBuffer::SetIndexBuffer(const Ref<RHIBuffer>& buffer, IndexFormat format, uint64_t offset)
 	{
+		m_Validator.OnSetIndexBuffer();
 		auto* d3d12buffer = dynamic_cast<D3D12Buffer*>(buffer.get());
 		if (d3d12buffer)
 		{
@@ -346,6 +355,7 @@ namespace Candy {
 	                             uint32_t firstVertex,
 	                             uint32_t firstInstance)
 	{
+		m_Validator.OnDraw(vertexCount);
 		m_CommandList->DrawInstanced(vertexCount, instanceCount, firstVertex, firstInstance);
 	}
 
@@ -355,6 +365,7 @@ namespace Candy {
 	                                    int32_t  vertexOffset,
 	                                    uint32_t firstInstance)
 	{
+		m_Validator.OnDrawIndexed(indexCount);
 		m_CommandList->DrawIndexedInstanced(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 	}
 
