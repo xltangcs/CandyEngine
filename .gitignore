@@ -1,0 +1,11 @@
+build/
+/tags
+/bazel-*
+
+
+/bin
+/bin-int
+
+
+**.vcxproj
+**.vcxproj.filters
