@@ -249,8 +249,33 @@ namespace Candy {
 
 		if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
 		{
+			// Consume queued layout requests BEFORE submitting the DockSpace. Rebuilding
+			// the dock tree after DockSpace() was already submitted this frame leaves the
+			// new nodes with stale LastFrameAlive; docked windows then take the orphan path
+			// in BeginDocked() (skipping node pos/size) and the layout scrambles.
+			if (m_PendingLayoutRequest == LayoutRequestType::ApplyDefault)
+				LayoutPresetManager::ApplyDefault();
+			else if (m_PendingLayoutRequest == LayoutRequestType::LoadPreset)
+				LayoutPresetManager::LoadPreset(m_PendingLayoutPresetName);
+			m_PendingLayoutRequest = LayoutRequestType::None;
+			m_PendingLayoutPresetName.clear();
+
 			ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
 			ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+
+			// First-run default layout: a fresh project has no Saved/imgui.ini, so
+			// there is no docking layout to restore. Apply the built-in default once.
+			if (!m_LayoutInitialized)
+			{
+				m_LayoutInitialized = true;
+				auto& editorState = EditorState::Get();
+				if (!editorState.LayoutPresetApplied)
+				{
+					editorState.LayoutPresetApplied = true;
+					editorState.Save();
+					LayoutPresetManager::ApplyDefault();
+				}
+			}
 		}
 
 		style.WindowMinSize.x = minWinSizeX;
@@ -313,6 +338,52 @@ namespace Candy {
 
 				if (ImGui::MenuItem("Editor Settings"))
 					EditorState::Get().ShowEditorSettings = true;
+
+				ImGui::Separator();
+
+				// Editor Layout presets (Godot-style layout management).
+				if (ImGui::BeginMenu("Editor Layout"))
+				{
+					if (ImGui::MenuItem("Save Layout..."))
+						m_ShowSaveLayoutDialog = true;
+
+					ImGui::Separator();
+
+				bool isDefaultActive = m_CurrentLayoutName.empty();
+				if (ImGui::MenuItem(isDefaultActive ? "> Default" : "  Default"))
+				{
+					m_CurrentLayoutName.clear();
+					m_PendingLayoutRequest = LayoutRequestType::ApplyDefault;
+				}
+
+					auto presets = LayoutPresetManager::ListPresets();
+					for (const auto& name : presets)
+					{
+						bool isActive = (name == m_CurrentLayoutName);
+						std::string label = std::string(isActive ? "> " : "  ") + name;
+						if (ImGui::BeginMenu(label.c_str()))
+						{
+							if (ImGui::MenuItem("Apply Layout"))
+							{
+								m_CurrentLayoutName = name;
+								m_PendingLayoutRequest = LayoutRequestType::LoadPreset;
+								m_PendingLayoutPresetName = name;
+							}
+							if (ImGui::MenuItem("Delete Layout"))
+							{
+								if (LayoutPresetManager::DeletePreset(name))
+								{
+									if (name == m_CurrentLayoutName)
+										m_CurrentLayoutName.clear(); // the deleted preset is gone; fall back to Default
+								}
+								else
+									CANDY_CORE_ERROR("Failed to delete layout preset '{0}'", name);
+							}
+							ImGui::EndMenu();
+						}
+					}
+					ImGui::EndMenu();
+				}
 
 				ImGui::EndMenu();
 			}
@@ -523,6 +594,7 @@ namespace Candy {
 		if (EditorState::Get().ShowProjectSettings) ProjectSettingsPanel::OnImGuiRender();
 		if (EditorState::Get().ShowEditorSettings) EditorSettingsPanel::OnImGuiRender();
 		UI_BuildDialog();
+		UI_LayoutDialogs();
 
 		ImGui::End();
 
@@ -901,6 +973,49 @@ namespace Candy {
 			{
 				m_ShowBuildDialog = false;
 			}
+
+			ImGui::EndPopup();
+		}
+	}
+
+	void EditorLayer::UI_LayoutDialogs()
+	{
+		// ----- Save Layout dialog -----
+		if (m_ShowSaveLayoutDialog)
+		{
+			ImGui::OpenPopup("Save Layout");
+			memset(m_NewLayoutName, 0, sizeof(m_NewLayoutName));
+			m_ShowSaveLayoutDialog = false;
+		}
+
+		if (ImGui::BeginPopupModal("Save Layout", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::Text("Save current editor layout as:");
+			ImGui::Spacing();
+
+			ImGui::PushItemWidth(280);
+			ImGui::InputText("Name", m_NewLayoutName, sizeof(m_NewLayoutName));
+			ImGui::PopItemWidth();
+
+			ImGui::Spacing();
+			ImGui::Separator();
+			ImGui::Spacing();
+
+			bool nameEmpty = (m_NewLayoutName[0] == '\0');
+			if (ImGui::Button("Save", ImVec2(120, 0)) && !nameEmpty)
+			{
+				std::string name(m_NewLayoutName);
+				if (LayoutPresetManager::SaveCurrent(name))
+				{
+					m_CurrentLayoutName = name; // the just-saved snapshot is now the active layout
+					ImGui::CloseCurrentPopup();
+				}
+				else
+					CANDY_CORE_ERROR("Failed to save layout preset '{0}'", name);
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel", ImVec2(120, 0)))
+				ImGui::CloseCurrentPopup();
 
 			ImGui::EndPopup();
 		}

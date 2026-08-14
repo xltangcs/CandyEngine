@@ -29,6 +29,7 @@ namespace Candy {
 		out << YAML::Key << "WindowWidth" << YAML::Value << w;
 		out << YAML::Key << "WindowHeight" << YAML::Value << h;
 		out << YAML::Key << "WindowMaximized" << YAML::Value << (bool)glfwGetWindowAttrib(window, GLFW_MAXIMIZED);
+		out << YAML::Key << "LayoutPresetApplied" << YAML::Value << LayoutPresetApplied;
 		out << YAML::EndMap << YAML::EndMap;
 		std::ofstream("Saved/EditorState.candy") << out.c_str();
 	}
@@ -44,6 +45,7 @@ namespace Candy {
 		if (s["WindowWidth"]) WindowWidth = s["WindowWidth"].as<int>();
 		if (s["WindowHeight"]) WindowHeight = s["WindowHeight"].as<int>();
 		if (s["WindowMaximized"]) WindowMaximized = s["WindowMaximized"].as<bool>();
+		if (s["LayoutPresetApplied"]) LayoutPresetApplied = s["LayoutPresetApplied"].as<bool>();
 	}
 
 }

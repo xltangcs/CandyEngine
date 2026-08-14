@@ -19,6 +19,10 @@ namespace Candy {
 		bool ShowProjectSettings = false;
 		bool ShowEditorSettings = false;
 
+		// Whether the initial default docking layout has already been applied for
+		// a fresh project (no Saved/imgui.ini yet). Persisted so we only apply it once.
+		bool LayoutPresetApplied = false;
+
 	private:
 		EditorState() = default;
 	};

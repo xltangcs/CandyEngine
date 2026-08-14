@@ -4,6 +4,7 @@
 #include "Runtime/Project/RecentProjects.h"
 #include "Setting/EditorSettings.h"
 #include "Setting/EditorState.h"
+#include "Setting/LayoutPresetManager.h"
 #include "Panel/SceneHierarchyPanel.h"
 #include "Panel/ContentBrowserPanel.h"
 #include "Panel/EditorSettingsPanel.h"
@@ -45,6 +46,7 @@ namespace Candy {
 		// Project
 		void OpenRecent(const std::filesystem::path& path);
 		void UI_BuildDialog();
+		void UI_LayoutDialogs();
 	
 	private:
 		Candy::OrthographicCameraController m_CameraController;
@@ -94,6 +96,18 @@ namespace Candy {
 		bool m_ShowBuildDialog = false;
 		int m_BuildMode = 0; // 0 = Content Only, 1 = Full Build (MSBuild)
 		int m_BuildConfig = 0; // 0 = Debug, 1 = Release, 2 = Dist
+
+		// Editor Layout preset state
+		bool m_LayoutInitialized = false;  // prevents re-applying the first-run default
+		bool m_ShowSaveLayoutDialog = false;
+		char m_NewLayoutName[128] = { 0 };
+		std::string m_CurrentLayoutName;   // preset currently in use (empty = Default); drives the ">" marker
+
+		// Deferred layout request. Dock tree rebuilds must run BEFORE the DockSpace
+		// submission (imgui DockBuilder contract), so menu clicks only queue them.
+		enum class LayoutRequestType { None, ApplyDefault, LoadPreset };
+		LayoutRequestType m_PendingLayoutRequest = LayoutRequestType::None;
+		std::string m_PendingLayoutPresetName;
 	};
 
 }
