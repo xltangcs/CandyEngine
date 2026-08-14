@@ -2,7 +2,6 @@
 
 #include "Runtime/Renderer/Camera.h"
 #include "Runtime/Renderer/Texture.h"
-#include "Runtime/Renderer/OrthographicCamera.h"
 #include "Runtime/Renderer/EditorCamera.h"
 #include "Runtime/RHI/RHI.h"
 
@@ -16,7 +15,6 @@ namespace Candy {
 		static void Shutdown();
 
 		static void BeginScene(const Camera& camera, const glm::mat4& transform);
-		static void BeginScene(const OrthographicCamera& camera); // TODO: Remove
 		static void BeginScene(const EditorCamera& camera);
 		static void EndScene();
 		static void Flush();

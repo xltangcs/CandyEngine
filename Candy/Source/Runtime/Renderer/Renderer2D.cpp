@@ -276,13 +276,6 @@ namespace Candy {
 			slot.reset();
 	}
 
-		void Renderer2D::BeginScene(const OrthographicCamera& camera)
-	{
-		// TODO: legacy 2D ortho path �� camera matrix currently unused by the RHI
-		// path (no callers render through this overload on RHI backends).
-		StartBatch();
-	}
-
 	void Renderer2D::BeginScene(const Camera& camera, const glm::mat4& transform)
 	{
 		s_Data.CameraBuffer.ViewProjection = camera.GetProjection() * glm::inverse(transform);

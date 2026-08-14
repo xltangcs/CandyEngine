@@ -9,8 +9,6 @@
 #include "Platform/OpenGL/OpenGLTexture.h"
 #include "Platform/D3D12/D3D12Device.h"
 #include "Platform/D3D12/D3D12Texture2D.h"
-#include "Platform/Vulkan/VulkanDevice.h"
-#include "Platform/Vulkan/VulkanTexture2D.h"
 
 namespace Candy {
 
@@ -23,11 +21,6 @@ namespace Candy {
 		return static_cast<D3D12Device*>(RHIContext::GetDevice());
 	}
 
-	static VulkanDevice* GetVulkanDevice()
-	{
-		return static_cast<VulkanDevice*>(RHIContext::GetDevice());
-	}
-
 	Ref<Texture2D> Texture2D::Create(uint32_t width, uint32_t height)
 	{
 		switch (Renderer::GetAPI())
@@ -38,12 +31,6 @@ namespace Candy {
 		{
 			auto* dev = GetD3D12Device();
 			if (dev) return CreateRef<D3D12Texture2D>(dev, width, height);
-			return nullptr;
-		}
-		case RendererAPI::API::Vulkan:
-		{
-			auto* dev = GetVulkanDevice();
-			if (dev) return CreateRef<VulkanTexture2D>(dev, width, height);
 			return nullptr;
 		}
 		}
@@ -61,12 +48,6 @@ namespace Candy {
 		{
 			auto* dev = GetD3D12Device();
 			if (dev) return CreateRef<D3D12Texture2D>(dev, path);
-			return nullptr;
-		}
-		case RendererAPI::API::Vulkan:
-		{
-			auto* dev = GetVulkanDevice();
-			if (dev) return CreateRef<VulkanTexture2D>(dev, path);
 			return nullptr;
 		}
 		}

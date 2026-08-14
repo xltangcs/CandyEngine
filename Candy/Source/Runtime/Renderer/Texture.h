@@ -29,8 +29,7 @@ namespace Candy {
 		/// RHI view of this texture, for command-buffer binding
 		/// (RHICommandBuffer::SetTexture). Backends either return themselves
 		/// (when the texture class already is-a RHITexture, e.g. OpenGL) or
-		/// the RHI texture they own (D3D12). May return nullptr on backends
-		/// without RHI texture support (frozen Vulkan path).
+		/// the RHI texture they own (D3D12).
 		virtual Ref<RHITexture> GetRHITexture() = 0;
 	};
 
