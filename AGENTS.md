@@ -5,11 +5,12 @@
 ## Build
 
 ```pwsh
-git submodule update --init --recursive
 .\Scripts\GenerateProjects.bat    # premake5 → .sln/.vcxproj (均 gitignored)
 msbuild CandyEngine.sln /p:Configuration=Debug
 .\bin\Debug-windows-x86_64\CandyEditor\CandyEditor.exe
 ```
+
+> 第三方依赖已通过 **git subtree** 合并进主仓库，克隆后无需 submodule 拉取。
 
 - `premake5.lua` 是唯一真实构建来源，**不要手动编辑生成的 .sln/.vcxproj**
 - 配置: `Debug`/`Release`/`Dist` → `CANDY_DEBUG`/`CANDY_RELEASE`/`CANDY_DIST`

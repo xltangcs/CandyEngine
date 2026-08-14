@@ -23,11 +23,7 @@ msbuild CandyEngine.sln /p:Configuration=Debug
 .\bin\Debug-windows-x86_64\CandyEditor\CandyEditor.exe
 ```
 
-> **如果克隆时漏掉了子模块**，可以事后补救：
-> ```bash
-> git submodule update --init --recursive
-> .\Scripts\GenerateProjects.bat
-> ```
+> 第三方依赖（GLFW、glm、yaml-cpp、ImGuizmo、box2d、imgui、pybind11）已通过 **git subtree** 直接合并进主仓库，克隆后无需额外拉取依赖，可直接生成工程并构建。
 
 构建配置对应宏：`Debug` → `CANDY_DEBUG`，`Release` → `CANDY_RELEASE`，`Dist` → `CANDY_DIST`。
 
