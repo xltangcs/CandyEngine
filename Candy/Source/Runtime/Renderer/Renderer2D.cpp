@@ -4,16 +4,10 @@
 #include "Runtime/Renderer/Renderer.h"
 #include "Runtime/Renderer/GraphicsContext.h"
 #include "Runtime/Core/FileSystem.h"
-#include "Runtime/Core/Application.h"
 #include "Runtime/RHI/RHICommandQueue.h"
 #include "Runtime/RHI/RHIContext.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-
-// Backend includes — needed only by the [FROZEN] Vulkan init branch.
-// The unified D3D12/OpenGL init and Flush() go through RHIContext + RHI interfaces.
-#include "Platform/Vulkan/VulkanDevice.h"
-#include "Platform/Vulkan/VulkanGraphicsContext.h"
 
 
 namespace Candy {
@@ -89,12 +83,7 @@ namespace Candy {
 		Ref<RHIBuffer>           CameraCB; // constant buffer for ViewProjection
 		Ref<RHIGraphicsPipeline> QuadPipeline, CirclePipeline, LinePipeline;
 
-		// Backend activation flags (exactly one is true; selects the Init branch)
-		bool D3D12Active = false;
-		bool VkActive    = false;
-		bool OL_Active   = false;
-
-		// Active render target for D3D12/OpenGL/Vulkan flushing (RHI-bridged).
+		// Active render target for D3D12/OpenGL flushing (RHI-bridged).
 		Ref<RHIFramebuffer> ActiveRenderTarget;
 		// True when the active render target has not been cleared since it was
 		// (re-)bound via SetActiveRenderTarget. The first Flush after binding uses
@@ -102,153 +91,14 @@ namespace Candy {
 		// overlay pass) must use LoadOp::Load so they don't erase what earlier
 		// passes already drew into the same target.
 		bool ActiveRenderTargetPendingClear = true;
-
-		// ---- Vulkan-only init data ([FROZEN] backend) ----
-		VulkanDevice* VkDev = nullptr;
-		VkDescriptorSetLayout VkDescLayout = VK_NULL_HANDLE;
-		VkDescriptorSet       VkDescSet    = VK_NULL_HANDLE;
-		VkDescriptorPool      VkDescPool   = VK_NULL_HANDLE;
 	};
 
 	static Renderer2DData s_Data;
 
 	void Renderer2D::Init()
 	{
-		s_Data.D3D12Active = (Renderer::GetAPI() == RendererAPI::API::D3D12);
-		s_Data.VkActive    = (Renderer::GetAPI() == RendererAPI::API::Vulkan);
-		s_Data.OL_Active   = (Renderer::GetAPI() == RendererAPI::API::OpenGL);
-
-		if (s_Data.VkActive)
-		{
-			CANDY_CORE_INFO("Renderer2D: initializing Vulkan backend (triangle SPIR-V shaders)...");
-
-			auto* gfxCtx = dynamic_cast<VulkanGraphicsContext*>(
-				Application::Get().GetWindow().GetGraphicsContext());
-			if (!gfxCtx) { CANDY_CORE_ERROR("Renderer2D: Vulkan API but no VulkanGraphicsContext"); return; }
-			s_Data.VkDev = gfxCtx->GetDevice();
-
-			auto* dev = s_Data.VkDev;
-			VkDevice vkDev = dev->GetVkDevice();
-
-			// --- CPU-side vertex buffers ---
-			s_Data.QuadVertexBufferBase   = new QuadVertex[s_Data.MaxVertices];
-			s_Data.CircleVertexBufferBase = new CircleVertex[s_Data.MaxVertices];
-			s_Data.LineVertexBufferBase   = new LineVertex[s_Data.MaxVertices];
-
-			// --- GPU vertex buffers (upload heap, CPU-accessible) ---
-			auto makeUploadVB = [&](uint64_t size, uint32_t stride, const char* name) -> Ref<RHIBuffer> {
-				BufferDesc d; d.Size=size; d.Usage=ResourceUsage::VertexBuffer; d.CPUAccessible=true; d.Stride=stride; d.DebugName=name;
-				return dev->CreateBuffer(d);
-			};
-			s_Data.QuadVB   = makeUploadVB(s_Data.MaxVertices * sizeof(QuadVertex),  sizeof(QuadVertex),  "Vk2D_QuadVB");
-			s_Data.CircleVB = makeUploadVB(s_Data.MaxVertices * sizeof(CircleVertex),sizeof(CircleVertex),"Vk2D_CircleVB");
-			s_Data.LineVB   = makeUploadVB(s_Data.MaxVertices * sizeof(LineVertex),  sizeof(LineVertex),  "Vk2D_LineVB");
-
-			// Index buffer (with data uploaded)
-			{
-				uint32_t* indices = new uint32_t[s_Data.MaxIndices];
-				uint32_t off = 0;
-				for (uint32_t i = 0; i < s_Data.MaxIndices; i += 6)
-				{ indices[i+0]=off; indices[i+1]=off+1; indices[i+2]=off+2; indices[i+3]=off+2; indices[i+4]=off+3; indices[i+5]=off; off+=4; }
-
-				// Create host-visible index buffer and upload data
-				{
-					BufferDesc ibDesc;
-					ibDesc.Size = s_Data.MaxIndices * sizeof(uint32_t);
-					ibDesc.Usage = ResourceUsage::IndexBuffer;
-					ibDesc.CPUAccessible = true; // host-visible for upload
-					ibDesc.DebugName = "Vk2D_QuadIB";
-					s_Data.QuadIB = dev->CreateBuffer(ibDesc);
-				}
-				// Upload
-				s_Data.QuadIB->Write(indices, s_Data.MaxIndices * sizeof(uint32_t));
-				delete[] indices;
-			}
-
-			// Camera CB
-			{
-				BufferDesc d; d.Size=256; d.Usage=ResourceUsage::ConstantBuffer; d.CPUAccessible=true; d.DebugName="Vk2D_CameraCB";
-				s_Data.CameraCB = dev->CreateBuffer(d);
-			}
-
-			// --- Shaders (use built-in triangle SPIR-V) ---
-			auto& vsSpv = dev->GetTriangleVSSPIRV();
-			auto& psSpv = dev->GetTrianglePSSPIRV();
-			auto quadVS = dev->CreateShaderModule(vsSpv.data(), static_cast<uint32_t>(vsSpv.size()*4), "QuadVS");
-			auto quadPS = dev->CreateShaderModule(psSpv.data(), static_cast<uint32_t>(psSpv.size()*4), "QuadPS");
-			auto circleVS = quadVS; auto circlePS = quadPS;
-			auto lineVS   = quadVS; auto linePS   = quadPS;
-
-			// --- Descriptor set layout + pool + set ---
-			{
-				VkDescriptorSetLayoutBinding uboBinding = {};
-				uboBinding.binding         = 0;
-				uboBinding.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				uboBinding.descriptorCount = 1;
-				uboBinding.stageFlags      = VK_SHADER_STAGE_VERTEX_BIT;
-
-				VkDescriptorSetLayoutCreateInfo dsli = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-				dsli.bindingCount = 1;
-				dsli.pBindings    = &uboBinding;
-				dev->fnCreateDescriptorSetLayout(vkDev, &dsli, nullptr, &s_Data.VkDescLayout);
-
-				VkDescriptorPoolSize poolSize = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 };
-				VkDescriptorPoolCreateInfo dpci = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-				dpci.poolSizeCount = 1;
-				dpci.pPoolSizes    = &poolSize;
-				dpci.maxSets       = 1;
-				dev->fnCreateDescriptorPool(vkDev, &dpci, nullptr, &s_Data.VkDescPool);
-
-				VkDescriptorSetAllocateInfo dsai = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-				dsai.descriptorPool     = s_Data.VkDescPool;
-				dsai.descriptorSetCount = 1;
-				dsai.pSetLayouts        = &s_Data.VkDescLayout;
-				dev->fnAllocateDescriptorSets(vkDev, &dsai, &s_Data.VkDescSet);
-			}
-
-			// --- Pipelines ---
-			{
-				GraphicsPipelineDesc pd;
-				pd.Topology=PrimitiveTopology::Triangles; pd.Rasterizer.Cull=CullMode::None; pd.Rasterizer.Fill=FillMode::Solid;
-				pd.DepthStencil.DepthTestEnable=false; pd.DepthStencil.DepthWriteEnable=false;
-				pd.Blend.BlendEnable=true; pd.Blend.SrcColorBlendFactor=BlendState::BlendFactor::SrcAlpha;
-				pd.Blend.DstColorBlendFactor=BlendState::BlendFactor::OneMinusSrcAlpha; pd.Blend.WriteMask=ColorWriteMask::All;
-				pd.RenderTargetFormats={RHIFormat::R8G8B8A8Unorm};
-
-				// Quad
-				{ GraphicsPipelineDesc qd=pd; VertexInputLayout::VertexBinding b; b.Binding=0; b.Stride=sizeof(QuadVertex);
-				  qd.VertexInput.Bindings.push_back(b);
-				  qd.VertexInput.Attributes.push_back({0,0,RHIFormat::R32G32B32Float,0});
-				  qd.VertexInput.Attributes.push_back({1,0,RHIFormat::R32G32B32A32Float,offsetof(QuadVertex,Color)});
-				  s_Data.QuadPipeline=dev->CreateGraphicsPipeline(qd,quadVS,quadPS); }
-
-				// Circle
-				{ GraphicsPipelineDesc cd=pd; VertexInputLayout::VertexBinding b; b.Binding=0; b.Stride=sizeof(CircleVertex);
-				  cd.VertexInput.Bindings.push_back(b);
-				  cd.VertexInput.Attributes.push_back({0,0,RHIFormat::R32G32B32Float,0});
-				  cd.VertexInput.Attributes.push_back({2,0,RHIFormat::R32G32B32A32Float,offsetof(CircleVertex,Color)});
-				  s_Data.CirclePipeline=dev->CreateGraphicsPipeline(cd,circleVS,circlePS); }
-
-				// Line
-				{ GraphicsPipelineDesc ld=pd; ld.Topology=PrimitiveTopology::Lines; VertexInputLayout::VertexBinding b; b.Binding=0; b.Stride=sizeof(LineVertex);
-				  ld.VertexInput.Bindings.push_back(b);
-				  ld.VertexInput.Attributes.push_back({0,0,RHIFormat::R32G32B32Float,0});
-				  ld.VertexInput.Attributes.push_back({1,0,RHIFormat::R32G32B32A32Float,offsetof(LineVertex,Color)});
-				  s_Data.LinePipeline=dev->CreateGraphicsPipeline(ld,lineVS,linePS); }
-			}
-
-			s_Data.WhiteTexture = Texture2D::Create(1, 1);
-			uint32_t wtd=0xffffffff; s_Data.WhiteTexture->SetData(&wtd,sizeof(uint32_t));
-			s_Data.TextureSlots[0]=s_Data.WhiteTexture;
-			s_Data.QuadVertexPositions[0]={-0.5f,-0.5f,0.0f,1.0f}; s_Data.QuadVertexPositions[1]={0.5f,-0.5f,0.0f,1.0f};
-			s_Data.QuadVertexPositions[2]={0.5f,0.5f,0.0f,1.0f}; s_Data.QuadVertexPositions[3]={-0.5f,0.5f,0.0f,1.0f};
-
-			CANDY_CORE_INFO("Renderer2D: Vulkan backend initialized (colored primitives only)");
-			return;
-		}
-
 	// =====================================================
-	// Unified D3D12 / OpenGL init (Vulkan branch above is [FROZEN])
+	// Unified RHI init (D3D12 / OpenGL)
 	// =====================================================
 	{
 		auto* dev = RHIContext::GetDevice();
@@ -312,8 +162,8 @@ namespace Candy {
 		}
 
 		// --- Shader modules: per-API source directory; one multi-stage file per primitive ---
-		const char* shaderDir = s_Data.D3D12Active ? "DX12" : "OpenGL";
-		const char* shaderExt = s_Data.D3D12Active ? "hlsl" : "glsl";
+		const char* shaderDir = (Renderer::GetAPI() == RendererAPI::API::D3D12) ? "DX12" : "OpenGL";
+		const char* shaderExt = (Renderer::GetAPI() == RendererAPI::API::D3D12) ? "hlsl" : "glsl";
 		auto loadModule = [&](const char* file, ShaderStage stage, const char* entry) -> Ref<RHIShaderModule> {
 			std::string path = std::string("VFS://Engine/Shaders/") + shaderDir + "/" + file + "." + shaderExt;
 			auto src = FileSystem::Get().ReadText(path);
@@ -415,13 +265,15 @@ namespace Candy {
 		s_Data.CirclePipeline.reset();
 		s_Data.LinePipeline.reset();
 
-		if (s_Data.VkActive && s_Data.VkDev)
-		{
-			VkDevice vd = s_Data.VkDev->GetVkDevice();
-			if (s_Data.VkDescSet)  s_Data.VkDev->fnFreeCommandBuffers(vd, VK_NULL_HANDLE, 0, nullptr); // pool auto-frees sets
-			if (s_Data.VkDescPool) s_Data.VkDev->fnDestroyDescriptorPool(vd, s_Data.VkDescPool, nullptr);
-			if (s_Data.VkDescLayout) s_Data.VkDev->fnDestroyDescriptorSetLayout(vd, s_Data.VkDescLayout, nullptr);
-		}
+		// Release every tracked RHI resource still held by static s_Data while
+		// the device (owner of RHIResourceManager) is still alive. Otherwise
+		// ~Renderer2DData runs at atexit, after the device is gone, and
+		// RHITrackable::~RHITrackable unregisters through a dangling manager.
+		s_Data.ActiveRenderTarget.reset();
+		s_Data.ActiveRenderTargetPendingClear = true;
+		s_Data.WhiteTexture.reset();
+		for (auto& slot : s_Data.TextureSlots)
+			slot.reset();
 	}
 
 		void Renderer2D::BeginScene(const OrthographicCamera& camera)
