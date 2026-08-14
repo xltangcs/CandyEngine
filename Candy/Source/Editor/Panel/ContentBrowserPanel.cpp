@@ -12,22 +12,65 @@
 
 namespace Candy {
 
+	namespace
+	{
+		// Lowercase a string (ASCII, for extension matching).
+		std::string ToLower(const std::string& s)
+		{
+			std::string out = s;
+			std::transform(out.begin(), out.end(), out.begin(),
+			               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+			return out;
+		}
+
+		bool Contains(const std::vector<std::string>& list, const std::string& value)
+		{
+			return std::find(list.begin(), list.end(), value) != list.end();
+		}
+
+		// Returns false if `name` is a hidden file/folder that should be skipped.
+		// Hidden rules come from the (global) EditorSettings, filled in the
+		// Editor Settings panel.
+		//   * Folders: hidden by full name only (exact, case-sensitive).
+		//   * Files: hidden when their (lowercased) name ends with one of the
+		//     configured extensions (case-insensitive suffix match, no auto-dot).
+		//     The user controls the rule; e.g. ".png" only matches a trailing
+		//     ".png" while "png" also matches names ending in "png".
+		bool ShouldDisplayEntry(const std::string& name, bool isDirectory,
+		                        const std::vector<std::string>& hiddenFolderNames,
+		                        const std::vector<std::string>& hiddenExtensions)
+		{
+			// Folders are hidden by full name only.
+			if (isDirectory)
+				return !Contains(hiddenFolderNames, name);
+
+			// Files are hidden by case-insensitive suffix match against their name.
+			std::string lower = ToLower(name);
+			for (const auto& e : hiddenExtensions)
+			{
+				if (!e.empty() && lower.ends_with(ToLower(e)))
+					return false;
+			}
+			return true;
+		}
+	}
+
 	ContentBrowserPanel::ContentBrowserPanel()
 	{
-		m_DirectoryIcon = Texture2D::Create("VFS://Engine/Icons/ContentBrowser/DirectoryIcon.png");
-		m_FileIcon = Texture2D::Create("VFS://Engine/Icons/ContentBrowser/FileIcon.png");
+		m_DirectoryIcon = Texture2D::Create("VFS://Engine/Content/Icons/ContentBrowser/DirectoryIcon.png");
+		m_FileIcon = Texture2D::Create("VFS://Engine/Content/Icons/ContentBrowser/FileIcon.png");
 		m_TreePaneWidth = EditorSettings::Get().m_ContentBrowserTreeWidth;
 		if (m_TreePaneWidth < 160.0f) m_TreePaneWidth = 240.0f;
 	}
 
 	std::filesystem::path ContentBrowserPanel::ResolveDiskPath(Domain d, const std::filesystem::path& rel)
 	{
-		// Engine Content lives at ../Candy/Content relative to the editor CWD
-		static const std::filesystem::path kEngineContent = std::filesystem::path("..") / "Candy" / "Content";
+		// Engine root lives at ../Candy relative to the editor CWD (resources under Content/)
+		static const std::filesystem::path kEngineRoot = std::filesystem::path("..") / "Candy";
 
 		auto root = (d == Domain::Game)
-			? Application::Get().GetProject()->GetProjectDirectory() / "Content"
-			: kEngineContent;
+			? Application::Get().GetProject()->GetProjectDirectory()
+			: kEngineRoot;
 		return root / rel;
 	}
 
@@ -153,12 +196,18 @@ namespace Candy {
 		auto diskDir = ResolveDiskPath(domain, dir);
 		if (!std::filesystem::exists(diskDir)) return;
 
+		auto& editorSettings = EditorSettings::Get();
+
 		// Collect and sort subdirectories (files are shown in the content grid, not the tree)
 		std::vector<std::filesystem::path> subdirs;
 		for (auto& entry : std::filesystem::directory_iterator(diskDir))
 		{
 			if (entry.is_directory())
-				subdirs.push_back(entry.path());
+			{
+				auto name = entry.path().filename().string();
+				if (ShouldDisplayEntry(name, true, editorSettings.m_HiddenFolderNames, editorSettings.m_HiddenExtensions))
+					subdirs.push_back(entry.path());
+			}
 		}
 		std::sort(subdirs.begin(), subdirs.end());
 
@@ -241,6 +290,11 @@ namespace Candy {
 			const auto& path = directoryEntry.path();
 			auto relativeToDomain = std::filesystem::relative(path, domainRoot);
 			std::string filenameString = relativeToDomain.filename().string();
+
+			// Skip hidden extensions / folder names
+			if (!ShouldDisplayEntry(filenameString, directoryEntry.is_directory(),
+			                        editorSettings.m_HiddenFolderNames, editorSettings.m_HiddenExtensions))
+				continue;
 
 			// Apply search filter (case-insensitive substring on filename)
 			if (!lowerFilter.empty())

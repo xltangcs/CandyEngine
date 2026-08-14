@@ -227,6 +227,63 @@ namespace Candy {
 		return modified;
 	}
 
+	bool ImGuiUtils::DrawMultilineStringList(const std::string& label, std::vector<std::string>& values)
+	{
+		bool modified = false;
+
+		ImGui::PushID(label.c_str());
+
+		ImGui::Columns(2);
+		ImGui::SetColumnWidth(0, EditorSettings::Get().m_ColumnWidth);
+
+		ImGui::Text("%s", label.c_str());
+		ImGui::NextColumn();
+
+		// Ensure at least one row is always available for the user to type into.
+		if (values.empty())
+			values.push_back("");
+
+		// Each row: one input text + a delete button (when more than one row).
+		const float buttonWidth = ImGui::GetFrameHeight();
+		for (size_t i = 0; i < values.size(); ++i)
+		{
+			ImGui::PushID(static_cast<int>(i));
+
+			ImGui::PushItemWidth(-(buttonWidth + ImGui::GetStyle().ItemSpacing.x));
+			if (ImGui::InputText("##value", &values[i]))
+			{
+				if (ImGui::IsItemDeactivatedAfterEdit())
+					modified = true;
+			}
+			ImGui::PopItemWidth();
+
+			if (values.size() > 1)
+			{
+				ImGui::SameLine();
+				if (ImGui::Button("-", ImVec2(buttonWidth, 0)))
+				{
+					values.erase(values.begin() + i);
+					modified = true;
+					--i;
+				}
+			}
+
+			ImGui::PopID();
+		}
+
+		// Add a new empty row.
+		if (ImGui::Button("+ Add", ImVec2(0, 0)))
+		{
+			values.push_back("");
+			modified = true;
+		}
+
+		ImGui::Columns(1);
+		ImGui::PopID();
+
+		return modified;
+	}
+
 	void ImGuiUtils::DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue)
 	{
 		ImGuiIO& io = ImGui::GetIO();

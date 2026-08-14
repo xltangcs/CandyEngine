@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace Candy {
 
@@ -19,9 +20,12 @@ namespace Candy {
 		bool m_AutoOpenLastProject = false;
 
 		float m_FontSize = 18.0f;
-		std::string m_FontPath = "VFS://Engine/Fonts/opensans/OpenSans-Regular.ttf";
+		std::string m_FontPath = "VFS://Engine/Content/Fonts/opensans/OpenSans-Regular.ttf";
 
 		bool m_ShowPhysicsColliders = false;
+
+		std::vector<std::string> m_HiddenExtensions;
+		std::vector<std::string> m_HiddenFolderNames;
 
 	private:
 		EditorSettings() = default;

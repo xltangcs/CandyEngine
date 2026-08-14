@@ -44,6 +44,16 @@ namespace Candy {
 		if (ImGuiUtils::DrawCheckbox("Show Physics Colliders", editorSetting.m_ShowPhysicsColliders))
 			editorSetting.Save();
 
+		ImGui::Separator();
+		ImGui::TextUnformatted("Content Browser Hidden Rules");
+		ImGui::TextDisabled("One item per line. Folder hides by full name; extension hides files whose name ends with it (case-insensitive, no auto-dot).");
+
+		if (ImGuiUtils::DrawMultilineStringList("Hidden Extensions", editorSetting.m_HiddenExtensions))
+			editorSetting.Save();
+
+		if (ImGuiUtils::DrawMultilineStringList("Hidden folder name", editorSetting.m_HiddenFolderNames))
+			editorSetting.Save();
+
 		ImGui::End();
 	}
 

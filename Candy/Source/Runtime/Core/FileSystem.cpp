@@ -50,8 +50,8 @@ namespace Candy {
 	const FileSystem::MountPoint* FileSystem::Resolve(const std::string& virtualPath, std::string& outRelativePath)
 	{
 		// Only accept VFS:// scheme.
-		// "VFS://Engine/Icons/x.png" -> domain="Engine", relative="Icons/x.png"
-		// "VFS://Game"               -> domain="Game",   relative=""
+		// "VFS://Engine/Content/Icons/x.png" -> domain="Engine", relative="Content/Icons/x.png"
+		// "VFS://Game"                       -> domain="Game",   relative=""
 		const std::string scheme = "VFS://";
 		if (!virtualPath.starts_with(scheme))
 			return nullptr;

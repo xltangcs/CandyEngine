@@ -48,22 +48,24 @@ namespace Candy {
 		m_ImGuiLayer = new ImGuiLayer();
 		PushOverlay(m_ImGuiLayer);
 
-		ImGuiLayer::RebuildFont("VFS://Engine/Fonts/opensans/OpenSans-Regular.ttf");
+		ImGuiLayer::RebuildFont("VFS://Engine/Content/Fonts/opensans/OpenSans-Regular.ttf");
 	}
 
 	void Application::MountContent()
 	{
 		if (m_IsEditor)
 		{
-			// Editor: mount the real Engine Content directory (hot-reload friendly).
-			// Try several candidate relative paths so the editor works whether the
-			// process cwd is the workspace root (`Candy/Content`) or under bin/.
+			// Editor: mount the engine root directory (hot-reload friendly).
+			// Engine resources live under the `Content/` subdirectory, so their
+			// VFS paths are `VFS://Engine/Content/...`. Try several candidate
+			// relative paths so the editor works whether the process cwd is the
+			// workspace root (`Candy`) or under bin/.
 			std::array<const char*, 5> candidates = {
-				"Candy/Content",          // cwd == workspace root (e.g. `E:\CandyEngine`)
-				"../Candy/Content",       // cwd == bin/Debug-windows-x86_64/CandyEditor
-				"../../Candy/Content",
-				"../../../Candy/Content",
-				"Content",                // last-resort fallback beside the exe
+				"Candy",                  // cwd == workspace root (e.g. `E:\CandyEngine`)
+				"../Candy",               // cwd == bin/Debug-windows-x86_64/CandyEditor
+				"../../Candy",
+				"../../../Candy",
+				"..",                     // last-resort fallback beside the exe
 			};
 			std::filesystem::path engineDir;
 			for (const char* c : candidates)
@@ -78,7 +80,7 @@ namespace Candy {
 			if (!engineDir.empty())
 				FileSystem::Get().Mount("Engine", engineDir);
 			else
-				CANDY_CORE_WARN("Engine content not found in any candidate path");
+				CANDY_CORE_WARN("Engine directory not found in any candidate path");
 		}
 		else
 		{
@@ -234,15 +236,16 @@ namespace Candy {
 			m_ActiveProject = project;
 			UpdateWindowTitle();
 
-			// Editor: mount the game's real Content directory (supports hot reload).
-			// Packaged builds already mount Game content from the .pak in MountContent().
+			// Editor: mount the game's root directory (same directory as the
+			// .candyproj file, supports hot reload). Packaged builds already mount
+			// Game content from the .pak in MountContent().
 			if (m_IsEditor)
 			{
-				auto contentDir = project->GetProjectDirectory() / "Content";
-				if (std::filesystem::exists(contentDir))
-					FileSystem::Get().Mount("Game", contentDir);
+				auto projectDir = project->GetProjectDirectory();
+				if (std::filesystem::exists(projectDir))
+					FileSystem::Get().Mount("Game", projectDir);
 				else
-					CANDY_CORE_WARN("Game content not found: {0}", contentDir.string());
+					CANDY_CORE_WARN("Game directory not found: {0}", projectDir.string());
 			}
 		}
 	}

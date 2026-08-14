@@ -43,10 +43,10 @@ namespace Candy {
 	{
 		CANDY_PROFILE_FUNCTION();
 
-		m_CheckerboardTexture = Texture2D::Create("VFS://Engine/Textures/Checkerboard.png");
-		m_IconPlay = Texture2D::Create("VFS://Engine/Icons/PlayButton.png");
-		m_IconStop = Texture2D::Create("VFS://Engine/Icons/StopButton.png");
-		m_IconSimulate = Texture2D::Create("VFS://Engine/Icons/SimulateButton.png");
+		m_CheckerboardTexture = Texture2D::Create("VFS://Engine/Content/Textures/Checkerboard.png");
+		m_IconPlay = Texture2D::Create("VFS://Engine/Content/Icons/PlayButton.png");
+		m_IconStop = Texture2D::Create("VFS://Engine/Content/Icons/StopButton.png");
+		m_IconSimulate = Texture2D::Create("VFS://Engine/Content/Icons/SimulateButton.png");
 
 		FramebufferDesc fbSpec;
 		fbSpec.ColorAttachments = { { RHIFormat::R8G8B8A8Unorm, false }, { RHIFormat::R32Sint, true } };

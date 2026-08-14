@@ -6,10 +6,13 @@
 namespace Candy {
 
 	// VfsPath — value type for the unified VFS:// path scheme.
+	// The mount roots are: Engine -> engine root dir, Game -> project root dir.
+	// Engine resources live under the Content/ subdirectory of the engine root,
+	// e.g. "VFS://Engine/Content/Icons/StopButton.png".
 	// Examples:
-	//   "VFS://Engine/Icons/StopButton.png"  -> { Engine, "Icons/StopButton.png" }
-	//   "VFS://Game/Scripts/Player.py"       -> { Game,   "Scripts/Player.py" }
-	//   "VFS://Engine"                       -> { Engine, "" }  (domain root)
+	//   "VFS://Engine/Content/Icons/StopButton.png"  -> { Engine, "Content/Icons/StopButton.png" }
+	//   "VFS://Game/Scripts/Player.py"               -> { Game,   "Scripts/Player.py" }
+	//   "VFS://Engine"                               -> { Engine, "" }  (domain root)
 	struct VfsPath
 	{
 		enum class Domain { Engine, Game, Invalid };

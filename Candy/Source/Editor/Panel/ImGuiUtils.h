@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <glm/glm.hpp>
 #include <imgui/imgui.h>
 #include <imgui/misc/cpp/imgui_stdlib.h>
@@ -27,6 +28,8 @@ namespace Candy {
 		static bool DrawCombo(const std::string& label, const char** items, int itemCount, int& currentIndex);
 
 		static bool DrawInputText(const std::string& label, std::string& value);
+
+		static bool DrawMultilineStringList(const std::string& label, std::vector<std::string>& values);
 
 		static void DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue = 0.0f);
 	};

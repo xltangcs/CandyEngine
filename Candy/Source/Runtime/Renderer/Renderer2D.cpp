@@ -165,7 +165,7 @@ namespace Candy {
 		const char* shaderDir = (Renderer::GetAPI() == RendererAPI::API::D3D12) ? "DX12" : "OpenGL";
 		const char* shaderExt = (Renderer::GetAPI() == RendererAPI::API::D3D12) ? "hlsl" : "glsl";
 		auto loadModule = [&](const char* file, ShaderStage stage, const char* entry) -> Ref<RHIShaderModule> {
-			std::string path = std::string("VFS://Engine/Shaders/") + shaderDir + "/" + file + "." + shaderExt;
+			std::string path = std::string("VFS://Engine/Content/Shaders/") + shaderDir + "/" + file + "." + shaderExt;
 			auto src = FileSystem::Get().ReadText(path);
 			if (!src)
 			{

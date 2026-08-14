@@ -1,9 +1,19 @@
 EditorSettings:
   FontSize: 27
-  FontPath: VFS://Engine/Fonts/opensans/OpenSans-Regular.ttf
+  FontPath: VFS://Engine/Content/Fonts/opensans/OpenSans-Regular.ttf
   ShowPhysicsColliders: false
   ThumbnailSize: 99.2679977
   ThumbnailPadding: 12.085
   ContentBrowserTreeWidth: 379
-  ColumnWidth: 150
+  ColumnWidth: 233
   AutoOpenLastProject: true
+  HiddenExtensions:
+    - .candyproj
+    - .pak
+    - .vcxproj
+    - .vcxproj.filters
+    - .lua
+  HiddenFolderNames:
+    - ThirdParty
+    - Source
+    - Saved

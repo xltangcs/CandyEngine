@@ -15,6 +15,19 @@ namespace Candy {
 
 	void EditorSettings::Save()
 	{
+		// Drop empty rows so the settings file stays clean.
+		auto cleaned = [](const std::vector<std::string>& list)
+		{
+			std::vector<std::string> out;
+			out.reserve(list.size());
+			for (const auto& v : list)
+			{
+				if (!v.empty())
+					out.push_back(v);
+			}
+			return out;
+		};
+
 		std::filesystem::create_directories("Config");
 		YAML::Emitter out;
 		out << YAML::BeginMap;
@@ -27,6 +40,8 @@ namespace Candy {
 		out << YAML::Key << "ContentBrowserTreeWidth" << YAML::Value << m_ContentBrowserTreeWidth;
 		out << YAML::Key << "ColumnWidth" << YAML::Value << m_ColumnWidth;
 		out << YAML::Key << "AutoOpenLastProject" << YAML::Value << m_AutoOpenLastProject;
+		out << YAML::Key << "HiddenExtensions" << YAML::Value << cleaned(m_HiddenExtensions);
+		out << YAML::Key << "HiddenFolderNames" << YAML::Value << cleaned(m_HiddenFolderNames);
 		out << YAML::EndMap << YAML::EndMap;
 		std::ofstream("Config/EditorSettings.candy") << out.c_str();
 	}
@@ -56,6 +71,8 @@ namespace Candy {
 		if (s["ContentBrowserTreeWidth"]) m_ContentBrowserTreeWidth = s["ContentBrowserTreeWidth"].as<float>();
 		if (s["ColumnWidth"]) m_ColumnWidth = s["ColumnWidth"].as<float>();
 		if (s["AutoOpenLastProject"]) m_AutoOpenLastProject = s["AutoOpenLastProject"].as<bool>();
+		if (s["HiddenExtensions"]) m_HiddenExtensions = s["HiddenExtensions"].as<std::vector<std::string>>();
+		if (s["HiddenFolderNames"]) m_HiddenFolderNames = s["HiddenFolderNames"].as<std::vector<std::string>>();
 	}
 
 }

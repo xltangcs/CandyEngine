@@ -33,7 +33,8 @@ namespace Candy {
 		// contains both engine/ and game/ subdirectories (standalone mode), use
 		// pakSubDir to specify the subdirectory within the pak.
 		// Examples:
-		//   Mount("Engine", "Candy/Content/")              — editor: directory
+		//   Mount("Engine", "Candy/")                      — editor: engine root dir
+		//   Mount("Game",   "MyProject/")                  — editor: project root dir
 		//   Mount("Game",   "MyGame.pak")                  — game: pak w/o subdir
 		//   Mount("Engine", "Standalone.pak", "engine/")   — standalone: subdir
 		//   Mount("Game",   "Standalone.pak", "game/")     — standalone: subdir
