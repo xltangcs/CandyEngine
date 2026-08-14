@@ -32,16 +32,16 @@ namespace Candy {
 	Ref<RHIBuffer> OpenGLRHIDevice::CreateBuffer(const BufferDesc& desc)
 	{
 		auto buf = CreateRef<OpenGLRHIBuffer>(desc);
-		buf->SetIRTracking(&GetResourceManager(),
-			GetResourceManager().Register(IR::ResourceType::Buffer, buf.get(), desc.DebugName));
+		buf->SetRHITracking(&GetResourceManager(),
+			GetResourceManager().Register(ResourceType::Buffer, buf.get(), desc.DebugName));
 		return buf;
 	}
 
 	Ref<RHITexture> OpenGLRHIDevice::CreateTexture(const TextureDesc& desc)
 	{
 		auto tex = CreateRef<OpenGLRHITexture2D>(desc);
-		tex->SetIRTracking(&GetResourceManager(),
-			GetResourceManager().Register(IR::ResourceType::Texture, tex.get(), desc.DebugName));
+		tex->SetRHITracking(&GetResourceManager(),
+			GetResourceManager().Register(ResourceType::Texture, tex.get(), desc.DebugName));
 		return tex;
 	}
 
@@ -64,8 +64,8 @@ namespace Candy {
 		}
 
 		// Dedup via the IR shader library: identical source never creates two modules.
-		const uint64_t key = IR::IRShaderLibrary::MakeKey(
-			IR::IRShaderLibrary::HashBytes(sourceBytes, byteSize), ShaderStage::None, debugName);
+		const uint64_t key = RHIShaderLibrary::MakeKey(
+			RHIShaderLibrary::HashBytes(sourceBytes, byteSize), ShaderStage::None, debugName);
 
 		return GetShaderLibrary().GetOrCreate(key, ShaderStage::None, debugName, [&]() -> Ref<RHIShaderModule> {
 			std::string source(static_cast<const char*>(sourceBytes), byteSize);
@@ -157,8 +157,8 @@ namespace Candy {
 
 		auto pipeline = CreateRef<OpenGLRHIGraphicsPipeline>(desc);
 		pipeline->SetProgram(program);
-		pipeline->SetIRTracking(&GetResourceManager(),
-			GetResourceManager().Register(IR::ResourceType::GraphicsPipeline, pipeline.get(), "GraphicsPipeline"));
+		pipeline->SetRHITracking(&GetResourceManager(),
+			GetResourceManager().Register(ResourceType::GraphicsPipeline, pipeline.get(), "GraphicsPipeline"));
 		return pipeline;
 	}
 
@@ -170,8 +170,8 @@ namespace Candy {
 	Ref<RHIFramebuffer> OpenGLRHIDevice::CreateFramebuffer(const FramebufferDesc& desc)
 	{
 		auto fb = CreateRef<OpenGLFramebuffer>(desc);
-		fb->SetIRTracking(&GetResourceManager(),
-			GetResourceManager().Register(IR::ResourceType::Framebuffer, fb.get(), "Framebuffer"));
+		fb->SetRHITracking(&GetResourceManager(),
+			GetResourceManager().Register(ResourceType::Framebuffer, fb.get(), "Framebuffer"));
 		return fb;
 	}
 

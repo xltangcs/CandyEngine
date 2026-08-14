@@ -312,8 +312,8 @@ namespace Candy {
 	Ref<RHIBuffer> VulkanDevice::CreateBuffer(const BufferDesc& desc)
 	{
 		auto buf = CreateRef<VulkanBuffer>(this, desc);
-		buf->SetIRTracking(&GetResourceManager(),
-			GetResourceManager().Register(IR::ResourceType::Buffer, buf.get(), desc.DebugName));
+		buf->SetRHITracking(&GetResourceManager(),
+			GetResourceManager().Register(ResourceType::Buffer, buf.get(), desc.DebugName));
 		return buf;
 	}
 
@@ -347,8 +347,8 @@ namespace Candy {
 		if (!spirv || size == 0) return nullptr;
 
 		// [FROZEN] Dedup via the IR shader library (bytecode content hash).
-		const uint64_t key = IR::IRShaderLibrary::MakeKey(
-			IR::IRShaderLibrary::HashBytes(spirv, size), ShaderStage::None, "");
+		const uint64_t key = RHIShaderLibrary::MakeKey(
+			RHIShaderLibrary::HashBytes(spirv, size), ShaderStage::None, "");
 
 		return GetShaderLibrary().GetOrCreate(key, ShaderStage::None, "", [&]() -> Ref<RHIShaderModule> {
 			VkShaderModuleCreateInfo ci = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
@@ -493,8 +493,8 @@ namespace Candy {
 	{
 		// [FROZEN] minimal implementation ¡ª kept compiling only.
 		auto fb = CreateRef<VulkanFramebuffer>(desc, this);
-		fb->SetIRTracking(&GetResourceManager(),
-			GetResourceManager().Register(IR::ResourceType::Framebuffer, fb.get(), "Framebuffer"));
+		fb->SetRHITracking(&GetResourceManager(),
+			GetResourceManager().Register(ResourceType::Framebuffer, fb.get(), "Framebuffer"));
 		return fb;
 	}
 

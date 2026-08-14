@@ -5,7 +5,7 @@
 #include "Runtime/RHI/RHIPipelineState.h"
 #include "Runtime/RHI/RHISwapChain.h"
 #include "Runtime/RHI/RHIFramebuffer.h"
-#include "Runtime/RHI/IR/IRTracking.h"
+#include "Runtime/RHI/Shared/RHITracking.h"
 
 #include <cstdint>
 #include <cstring>
@@ -70,7 +70,7 @@ namespace Candy {
 	// =========================================================================
 	// RHIBuffer — GPU buffer resource (vertex, index, constant, storage, …)
 	// =========================================================================
-	class RHIBuffer : public IRTrackable
+	class RHIBuffer : public RHITrackable
 	{
 	public:
 		virtual ~RHIBuffer() = default;
@@ -99,7 +99,7 @@ namespace Candy {
 	// =========================================================================
 	// RHITexture — 1D / 2D / 3D / Cubemap texture resource
 	// =========================================================================
-	class RHITexture : public IRTrackable
+	class RHITexture : public RHITrackable
 	{
 	public:
 		virtual ~RHITexture() = default;

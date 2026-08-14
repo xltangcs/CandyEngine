@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Runtime/RHI/RHITypes.h"
-#include "Runtime/RHI/IR/IRTracking.h"
+#include "Runtime/RHI/Shared/RHITracking.h"
 
 #include <vector>
 #include <cstdint>
@@ -40,7 +40,7 @@ namespace Candy {
 	// (Vulkan). Runtime code only sees this abstract interface plus the
 	// descriptor returned by RHIDevice::CreateFramebuffer.
 	// =========================================================================
-	class RHIFramebuffer : public IRTrackable
+	class RHIFramebuffer : public RHITrackable
 	{
 	public:
 		virtual ~RHIFramebuffer() = default;

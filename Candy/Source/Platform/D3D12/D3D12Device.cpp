@@ -102,9 +102,11 @@ float4 main(PSInput input) : SV_TARGET
 	public:
 		D3D12CommandQueue(ID3D12Device* device, ComPtr<ID3D12CommandQueue> queue,
 		                 ID3D12DescriptorHeap* cbvSrvUavHeap,
-		                 ID3D12DescriptorHeap* samplerHeap)
+		                 ID3D12DescriptorHeap* samplerHeap,
+		                 uint32_t textureTableBase)
 			: m_Device(device), m_Queue(std::move(queue))
 			, m_CBVSRVUAVHeap(cbvSrvUavHeap), m_SamplerHeap(samplerHeap)
+			, m_TextureTableBase(textureTableBase)
 		{
 			HRESULT hr = device->CreateCommandAllocator(
 				D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_CommandAllocator));
@@ -144,7 +146,7 @@ float4 main(PSInput input) : SV_TARGET
 
 			return Candy::CreateScope<D3D12CommandBuffer>(
 				std::move(cmdList), std::move(allocator), m_Device,
-				m_CBVSRVUAVHeap, m_SamplerHeap);
+				m_CBVSRVUAVHeap, m_SamplerHeap, m_TextureTableBase);
 		}
 
 		void Submit(const std::vector<RHICommandBuffer*>& commandBuffers) override
@@ -199,6 +201,9 @@ float4 main(PSInput input) : SV_TARGET
 		ComPtr<ID3D12CommandAllocator> m_CommandAllocator;
 		ID3D12DescriptorHeap*          m_CBVSRVUAVHeap = nullptr;
 		ID3D12DescriptorHeap*          m_SamplerHeap   = nullptr;
+		// Base slot of the Renderer2D texture table in the shared heap
+		// (owned by D3D12Device, handed out at construction).
+		uint32_t                       m_TextureTableBase = 0;
 	};
 
 	// =========================================================================
@@ -327,6 +332,16 @@ float4 main(PSInput input) : SV_TARGET
 					D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 		}
 
+		// SRV range allocator over the shared CBV_SRV_UAV heap. All regions
+		// (Renderer2D texture table, ImGui editor/game UI, framebuffer SRVs,
+		// engine textures) are handed out by RHIDescriptorSetManager instead of
+		// hard-coded slot constants.
+		GetDescriptorSetManager().InitRangeAllocator(256);
+
+		// Renderer2D's 32-wide texture table region (t0-t31) ¡ª allocated once
+		// here; command buffers write batch textures relative to this base.
+		m_TextureTableBase = AllocateSRVRange(32);
+
 		// Command queue
 		D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 		queueDesc.Type     = D3D12_COMMAND_LIST_TYPE_DIRECT;
@@ -343,7 +358,8 @@ float4 main(PSInput input) : SV_TARGET
 
 		m_CommandQueue = CreateScope<D3D12CommandQueue>(
 			m_NativeDevice.Get(), std::move(commandQueue),
-			m_CBVSRVUAVHeap.Get(), m_SamplerHeap.Get());
+			m_CBVSRVUAVHeap.Get(), m_SamplerHeap.Get(),
+			m_TextureTableBase);
 
 		// Fence
 		hr = m_NativeDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_Fence));
@@ -394,6 +410,11 @@ float4 main(PSInput input) : SV_TARGET
 	{
 		auto* q = static_cast<D3D12CommandQueue*>(m_CommandQueue.get());
 		return q ? q->GetNativeQueue() : nullptr;
+	}
+
+	uint32_t D3D12Device::AllocateSRVRange(uint32_t count)
+	{
+		return GetDescriptorSetManager().AllocateRange(count);
 	}
 
 	void D3D12Device::LogDebugLayerMessages() const
@@ -500,8 +521,8 @@ float4 main(PSInput input) : SV_TARGET
 	{
 		// Dedup via the IR shader library: identical (source, stage, entry) never
 		// compiles twice. The factory runs only on cache miss.
-		const uint64_t key = IR::IRShaderLibrary::MakeKey(
-			IR::IRShaderLibrary::HashBytes(source, strlen(source)), stage, entryPoint);
+		const uint64_t key = RHIShaderLibrary::MakeKey(
+			RHIShaderLibrary::HashBytes(source, strlen(source)), stage, entryPoint);
 
 		return GetShaderLibrary().GetOrCreate(key, stage, debugName, [&]() -> Ref<RHIShaderModule> {
 			const char* target = (stage == ShaderStage::Vertex) ? "vs_5_0" : "ps_5_0";
@@ -696,16 +717,16 @@ float4 main(PSInput input) : SV_TARGET
 	Ref<RHIBuffer> D3D12Device::CreateBuffer(const BufferDesc& desc)
 	{
 		auto buf = CreateRef<D3D12Buffer>(m_NativeDevice.Get(), desc);
-		buf->SetIRTracking(&GetResourceManager(),
-			GetResourceManager().Register(IR::ResourceType::Buffer, buf.get(), desc.DebugName));
+		buf->SetRHITracking(&GetResourceManager(),
+			GetResourceManager().Register(ResourceType::Buffer, buf.get(), desc.DebugName));
 		return buf;
 	}
 
 	Ref<RHITexture> D3D12Device::CreateTexture(const TextureDesc& desc)
 	{
 		auto tex = CreateRef<D3D12Texture>(this, desc);
-		tex->SetIRTracking(&GetResourceManager(),
-			GetResourceManager().Register(IR::ResourceType::Texture, tex.get(), desc.DebugName));
+		tex->SetRHITracking(&GetResourceManager(),
+			GetResourceManager().Register(ResourceType::Texture, tex.get(), desc.DebugName));
 		return tex;
 	}
 
@@ -950,8 +971,8 @@ float4 main(PSInput input) : SV_TARGET
 		pipeline->SetNativePipeline(std::move(pso), std::move(rootSig));
 
 		GetPipelineCache().Insert(desc, pipeline);
-		pipeline->SetIRTracking(&GetResourceManager(),
-			GetResourceManager().Register(IR::ResourceType::GraphicsPipeline, pipeline.get(), "GraphicsPipeline"));
+		pipeline->SetRHITracking(&GetResourceManager(),
+			GetResourceManager().Register(ResourceType::GraphicsPipeline, pipeline.get(), "GraphicsPipeline"));
 
 		CANDY_CORE_INFO("D3D12Device::CreateGraphicsPipeline: pipeline created ({} attributes, {} RT format(s))",
 		                desc.VertexInput.Attributes.size(), desc.RenderTargetFormats.size());
@@ -1094,8 +1115,8 @@ float4 main(PSInput input) : SV_TARGET
 	Ref<RHIFramebuffer> D3D12Device::CreateFramebuffer(const FramebufferDesc& desc)
 	{
 		auto fb = CreateRef<D3D12Framebuffer>(desc, this);
-		fb->SetIRTracking(&GetResourceManager(),
-			GetResourceManager().Register(IR::ResourceType::Framebuffer, fb.get(), "Framebuffer"));
+		fb->SetRHITracking(&GetResourceManager(),
+			GetResourceManager().Register(ResourceType::Framebuffer, fb.get(), "Framebuffer"));
 		return fb;
 	}
 

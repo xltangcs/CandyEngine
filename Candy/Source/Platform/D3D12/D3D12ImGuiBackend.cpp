@@ -27,12 +27,12 @@ namespace Candy {
 	{
 		auto* self = static_cast<D3D12ImGuiBackend*>(info->UserData);
 
-		// Each ImGui context owns a distinct descriptor region of the device heap
-		// so their fonts never collide: editor @32, game UI @64. Renderer2D uses
-		// 0-31, viewport @128+, engine textures @160+. The per-context counters
-		// persist (fonts are created once and stay put).
+		// Each ImGui context owns a distinct descriptor region of the device
+		// heap so their fonts never collide; both region bases were handed out
+		// by the device's IR descriptor range allocator at Init. The per-context
+		// counters persist (fonts are created once and stay put).
 		const bool isGameUI = (ImGui::GetCurrentContext() == self->m_GameUIContext);
-		const uint32_t kBase = isGameUI ? 64u : 32u;
+		const uint32_t kBase = isGameUI ? self->m_GameUISRVBase : self->m_EditorSRVBase;
 		uint32_t& used = isGameUI ? self->m_SRVHeapUsedGameUI : self->m_SRVHeapUsedEditor;
 
 		D3D12_CPU_DESCRIPTOR_HANDLE cpu = self->m_SRVHeap->GetCPUDescriptorHandleForHeapStart();
@@ -73,9 +73,9 @@ namespace Candy {
 
 		// SRV descriptor heap for ImGui textures. Use the *device's* shared
 		// CBV_SRV_UAV heap so that ALL SRVs ImGui displays (fonts, viewport
-		// framebuffer at slot 128+, engine icons/textures at slot 160+) live in ONE
-		// heap that the render pass binds. D3D12 allows only one CBV_SRV_UAV heap
-		// per SetDescriptorHeaps, so a separate small heap would leave the viewport
+		// framebuffer, engine icons/textures) live in ONE heap that the render
+		// pass binds. D3D12 allows only one CBV_SRV_UAV heap per
+		// SetDescriptorHeaps, so a separate small heap would leave the viewport
 		// / icon descriptors out of the bound heap (they would not display).
 		m_SRVHeap     = gfxCtx->GetDevice()->GetCBVSRVUAVHeap();
 		m_SRVDescSize = gfxCtx->GetDevice()->GetCBVSRVDescriptorSize();
@@ -84,6 +84,11 @@ namespace Candy {
 			CANDY_CORE_ERROR("D3D12ImGuiBackend::Init: no device CBV_SRV_UAV heap");
 			return;
 		}
+
+		// Each ImGui context gets its own 32-slot descriptor region from the
+		// device's IR descriptor range allocator (fonts + per-frame images).
+		m_EditorSRVBase  = gfxCtx->GetDevice()->AllocateSRVRange(32);
+		m_GameUISRVBase  = gfxCtx->GetDevice()->AllocateSRVRange(32);
 
 		// Per-frame command lists (shared across both contexts — they iterate
 		// sequentially per main loop so they do not stomp each other).
@@ -198,6 +203,7 @@ namespace Candy {
 		m_GameUIAllocator = nullptr;
 		m_GameUICmdList   = nullptr;
 		m_EditorContext = m_GameUIContext = nullptr;
+		m_EditorSRVBase = m_GameUISRVBase = 0;
 		m_SRVHeapUsedEditor = m_SRVHeapUsedGameUI = 0;
 		m_SRVDescSize = 0;
 	}
@@ -273,7 +279,7 @@ namespace Candy {
 		m_FrameCmdLists[fi]->Reset(m_FrameAllocators[fi], nullptr);
 
 		// Set descriptor heaps — bind the device's shared CBV_SRV_UAV heap. All
-		// SRVs ImGui displays (fonts @32/64, viewport @128+, engine textures @160+)
+		// SRVs ImGui displays (fonts, viewport framebuffer, engine textures)
 		// live in this heap, so their handles are only valid while it is bound.
 		ID3D12DescriptorHeap* heaps[] = { m_SRVHeap };
 		m_FrameCmdLists[fi]->SetDescriptorHeaps(1, heaps);

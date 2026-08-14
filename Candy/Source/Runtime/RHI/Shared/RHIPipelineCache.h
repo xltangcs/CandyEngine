@@ -7,20 +7,20 @@
 #include <string>
 #include <functional>
 
-namespace Candy::IR {
+namespace Candy {
 
 	// =========================================================================
-	// IRPipelineCache — caches RHIGraphicsPipeline objects keyed by
+	// RHIPipelineCache — caches RHIGraphicsPipeline objects keyed by
 	// GraphicsPipelineDesc hash.
 	//
 	// Pipeline creation (VkPipeline / ID3D12PipelineState) is expensive.
 	// This cache ensures identical pipeline descriptions reuse the same PSO.
 	// =========================================================================
-	class IRPipelineCache
+	class RHIPipelineCache
 	{
 	public:
-		IRPipelineCache() = default;
-		~IRPipelineCache();
+		RHIPipelineCache() = default;
+		~RHIPipelineCache();
 
 		// ---- Cache operations ----------------------------------------------
 
@@ -50,4 +50,4 @@ namespace Candy::IR {
 		std::unordered_map<size_t, Candy::Ref<Candy::RHIGraphicsPipeline>> m_Cache;
 	};
 
-} // namespace Candy::IR
+} // namespace Candy

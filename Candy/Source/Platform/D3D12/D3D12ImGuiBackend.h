@@ -50,7 +50,11 @@ namespace Candy {
 		// Points at the device's shared CBV_SRV_UAV heap (owned by D3D12Device).
 		ID3D12DescriptorHeap*      m_SRVHeap     = nullptr;
 		uint32_t                   m_SRVDescSize = 0;
-		// Per-context SRV bump counters (descriptor regions: editor @32, game UI @64).
+		// Per-context descriptor region bases, handed out by the device's IR
+		// descriptor range allocator at Init (32 slots each), plus the bump
+		// counters within those regions.
+		uint32_t                   m_EditorSRVBase     = 0;
+		uint32_t                   m_GameUISRVBase     = 0;
 		uint32_t                   m_SRVHeapUsedEditor = 0;
 		uint32_t                   m_SRVHeapUsedGameUI = 0;
 

@@ -1,21 +1,21 @@
 #pragma once
 
-#include "Runtime/RHI/IR/IRTypes.h"
+#include "Runtime/RHI/Shared/RHISharedTypes.h"
 
 #include <vector>
 #include <unordered_map>
 #include <cstdint>
 
-namespace Candy::IR {
+namespace Candy {
 
 	// =========================================================================
-	// IRDescriptorSetManager — manages descriptor set pool allocation and
+	// RHIDescriptorSetManager — manages descriptor set pool allocation and
 	// descriptor set layout management.
 	//
 	// Vulkan:   maps to VkDescriptorPool + VkDescriptorSetLayout + VkDescriptorSet
 	// D3D12:     maps to descriptor heap management + root parameter ranges
 	// =========================================================================
-	class IRDescriptorSetManager
+	class RHIDescriptorSetManager
 	{
 	public:
 		/// Describes the maximum capacity of a descriptor pool.
@@ -39,8 +39,8 @@ namespace Candy::IR {
 			uint32_t         ArrayIndex      = 0;
 		};
 
-		IRDescriptorSetManager() = default;
-		~IRDescriptorSetManager();
+		RHIDescriptorSetManager() = default;
+		~RHIDescriptorSetManager();
 
 		// ---- Layout management ---------------------------------------------
 
@@ -73,6 +73,20 @@ namespace Candy::IR {
 		/// Discards all pending descriptor writes without applying them.
 		void DiscardWrites();
 
+		// ---- Linear range allocator (D3D12 shared descriptor heap) ---------
+
+		/// Initialize the linear allocator with the heap's total descriptor count.
+		void InitRangeAllocator(uint32_t capacity);
+
+		/// Allocate a contiguous descriptor range; returns the base slot.
+		/// Asserts on exhaustion. D3D12 uses this to hand out regions of the
+		/// shared CBV_SRV_UAV heap (texture table, ImGui fonts, framebuffer
+		/// SRVs, engine textures) instead of hard-coded slot constants.
+		uint32_t AllocateRange(uint32_t count);
+
+		[[nodiscard]] uint32_t GetRangeUsed()     const { return m_NextRangeSlot; }
+		[[nodiscard]] uint32_t GetRangeCapacity() const { return m_RangeCapacity; }
+
 		// ---- Query ---------------------------------------------------------
 
 		[[nodiscard]] size_t GetPendingWriteCount() const { return m_PendingWrites.size(); }
@@ -89,6 +103,10 @@ namespace Candy::IR {
 
 		uint32_t m_NextLayoutHandle = 1;
 		uint32_t m_NextSetHandle    = 1;
+
+		// Linear range allocator state (D3D12 shared heap)
+		uint32_t m_RangeCapacity = 0;
+		uint32_t m_NextRangeSlot = 0;
 	};
 
-} // namespace Candy::IR
+} // namespace Candy

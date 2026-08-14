@@ -91,9 +91,10 @@ namespace Candy {
 		// and the editor ImGui pass (PIXEL_SHADER_RESOURCE for the viewport image).
 		std::vector<D3D12_RESOURCE_STATES> m_ColorAttachmentStates;
 
-		// Base SRV descriptor slot for THIS framebuffer (unique per instance, so
-		// the main viewport framebuffer and the camera-preview PIP do not stomp
-		// each other's descriptors at slot 128).
+		// Base SRV descriptor slot for THIS framebuffer (unique per instance,
+		// handed out by the device's IR descriptor range allocator, so the main
+		// viewport framebuffer and the camera-preview PIP do not stomp each
+		// other's descriptors).
 		uint32_t m_SRVBaseSlot = 0;
 
 		// Readback buffer for ReadPixel

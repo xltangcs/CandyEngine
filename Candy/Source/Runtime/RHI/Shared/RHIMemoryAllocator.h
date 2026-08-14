@@ -1,14 +1,14 @@
 #pragma once
 
-#include "Runtime/RHI/IR/IRTypes.h"
+#include "Runtime/RHI/Shared/RHISharedTypes.h"
 
 #include <cstdint>
 #include <vector>
 
-namespace Candy::IR {
+namespace Candy {
 
 	// =========================================================================
-	// IRMemoryAllocator — GPU memory sub-allocation using a slab / free-list
+	// RHIMemoryAllocator — GPU memory sub-allocation using a slab / free-list
 	// strategy.
 	//
 	// Instead of calling the driver API for every small buffer or texture,
@@ -19,7 +19,7 @@ namespace Candy::IR {
 	//   Vulkan → VkDeviceMemory
 	//   D3D12   → ID3D12Heap*
 	// =========================================================================
-	class IRMemoryAllocator
+	class RHIMemoryAllocator
 	{
 	public:
 		/// A sub-allocation within a larger memory block.
@@ -37,8 +37,8 @@ namespace Candy::IR {
 		/// Default block size for CPU-accessible allocations (64 MiB).
 		static constexpr uint64_t DefaultCPUBlockSize =  64ULL * 1024 * 1024;
 
-		IRMemoryAllocator() = default;
-		~IRMemoryAllocator();
+		RHIMemoryAllocator() = default;
+		~RHIMemoryAllocator();
 
 		// ---- Configuration -------------------------------------------------
 
@@ -89,4 +89,4 @@ namespace Candy::IR {
 		std::vector<FreeRegion>  m_FreeRegions; ///< sorted by offset, coalesced on free
 	};
 
-} // namespace Candy::IR
+} // namespace Candy

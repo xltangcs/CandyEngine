@@ -11,10 +11,10 @@ namespace Candy {
 	class RHIGraphicsPipeline;
 } // namespace Candy
 
-namespace Candy::IR {
+namespace Candy {
 
 	// =========================================================================
-	// IRCommandValidator — validates command-buffer recording state at
+	// RHICommandValidator — validates command-buffer recording state at
 	// debug time.  Catches common errors such as:
 	//   - Draw() called before BeginRenderPass()
 	//   - BeginRenderPass() called while already inside a pass
@@ -23,12 +23,12 @@ namespace Candy::IR {
 	// In release builds (defined CANDY_RELEASE / CANDY_DIST) all checks
 	// are compiled out via #ifdef for zero overhead.
 	// =========================================================================
-	class IRCommandValidator
+	class RHICommandValidator
 	{
 	public:
-		IRCommandValidator() = default;
+		RHICommandValidator() = default;
 
-		// ---- State transitions (called by IR command buffer wrappers) ------
+		// ---- State transitions (called by backend command buffer wrappers) -
 
 		void OnBegin();
 		void OnEnd();
@@ -56,4 +56,4 @@ namespace Candy::IR {
 		bool m_IndexBufferBound  = false;
 	};
 
-} // namespace Candy::IR
+} // namespace Candy

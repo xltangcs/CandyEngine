@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Runtime/RHI/IR/IRDevice.h"
+#include "Runtime/RHI/Shared/RHIDeviceBase.h"
 
 #ifndef VK_NO_PROTOTYPES
 #define VK_NO_PROTOTYPES
@@ -28,7 +28,7 @@ namespace Candy {
 	//
 	// Dynamic loading of vulkan-1.dll; no SDK link library required.
 	// =========================================================================
-	class VulkanDevice : public IR::IRDevice
+	class VulkanDevice : public RHIDeviceBase
 	{
 	public:
 		VulkanDevice();

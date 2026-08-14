@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace Candy::IR {
+namespace Candy {
 
 	// =========================================================================
 	// ResourceType — coarse categorization used by the resource manager
@@ -89,10 +89,10 @@ namespace Candy::IR {
 		bool operator==(const BindingSlot&) const = default;
 	};
 
-} // namespace Candy::IR
+} // namespace Candy
 
 // =========================================================================
-// std::hash specializations for RHI types used as map keys in IR
+// std::hash specializations for RHI types used as map keys in RHI/Shared
 // =========================================================================
 template<>
 struct std::hash<Candy::RHIHandle>
@@ -104,9 +104,9 @@ struct std::hash<Candy::RHIHandle>
 };
 
 template<>
-struct std::hash<Candy::IR::BindingSlot>
+struct std::hash<Candy::BindingSlot>
 {
-	size_t operator()(const Candy::IR::BindingSlot& s) const noexcept
+	size_t operator()(const Candy::BindingSlot& s) const noexcept
 	{
 		return (static_cast<uint64_t>(s.Set) << 32) | static_cast<uint64_t>(s.Binding);
 	}

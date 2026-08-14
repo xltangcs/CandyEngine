@@ -12,13 +12,6 @@ namespace Candy {
 
 	static const uint32_t s_MaxFramebufferSize = 8192;
 
-	// Unique SRV base slot per framebuffer instance. Descriptor layout of the
-	// device CBV_SRV_UAV heap: 0-31 Renderer2D, 32-63 editor ImGui, 64-95 game UI
-	// ImGui, 96-127 framebuffer SRVs (each framebuffer gets 2 slots), 160+ engine
-	// textures. Giving every framebuffer its OWN slots prevents the camera-preview
-	// PIP from overwriting the main viewport's SRV at slot 128.
-	static std::atomic<uint32_t> s_NextFramebufferSRVSlot{ 96 };
-
 	// =========================================================================
 	// Constructor / Destructor
 	// =========================================================================
@@ -26,9 +19,12 @@ namespace Candy {
 	D3D12Framebuffer::D3D12Framebuffer(const FramebufferDesc& desc, D3D12Device* device)
 		: m_Desc(desc), m_Device(device)
 	{
-		// Allocate this framebuffer's own SRV descriptor region (unique per
-		// instance) so it never collides with another framebuffer's descriptors.
-		m_SRVBaseSlot = s_NextFramebufferSRVSlot.fetch_add(2);
+		// Allocate this framebuffer's own SRV descriptor region from the
+		// device's IR descriptor range allocator (unique per instance) so it
+		// never collides with another framebuffer's descriptors — e.g. the
+		// camera-preview PIP must not overwrite the main viewport's SRV.
+		if (m_Device)
+			m_SRVBaseSlot = m_Device->AllocateSRVRange(2);
 
 		Invalidate();
 	}

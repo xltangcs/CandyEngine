@@ -1,5 +1,5 @@
 #include "CandyPCH.h"
-#include "Runtime/RHI/IR/IR.h"
+#include "Runtime/RHI/Shared/RHIShared.h"
 
 #include "Runtime/Core/Log.h"
 
@@ -7,19 +7,19 @@
 #include <cstring>
 #include <functional>
 
-namespace Candy::IR {
+namespace Candy {
 
 // =========================================================================
-// IRResourceManager
+// RHIResourceManager
 // =========================================================================
 
-IRResourceManager::~IRResourceManager()
+RHIResourceManager::~RHIResourceManager()
 {
 	if (!m_Resources.empty())
-		CANDY_CORE_WARN("IRResourceManager: {} resources still registered on shutdown", m_Resources.size());
+		CANDY_CORE_WARN("RHIResourceManager: {} resources still registered on shutdown", m_Resources.size());
 }
 
-Candy::RHIHandle IRResourceManager::Register(ResourceType type, void* rawPtr, std::string_view name)
+Candy::RHIHandle RHIResourceManager::Register(ResourceType type, void* rawPtr, std::string_view name)
 {
 	Candy::RHIHandle handle{ m_NextHandle++ };
 	ResourceEntry entry;
@@ -31,67 +31,67 @@ Candy::RHIHandle IRResourceManager::Register(ResourceType type, void* rawPtr, st
 	return handle;
 }
 
-void IRResourceManager::Unregister(Candy::RHIHandle handle)
+void RHIResourceManager::Unregister(Candy::RHIHandle handle)
 {
 	auto it = m_Resources.find(handle);
 	if (it == m_Resources.end())
 	{
-		CANDY_CORE_ERROR("IRResourceManager::Unregister: handle {} not found", handle.Value);
+		CANDY_CORE_ERROR("RHIResourceManager::Unregister: handle {} not found", handle.Value);
 		return;
 	}
 	m_Resources.erase(it);
 }
 
-const IRResourceManager::ResourceEntry* IRResourceManager::Find(Candy::RHIHandle handle) const
+const RHIResourceManager::ResourceEntry* RHIResourceManager::Find(Candy::RHIHandle handle) const
 {
 	auto it = m_Resources.find(handle);
 	return it != m_Resources.end() ? &it->second : nullptr;
 }
 
-IRResourceManager::ResourceEntry* IRResourceManager::Find(Candy::RHIHandle handle)
+RHIResourceManager::ResourceEntry* RHIResourceManager::Find(Candy::RHIHandle handle)
 {
 	auto it = m_Resources.find(handle);
 	return it != m_Resources.end() ? &it->second : nullptr;
 }
 
-ResourceType IRResourceManager::GetType(Candy::RHIHandle handle) const
+ResourceType RHIResourceManager::GetType(Candy::RHIHandle handle) const
 {
 	if (auto* e = Find(handle)) return e->Type;
 	return ResourceType::Unknown;
 }
 
-ResourceState IRResourceManager::GetState(Candy::RHIHandle handle) const
+ResourceState RHIResourceManager::GetState(Candy::RHIHandle handle) const
 {
 	if (auto* e = Find(handle)) return e->State;
 	return ResourceState::Undefined;
 }
 
-void IRResourceManager::SetState(Candy::RHIHandle handle, ResourceState newState)
+void RHIResourceManager::SetState(Candy::RHIHandle handle, ResourceState newState)
 {
 	if (auto* e = Find(handle)) e->State = newState;
-	else CANDY_CORE_ERROR("IRResourceManager::SetState: handle {} not found", handle.Value);
+	else CANDY_CORE_ERROR("RHIResourceManager::SetState: handle {} not found", handle.Value);
 }
 
-bool IRResourceManager::IsRegistered(Candy::RHIHandle handle) const
+bool RHIResourceManager::IsRegistered(Candy::RHIHandle handle) const
 {
 	return m_Resources.find(handle) != m_Resources.end();
 }
 
 // =========================================================================
-// IRPipelineCache
+// RHIPipelineCache
 // =========================================================================
 
-IRPipelineCache::~IRPipelineCache() = default;
+RHIPipelineCache::~RHIPipelineCache() = default;
 
 Candy::Ref<Candy::RHIGraphicsPipeline>
-IRPipelineCache::Find(const Candy::GraphicsPipelineDesc& desc) const
+RHIPipelineCache::Find(const Candy::GraphicsPipelineDesc& desc) const
 {
 	size_t h = HashDesc(desc);
 	auto it = m_Cache.find(h);
 	return it != m_Cache.end() ? it->second : nullptr;
 }
 
-bool IRPipelineCache::Insert(const Candy::GraphicsPipelineDesc& desc,
+bool RHIPipelineCache::Insert(const Candy::GraphicsPipelineDesc& desc,
                              const Candy::Ref<Candy::RHIGraphicsPipeline>& pipeline)
 {
 	size_t h = HashDesc(desc);
@@ -101,12 +101,12 @@ bool IRPipelineCache::Insert(const Candy::GraphicsPipelineDesc& desc,
 	return true;
 }
 
-void IRPipelineCache::Erase(const Candy::GraphicsPipelineDesc& desc)
+void RHIPipelineCache::Erase(const Candy::GraphicsPipelineDesc& desc)
 {
 	m_Cache.erase(HashDesc(desc));
 }
 
-void IRPipelineCache::Clear()
+void RHIPipelineCache::Clear()
 {
 	m_Cache.clear();
 }
@@ -118,7 +118,7 @@ static void HashCombine(size_t& seed, size_t value)
 	seed ^= value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
 }
 
-size_t IRPipelineCache::HashDesc(const Candy::GraphicsPipelineDesc& desc)
+size_t RHIPipelineCache::HashDesc(const Candy::GraphicsPipelineDesc& desc)
 {
 	size_t seed = 0;
 
@@ -171,14 +171,14 @@ size_t IRPipelineCache::HashDesc(const Candy::GraphicsPipelineDesc& desc)
 }
 
 // =========================================================================
-// IRCommandValidator
+// RHICommandValidator
 // =========================================================================
 // All methods are inlined/compiled-out in the header under CANDY_RELEASE.
 // In Debug they validate state transitions with assertions.
 
-void IRCommandValidator::OnBegin()
+void RHICommandValidator::OnBegin()
 {
-	CANDY_CORE_ASSERT(!m_Recording, "IRCommandValidator: Begin() called while already recording");
+	CANDY_CORE_ASSERT(!m_Recording, "RHICommandValidator: Begin() called while already recording");
 	m_Recording = true;
 	m_InRenderPass   = false;
 	m_PipelineSet    = false;
@@ -186,92 +186,92 @@ void IRCommandValidator::OnBegin()
 	m_IndexBufferBound  = false;
 }
 
-void IRCommandValidator::OnEnd()
+void RHICommandValidator::OnEnd()
 {
-	CANDY_CORE_ASSERT(m_Recording, "IRCommandValidator: End() called without Begin()");
-	CANDY_CORE_ASSERT(!m_InRenderPass, "IRCommandValidator: End() called inside a render pass");
+	CANDY_CORE_ASSERT(m_Recording, "RHICommandValidator: End() called without Begin()");
+	CANDY_CORE_ASSERT(!m_InRenderPass, "RHICommandValidator: End() called inside a render pass");
 	m_Recording = false;
 }
 
-void IRCommandValidator::OnBeginRenderPass(const Candy::RenderPassDesc& desc)
+void RHICommandValidator::OnBeginRenderPass(const Candy::RenderPassDesc& desc)
 {
 	(void)desc;
-	CANDY_CORE_ASSERT(m_Recording, "IRCommandValidator: BeginRenderPass() called outside recording");
-	CANDY_CORE_ASSERT(!m_InRenderPass, "IRCommandValidator: BeginRenderPass() called while already in a pass");
+	CANDY_CORE_ASSERT(m_Recording, "RHICommandValidator: BeginRenderPass() called outside recording");
+	CANDY_CORE_ASSERT(!m_InRenderPass, "RHICommandValidator: BeginRenderPass() called while already in a pass");
 	m_InRenderPass = true;
 }
 
-void IRCommandValidator::OnEndRenderPass()
+void RHICommandValidator::OnEndRenderPass()
 {
-	CANDY_CORE_ASSERT(m_InRenderPass, "IRCommandValidator: EndRenderPass() called without BeginRenderPass()");
+	CANDY_CORE_ASSERT(m_InRenderPass, "RHICommandValidator: EndRenderPass() called without BeginRenderPass()");
 	m_InRenderPass = false;
 }
 
-void IRCommandValidator::OnSetPipeline(const Candy::Ref<Candy::RHIGraphicsPipeline>& pipeline)
+void RHICommandValidator::OnSetPipeline(const Candy::Ref<Candy::RHIGraphicsPipeline>& pipeline)
 {
-	CANDY_CORE_ASSERT(m_Recording, "IRCommandValidator: SetPipeline() called outside recording");
+	CANDY_CORE_ASSERT(m_Recording, "RHICommandValidator: SetPipeline() called outside recording");
 	m_PipelineSet = (pipeline != nullptr);
 }
 
-void IRCommandValidator::OnSetVertexBuffer(uint32_t slot)
+void RHICommandValidator::OnSetVertexBuffer(uint32_t slot)
 {
-	CANDY_CORE_ASSERT(m_Recording, "IRCommandValidator: SetVertexBuffer() called outside recording");
+	CANDY_CORE_ASSERT(m_Recording, "RHICommandValidator: SetVertexBuffer() called outside recording");
 	(void)slot;
 	m_VertexBufferBound = true;
 }
 
-void IRCommandValidator::OnSetIndexBuffer()
+void RHICommandValidator::OnSetIndexBuffer()
 {
-	CANDY_CORE_ASSERT(m_Recording, "IRCommandValidator: SetIndexBuffer() called outside recording");
+	CANDY_CORE_ASSERT(m_Recording, "RHICommandValidator: SetIndexBuffer() called outside recording");
 	m_IndexBufferBound = true;
 }
 
-void IRCommandValidator::OnDraw(uint32_t vertexCount)
+void RHICommandValidator::OnDraw(uint32_t vertexCount)
 {
-	CANDY_CORE_ASSERT(m_Recording, "IRCommandValidator: Draw() called outside recording");
-	CANDY_CORE_ASSERT(m_InRenderPass, "IRCommandValidator: Draw() called outside render pass");
-	CANDY_CORE_ASSERT(m_PipelineSet, "IRCommandValidator: Draw() called without SetPipeline()");
+	CANDY_CORE_ASSERT(m_Recording, "RHICommandValidator: Draw() called outside recording");
+	CANDY_CORE_ASSERT(m_InRenderPass, "RHICommandValidator: Draw() called outside render pass");
+	CANDY_CORE_ASSERT(m_PipelineSet, "RHICommandValidator: Draw() called without SetPipeline()");
 	(void)vertexCount;
 }
 
-void IRCommandValidator::OnDrawIndexed(uint32_t indexCount)
+void RHICommandValidator::OnDrawIndexed(uint32_t indexCount)
 {
-	CANDY_CORE_ASSERT(m_Recording, "IRCommandValidator: DrawIndexed() called outside recording");
-	CANDY_CORE_ASSERT(m_InRenderPass, "IRCommandValidator: DrawIndexed() called outside render pass");
-	CANDY_CORE_ASSERT(m_PipelineSet, "IRCommandValidator: DrawIndexed() called without SetPipeline()");
-	CANDY_CORE_ASSERT(m_IndexBufferBound, "IRCommandValidator: DrawIndexed() called without SetIndexBuffer()");
+	CANDY_CORE_ASSERT(m_Recording, "RHICommandValidator: DrawIndexed() called outside recording");
+	CANDY_CORE_ASSERT(m_InRenderPass, "RHICommandValidator: DrawIndexed() called outside render pass");
+	CANDY_CORE_ASSERT(m_PipelineSet, "RHICommandValidator: DrawIndexed() called without SetPipeline()");
+	CANDY_CORE_ASSERT(m_IndexBufferBound, "RHICommandValidator: DrawIndexed() called without SetIndexBuffer()");
 	(void)indexCount;
 }
 
 // =========================================================================
-// IRDescriptorSetManager
+// RHIDescriptorSetManager
 // =========================================================================
 
-IRDescriptorSetManager::~IRDescriptorSetManager() = default;
+RHIDescriptorSetManager::~RHIDescriptorSetManager() = default;
 
-Candy::RHIHandle IRDescriptorSetManager::RegisterLayout(const DescriptorSetLayoutDesc& desc)
+Candy::RHIHandle RHIDescriptorSetManager::RegisterLayout(const DescriptorSetLayoutDesc& desc)
 {
 	Candy::RHIHandle h{ m_NextLayoutHandle++ };
 	m_Layouts[h] = desc;
 	return h;
 }
 
-void IRDescriptorSetManager::UnregisterLayout(Candy::RHIHandle layoutHandle)
+void RHIDescriptorSetManager::UnregisterLayout(Candy::RHIHandle layoutHandle)
 {
 	m_Layouts.erase(layoutHandle);
 }
 
-const DescriptorSetLayoutDesc* IRDescriptorSetManager::GetLayout(Candy::RHIHandle handle) const
+const DescriptorSetLayoutDesc* RHIDescriptorSetManager::GetLayout(Candy::RHIHandle handle) const
 {
 	auto it = m_Layouts.find(handle);
 	return it != m_Layouts.end() ? &it->second : nullptr;
 }
 
-Candy::RHIHandle IRDescriptorSetManager::AllocateSet(Candy::RHIHandle layoutHandle)
+Candy::RHIHandle RHIDescriptorSetManager::AllocateSet(Candy::RHIHandle layoutHandle)
 {
 	if (m_Layouts.find(layoutHandle) == m_Layouts.end())
 	{
-		CANDY_CORE_ERROR("IRDescriptorSetManager::AllocateSet: layout handle {} not found", layoutHandle.Value);
+		CANDY_CORE_ERROR("RHIDescriptorSetManager::AllocateSet: layout handle {} not found", layoutHandle.Value);
 		return {};
 	}
 	Candy::RHIHandle setH{ m_NextSetHandle++ };
@@ -279,18 +279,18 @@ Candy::RHIHandle IRDescriptorSetManager::AllocateSet(Candy::RHIHandle layoutHand
 	return setH;
 }
 
-void IRDescriptorSetManager::FreeSet(Candy::RHIHandle setHandle)
+void RHIDescriptorSetManager::FreeSet(Candy::RHIHandle setHandle)
 {
 	m_SetLayouts.erase(setHandle);
 }
 
-void IRDescriptorSetManager::InitPool(const PoolDesc& desc)
+void RHIDescriptorSetManager::InitPool(const PoolDesc& desc)
 {
 	m_PoolDesc = desc;
 	m_PendingWrites.clear();
 }
 
-void IRDescriptorSetManager::ResetPool()
+void RHIDescriptorSetManager::ResetPool()
 {
 	m_PendingWrites.clear();
 	m_Layouts.clear();
@@ -299,12 +299,12 @@ void IRDescriptorSetManager::ResetPool()
 	m_NextSetHandle    = 1;
 }
 
-void IRDescriptorSetManager::WriteDescriptor(const DescriptorWrite& write)
+void RHIDescriptorSetManager::WriteDescriptor(const DescriptorWrite& write)
 {
 	m_PendingWrites.push_back(write);
 }
 
-void IRDescriptorSetManager::CommitWrites()
+void RHIDescriptorSetManager::CommitWrites()
 {
 	// Backend-agnostic: we only record pending writes here. The concrete
 	// backend (Vulkan/D3D12) is responsible for draining m_PendingWrites
@@ -313,31 +313,48 @@ void IRDescriptorSetManager::CommitWrites()
 	m_PendingWrites.clear();
 }
 
-void IRDescriptorSetManager::DiscardWrites()
+void RHIDescriptorSetManager::DiscardWrites()
 {
 	m_PendingWrites.clear();
 }
 
+void RHIDescriptorSetManager::InitRangeAllocator(uint32_t capacity)
+{
+	m_RangeCapacity = capacity;
+	m_NextRangeSlot = 0;
+}
+
+uint32_t RHIDescriptorSetManager::AllocateRange(uint32_t count)
+{
+	uint32_t base = m_NextRangeSlot;
+	// NOTE: CANDY_CORE_ASSERT only supports (check) or (check, msg-literal) —
+	// its GET_MACRO arg-count dispatch breaks with 3+ args, so no format args.
+	CANDY_CORE_ASSERT(base + count <= m_RangeCapacity,
+	                  "RHIDescriptorSetManager: descriptor range exhausted");
+	m_NextRangeSlot += count;
+	return base;
+}
+
 // =========================================================================
-// IRMemoryAllocator
+// RHIMemoryAllocator
 // =========================================================================
 
-IRMemoryAllocator::~IRMemoryAllocator()
+RHIMemoryAllocator::~RHIMemoryAllocator()
 {
 	Reset();
 }
 
-void IRMemoryAllocator::SetBlockSizes(uint64_t gpuBlockSize, uint64_t cpuBlockSize)
+void RHIMemoryAllocator::SetBlockSizes(uint64_t gpuBlockSize, uint64_t cpuBlockSize)
 {
 	m_GPUBlockSize = gpuBlockSize;
 	m_CPUBlockSize = cpuBlockSize;
 }
 
-IRMemoryAllocator::Allocation IRMemoryAllocator::Allocate(uint64_t size, uint64_t alignment, MemoryType memoryType)
+RHIMemoryAllocator::Allocation RHIMemoryAllocator::Allocate(uint64_t size, uint64_t alignment, MemoryType memoryType)
 {
 	if (size == 0 || (alignment & (alignment - 1)) != 0)
 	{
-		CANDY_CORE_ERROR("IRMemoryAllocator::Allocate: invalid size={} alignment={}", size, alignment);
+		CANDY_CORE_ERROR("RHIMemoryAllocator::Allocate: invalid size={} alignment={}", size, alignment);
 		return {};
 	}
 
@@ -411,7 +428,7 @@ IRMemoryAllocator::Allocation IRMemoryAllocator::Allocate(uint64_t size, uint64_
 	return alloc;
 }
 
-void IRMemoryAllocator::Free(const Allocation& alloc)
+void RHIMemoryAllocator::Free(const Allocation& alloc)
 {
 	if (alloc.Size == 0)
 		return;
@@ -444,13 +461,13 @@ void IRMemoryAllocator::Free(const Allocation& alloc)
 		m_Blocks[alloc.BlockIndex].Used -= alloc.Size;
 }
 
-void IRMemoryAllocator::Reset()
+void RHIMemoryAllocator::Reset()
 {
 	m_Blocks.clear();
 	m_FreeRegions.clear();
 }
 
-uint64_t IRMemoryAllocator::GetTotalAllocated(MemoryType type) const
+uint64_t RHIMemoryAllocator::GetTotalAllocated(MemoryType type) const
 {
 	uint64_t total = 0;
 	for (const auto& b : m_Blocks)
@@ -458,7 +475,7 @@ uint64_t IRMemoryAllocator::GetTotalAllocated(MemoryType type) const
 	return total;
 }
 
-uint64_t IRMemoryAllocator::GetTotalUsed(MemoryType type) const
+uint64_t RHIMemoryAllocator::GetTotalUsed(MemoryType type) const
 {
 	uint64_t total = 0;
 	for (const auto& b : m_Blocks)
@@ -466,7 +483,7 @@ uint64_t IRMemoryAllocator::GetTotalUsed(MemoryType type) const
 	return total;
 }
 
-uint64_t IRMemoryAllocator::GetBlockCount(MemoryType type) const
+uint64_t RHIMemoryAllocator::GetBlockCount(MemoryType type) const
 {
 	uint64_t count = 0;
 	for (const auto& b : m_Blocks)
@@ -475,12 +492,12 @@ uint64_t IRMemoryAllocator::GetBlockCount(MemoryType type) const
 }
 
 // =========================================================================
-// IRShaderLibrary
+// RHIShaderLibrary
 // =========================================================================
 
-IRShaderLibrary::~IRShaderLibrary() = default;
+RHIShaderLibrary::~RHIShaderLibrary() = default;
 
-Candy::Ref<Candy::RHIShaderModule> IRShaderLibrary::GetOrCreate(
+Candy::Ref<Candy::RHIShaderModule> RHIShaderLibrary::GetOrCreate(
 	uint64_t contentHash,
 	Candy::ShaderStage stage,
 	std::string_view debugName,
@@ -502,7 +519,7 @@ Candy::Ref<Candy::RHIShaderModule> IRShaderLibrary::GetOrCreate(
 	return module;
 }
 
-uint64_t IRShaderLibrary::HashBytes(const void* data, size_t size)
+uint64_t RHIShaderLibrary::HashBytes(const void* data, size_t size)
 {
 	// FNV-1a over the raw bytes.
 	uint64_t hash = 14695981039346656037ULL;
@@ -515,7 +532,7 @@ uint64_t IRShaderLibrary::HashBytes(const void* data, size_t size)
 	return hash;
 }
 
-uint64_t IRShaderLibrary::MakeKey(uint64_t contentHash, Candy::ShaderStage stage, std::string_view entryPoint)
+uint64_t RHIShaderLibrary::MakeKey(uint64_t contentHash, Candy::ShaderStage stage, std::string_view entryPoint)
 {
 	// Fold stage and entry point into the content hash so identical source
 	// compiled as different stages/entries maps to distinct cache entries.
@@ -526,9 +543,9 @@ uint64_t IRShaderLibrary::MakeKey(uint64_t contentHash, Candy::ShaderStage stage
 	return key;
 }
 
-void IRShaderLibrary::Clear()
+void RHIShaderLibrary::Clear()
 {
 	m_Cache.clear();
 }
 
-} // namespace Candy::IR
+} // namespace Candy

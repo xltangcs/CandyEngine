@@ -82,7 +82,7 @@ Candy::Application* Candy::CreateApplication() {
   - **ImGui 后端适配器**：`ImGuiBackend` 接口（`Runtime/Imgui/`），实现在 `Platform/*/XxxImGuiBackend.*`；`ImguiLayer` 不含任何后端类型/#ifdef
   - **RendererAPI**：仅保留全局后端选择（`RendererAPI::GetAPI()/SetAPI()`），无渲染虚接口；`RenderCommand`/旧 `RendererAPI` 虚接口已删除
   - **后端状态**：D3D12 = 主参考后端；OpenGL = RHI 适配参考；**Vulkan = [EXPERIMENTAL — FROZEN]**（代码保留编译通过，不再打补丁；重新启用时按 D3D12↔Vulkan 概念映射平移：CommandList↔VkCommandBuffer、PSO↔VkPipeline、DescriptorTable↔VkDescriptorSet、RootSignature↔VkPipelineLayout、ResourceBarrier↔Vk*MemoryBarrier；注意 VkRenderPass 创建时烘焙 loadOp，需按 loadOp 组合缓存）
-  - **IR 层**（`Runtime/RHI/IR/`）：7 个子系统类（资源注册/PSO 缓存/命令校验/描述符集/内存分配/shader 库），`IRDevice` 为三后端设备基类；当前仅 `IRPipelineCache` 实际接线，其余待按需接入
+  - **RHI/Shared 层**（`Runtime/RHI/Shared/`）：后端共享基础设施（**不是 shader IR**，引擎无 SPIR-V 跨编译）。7 个子系统类（资源注册/PSO 缓存/命令校验/描述符集/内存分配/shader 库），`RHIDeviceBase` 为三后端设备基类（类 Godot `RenderingDeviceCommons`）。**已接线**：`RHIPipelineCache`（三后端 PSO 创建）/ `RHIShaderLibrary`（内容哈希去重，factory-on-miss）/ `RHICommandValidator`（每 cmd 实例，Debug 录制状态断言）/ `RHIResourceManager`（`RHITrackable` mixin，资源创建注册、析构自动注销）/ `RHIDescriptorSetManager`（D3D12 共享 CBV_SRV_UAV heap 的线性区域分配器——纹理表/ImGui 双上下文/FBO SRV/纹理 SRV 全部由 `AllocateRange` 发放，**禁止再引入硬编码槽位常量**）。**就绪待用**：`RHIMemoryAllocator`（D3D12 当前每资源独立 committed resource，无"大堆+子分配"接入点，等 3D/资产规模再接）
 - **ECS**: 使用 EnTT，`Scene` 拥有 `entt::registry` + `b2World`。`Entity` = `entt::entity + Scene*`。组件位于 `Scene/Components.h`
 - **物理**: Box2D 集成（Rigidbody2D + Box/CircleCollider2D），运行时 body/fixture 存为 `void*`
 - **原生脚本**: `ScriptableEntity` 基类 + `NativeScriptComponent::Bind<T>()`
@@ -98,6 +98,7 @@ Candy::Application* Candy::CreateApplication() {
 - 命名空间 `Candy::`，PCH: `CandyPCH.h`（所有 `Candy/Source/` .cpp 使用）
 - `Scope<T>` = `unique_ptr<T>`，`Ref<T>` = `shared_ptr<T>`，工厂 `CreateScope`/`CreateRef`
 - `CANDY_BIND_EVENT_FN(fn)` 绑定事件（不要用 `std::bind`）
+- `CANDY_CORE_ASSERT` / `CANDY_ASSERT` 只支持 `(check)` 或 `(check, 字面量msg)` 两种形式，**不支持格式化参数**（GET_MACRO 参数计数分发在 3+ 参数时展开错误）；要带数值诊断先 `CANDY_CORE_ERROR` 再 assert
 - 日志: `CANDY_CORE_*`（引擎内部） / `CANDY_*`（客户端/编辑器）
 - 入口 include: `#include "Candy.h"`（聚合所有公共头）
 - 新增源文件放到对应 `Source/` 下即可（premake 通过 `Source/**.cpp` glob 包含），新增第三方源需加 `NoPCH` flag

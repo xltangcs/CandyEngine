@@ -8,10 +8,10 @@
 #include <string>
 #include <unordered_map>
 
-namespace Candy::IR {
+namespace Candy {
 
 	// =========================================================================
-	// IRShaderLibrary — content-hash dedup cache for shader modules
+	// RHIShaderLibrary — content-hash dedup cache for shader modules
 	//
 	// Backend-agnostic by design: modules may originate from HLSL source
 	// (D3D12), GLSL source (OpenGL), or SPIR-V bytecode (Vulkan) — this library
@@ -23,11 +23,11 @@ namespace Candy::IR {
 	// shader IR (per-API source files are the strategy; Slang is the future
 	// migration candidate). See AGENTS.md.
 	// =========================================================================
-	class IRShaderLibrary
+	class RHIShaderLibrary
 	{
 	public:
-		IRShaderLibrary() = default;
-		~IRShaderLibrary();
+		RHIShaderLibrary() = default;
+		~RHIShaderLibrary();
 
 		/// Returns the cached module for `contentHash`, or invokes `factory`
 		/// once to create, cache, and return it.
@@ -58,4 +58,4 @@ namespace Candy::IR {
 		std::unordered_map<uint64_t, Entry> m_Cache; ///< key = MakeKey(content, stage, entry)
 	};
 
-} // namespace Candy::IR
+} // namespace Candy

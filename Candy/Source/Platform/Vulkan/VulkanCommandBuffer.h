@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Runtime/RHI/RHICommandBuffer.h"
-#include "Runtime/RHI/IR/IRCommandValidator.h"
+#include "Runtime/RHI/Shared/RHICommandValidator.h"
 
 #ifndef VK_NO_PROTOTYPES
 #define VK_NO_PROTOTYPES
@@ -51,7 +51,7 @@ namespace Candy {
 		float            m_ClearColor[4]     = { 0,0,0,1 };
 
 		// Debug-time recording-state validator (per command buffer ¡ª never shared).
-		IR::IRCommandValidator m_Validator;
+		RHICommandValidator m_Validator;
 	};
 
 } // namespace Candy

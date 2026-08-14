@@ -1,22 +1,22 @@
 #pragma once
 
-#include "Runtime/RHI/IR/IRTypes.h"
+#include "Runtime/RHI/Shared/RHISharedTypes.h"
 
 #include <unordered_map>
 #include <string>
 
-namespace Candy::IR {
+namespace Candy {
 
 	// =========================================================================
-	// IRResourceManager — centralized handle → resource registry
+	// RHIResourceManager — centralized handle → resource registry
 	//
-	// All GPU resources created through IRDevice are registered here with
+	// All GPU resources created through RHIDeviceBase are registered here with
 	// metadata (type, name, state).  This enables:
 	//  - Resource lifetime tracking and leak detection
 	//  - Barrier generation (know current state → compute target state)
 	//  - Debug naming across all backends
 	// =========================================================================
-	class IRResourceManager
+	class RHIResourceManager
 	{
 	public:
 		struct ResourceEntry
@@ -27,8 +27,8 @@ namespace Candy::IR {
 			void*         RawPtr = nullptr; ///< opaque pointer to backend resource
 		};
 
-		IRResourceManager() = default;
-		~IRResourceManager();
+		RHIResourceManager() = default;
+		~RHIResourceManager();
 
 		// ---- Registration --------------------------------------------------
 
@@ -78,4 +78,4 @@ namespace Candy::IR {
 		uint32_t m_NextHandle = 1;
 	};
 
-} // namespace Candy::IR
+} // namespace Candy

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Runtime/RHI/RHICommandBuffer.h"
-#include "Runtime/RHI/IR/IRCommandValidator.h"
+#include "Runtime/RHI/Shared/RHICommandValidator.h"
 #include "Runtime/RHI/RHIFramebuffer.h"
 
 #include <d3d12.h>
@@ -22,7 +22,8 @@ namespace Candy {
 		                  Microsoft::WRL::ComPtr<ID3D12CommandAllocator> allocator,
 		                  ID3D12Device* device,
 		                  ID3D12DescriptorHeap* cbvSrvUavHeap,
-		                  ID3D12DescriptorHeap* samplerHeap);
+		                  ID3D12DescriptorHeap* samplerHeap,
+		                  uint32_t textureTableBase);
 		virtual ~D3D12CommandBuffer();
 
 		// ---- Lifetime ------------------------------------------------------
@@ -86,6 +87,9 @@ namespace Candy {
 		ID3D12DescriptorHeap* m_CBVSRVUAVHeap = nullptr;
 		ID3D12DescriptorHeap* m_SamplerHeap   = nullptr;
 		uint32_t              m_CBVSRVDescriptorSize = 0;
+		// Base slot of the Renderer2D texture table in the shared heap
+		// (allocated once by D3D12Device from the IR descriptor range allocator).
+		uint32_t              m_TextureTableBase = 0;
 
 		// Current render target
 		D3D12SwapChain*   m_CurrentSwapChain   = nullptr;
@@ -95,7 +99,7 @@ namespace Candy {
 		D3D12_CPU_DESCRIPTOR_HANDLE m_NextCBVSRVHandle = {};
 
 		// Debug-time recording-state validator (per command buffer ¡ª never shared).
-		IR::IRCommandValidator m_Validator;
+		RHICommandValidator m_Validator;
 	};
 
 } // namespace Candy

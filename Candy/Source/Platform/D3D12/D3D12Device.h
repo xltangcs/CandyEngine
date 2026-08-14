@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Runtime/RHI/IR/IRDevice.h"
+#include "Runtime/RHI/Shared/RHIDeviceBase.h"
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -16,7 +16,7 @@ namespace Candy {
 	// Owns ID3D12Device, IDXGIFactory6, command queue, fence, descriptor heaps,
 	// and a built-in shader cache for inline HLSL compilation.
 	// =========================================================================
-	class D3D12Device : public IR::IRDevice
+	class D3D12Device : public RHIDeviceBase
 	{
 	public:
 		D3D12Device();
@@ -64,6 +64,14 @@ namespace Candy {
 		[[nodiscard]] ID3D12DescriptorHeap* GetSamplerHeap()       const { return m_SamplerHeap.Get(); }
 		[[nodiscard]] uint32_t              GetCBVSRVDescriptorSize() const { return m_CBVSRVUAVDescriptorSize; }
 		[[nodiscard]] uint32_t              GetSamplerDescriptorSize() const { return m_SamplerDescriptorSize; }
+
+		/// Allocate a contiguous SRV descriptor range from the shared heap
+		/// (backed by RHIDescriptorSetManager's linear range allocator).
+		uint32_t AllocateSRVRange(uint32_t count);
+
+		/// Base slot of the 32-wide texture table used by Renderer2D batch
+		/// rendering (allocated once at device init).
+		[[nodiscard]] uint32_t GetTextureTableBase() const { return m_TextureTableBase; }
 
 		// ---- Synchronization -----------------------------------------------
 
@@ -120,6 +128,10 @@ namespace Candy {
 		// Descriptor heaps
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_CBVSRVUAVHeap;
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_SamplerHeap;
+
+		// Base slot of the Renderer2D texture table within the shared heap
+		// (allocated from the IR descriptor range allocator at init).
+		uint32_t m_TextureTableBase = 0;
 		uint32_t m_CBVSRVUAVDescriptorSize = 0;
 		uint32_t m_SamplerDescriptorSize   = 0;
 

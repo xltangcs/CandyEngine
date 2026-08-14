@@ -9,21 +9,8 @@
 #include "Runtime/Core/Log.h"
 
 #include <stb_image.h>
-#include <atomic>
 
 namespace Candy {
-
-	// =========================================================================
-	// SRV slot allocator ¡ª simple atomic counter, descriptors 160¨C255
-	// =========================================================================
-	static std::atomic<uint32_t> s_NextSRVSlot{ 160 };
-
-	static uint32_t AllocateSRVSlot()
-	{
-		uint32_t slot = s_NextSRVSlot.fetch_add(1);
-		CANDY_CORE_ASSERT(slot < 256, "D3D12Texture2D: SRV descriptor heap exhausted!");
-		return slot;
-	}
 
 	// =========================================================================
 	// Constructor: empty texture (e.g. white 1x1 pixel for Renderer2D)
@@ -125,7 +112,9 @@ namespace Candy {
 		if (!m_Device || !m_RHI)
 			return;
 
-		m_SRVSlot = AllocateSRVSlot();
+		// Each texture owns one SRV slot from the device's IR descriptor
+		// range allocator (asserts internally on heap exhaustion).
+		m_SRVSlot = m_Device->AllocateSRVRange(1);
 
 		ID3D12DescriptorHeap* heap = m_Device->GetCBVSRVUAVHeap();
 		if (!heap) return;

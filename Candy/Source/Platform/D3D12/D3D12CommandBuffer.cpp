@@ -19,12 +19,14 @@ namespace Candy {
 	                                     ComPtr<ID3D12CommandAllocator> allocator,
 	                                     ID3D12Device* device,
 	                                     ID3D12DescriptorHeap* cbvSrvUavHeap,
-	                                     ID3D12DescriptorHeap* samplerHeap)
+	                                     ID3D12DescriptorHeap* samplerHeap,
+	                                     uint32_t textureTableBase)
 		: m_CommandList(std::move(cmdList))
 		, m_Allocator(std::move(allocator))
 		, m_Device(device)
 		, m_CBVSRVUAVHeap(cbvSrvUavHeap)
 		, m_SamplerHeap(samplerHeap)
+		, m_TextureTableBase(textureTableBase)
 	{
 		if (cbvSrvUavHeap)
 		{
@@ -326,15 +328,18 @@ namespace Candy {
 		if (!m_CBVSRVUAVHeap || !m_CommandList)
 			return;
 
-		// Write an SRV for this texture at offset `binding` from the heap
-		// start.  Multiple textures in the same batch occupy consecutive
-		// binding slots [0, N); the descriptor table bound to root parameter
-		// `slot` covers them all in one SetGraphicsRootDescriptorTable call.
-		d3d12tex->CreateSRV(m_CBVSRVUAVHeap, binding, m_CBVSRVDescriptorSize);
+		// Write an SRV for this texture at offset `binding` from the texture
+		// table base (m_TextureTableBase, allocated by the device from the IR
+		// descriptor range allocator).  Multiple textures in the same batch
+		// occupy consecutive binding slots [0, N); the descriptor table bound
+		// to root parameter `slot` covers them all in one
+		// SetGraphicsRootDescriptorTable call.
+		d3d12tex->CreateSRV(m_CBVSRVUAVHeap, m_TextureTableBase + binding, m_CBVSRVDescriptorSize);
 
-		// Bind the table starting at the heap base to root parameter `slot`.
-		// Re-binding the whole table is cheap; it remains valid until End().
+		// Bind the table starting at the texture table base to root parameter
+		// `slot`.  Re-binding the whole table is cheap; it remains valid until End().
 		D3D12_GPU_DESCRIPTOR_HANDLE gpuBase = m_CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart();
+		gpuBase.ptr += static_cast<SIZE_T>(m_TextureTableBase) * m_CBVSRVDescriptorSize;
 		m_CommandList->SetGraphicsRootDescriptorTable(slot, gpuBase);
 	}
 

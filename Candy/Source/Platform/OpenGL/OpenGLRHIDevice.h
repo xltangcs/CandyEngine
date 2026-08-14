@@ -1,17 +1,17 @@
 #pragma once
 
-#include "Runtime/RHI/IR/IRDevice.h"
+#include "Runtime/RHI/Shared/RHIDeviceBase.h"
 
 #include <glad/glad.h>
 
 namespace Candy {
 
 	// =========================================================================
-	// OpenGLRHIDevice — RHIDevice / IRDevice backend backed by OpenGL.
+	// OpenGLRHIDevice — RHIDevice / RHIDeviceBase backend backed by OpenGL.
 	// Provides direct-3D-style factory operations using modern OpenGL
 	// (DSA, persistently mapped buffers, program pipeline objects).
 	// =========================================================================
-	class OpenGLRHIDevice : public IR::IRDevice
+	class OpenGLRHIDevice : public RHIDeviceBase
 	{
 	public:
 		OpenGLRHIDevice();
