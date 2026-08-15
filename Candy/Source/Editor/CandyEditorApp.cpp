@@ -5,65 +5,93 @@
 #include "Layer/EditorLayer.h"
 #include "Layer/ProjectManagerLayer.h"
 #include "Setting/EditorSettings.h"
+#include "Setting/EditorState.h"
 
 #include <yaml-cpp/yaml.h>
 #include <filesystem>
 
 namespace Candy {
 
-	/// Peek the auto-opened last project's `.candyproj` YAML directly and
-	/// return its `RendererAPI` field.  Falls back to the engine default
-	/// ("D3D12") when no auto-open target exists or the file is missing the
-	/// key.  Runs *before* the `Application` base ctor — so the chosen
-	/// backend is in place by the time Window / GraphicsContext are created.
-	/// This is what makes "restart to apply" in Project Settings actually
-	/// apply without recompiling.
-	static std::string ResolveInitialRendererAPI()
+	/// Startup options resolved *before* the `Application` base ctor runs:
+	/// the RHI backend must be in place before Window/GraphicsContext are
+	/// created, and the window is created at its final size/maximized state so
+	/// no post-create resize happens at startup. The Project Manager gets its
+	/// own compact launcher window; the editor restores the persisted geometry.
+	struct StartupOptions
 	{
-		EditorSettings::Get().Load();
-		if (EditorSettings::Get().m_AutoOpenLastProject)
+		std::string RendererAPI = "D3D12";
+		uint32_t Width = 1280;
+		uint32_t Height = 720;
+		bool Maximized = false;
+		bool AutoOpenProject = false;
+		std::filesystem::path LastProjectPath;
+	};
+
+	static const StartupOptions& ResolveStartupOptions()
+	{
+		static const StartupOptions options = []()
 		{
+			StartupOptions opts;
+
+			EditorSettings::Get().Load();
+			EditorState::Get().Load();
+
 			auto recents = RecentProjects::Load();
-			if (!recents.empty())
+			opts.AutoOpenProject = EditorSettings::Get().m_AutoOpenLastProject && !recents.empty();
+			if (!opts.AutoOpenProject)
 			{
-				const std::filesystem::path& projectFile = recents[0].Path;
-				std::error_code ec;
-				if (std::filesystem::exists(projectFile, ec))
+				// Project Manager: compact launcher window of its own.
+				opts.Width = ProjectManagerLayer::ProjectManagerWidth;
+				opts.Height = ProjectManagerLayer::ProjectManagerHeight;
+				return opts;
+			}
+
+			// Editor: restore the persisted window geometry.
+			opts.Width = (uint32_t)EditorState::Get().WindowWidth;
+			opts.Height = (uint32_t)EditorState::Get().WindowHeight;
+			opts.Maximized = EditorState::Get().WindowMaximized;
+			opts.LastProjectPath = recents[0].Path;
+
+			// Peek the auto-opened last project's `.candyproj` YAML directly
+			// and return its `RendererAPI` field (fallback: "D3D12"). This is
+			// what makes "restart to apply" in Project Settings actually apply
+			// without recompiling.
+			std::error_code ec;
+			if (std::filesystem::exists(opts.LastProjectPath, ec))
+			{
+				try
 				{
-					try
-					{
-						YAML::Node data = YAML::LoadFile(projectFile.string());
-						if (auto proj = data["Project"])
-							if (proj["RendererAPI"])
-								return proj["RendererAPI"].as<std::string>();
-					}
-					catch (const std::exception&)
-					{
-						// malformed yaml — fall back to engine default
-					}
+					YAML::Node data = YAML::LoadFile(opts.LastProjectPath.string());
+					if (auto proj = data["Project"])
+						if (proj["RendererAPI"])
+							opts.RendererAPI = proj["RendererAPI"].as<std::string>();
+				}
+				catch (const std::exception&)
+				{
+					// malformed yaml — fall back to engine default
 				}
 			}
-		}
-		return "D3D12";
+			return opts;
+		}();
+		return options;
 	}
 
 	class CandyEditor : public Application
 	{
 	public:
 		CandyEditor()
-			: Application("Candy Engine", 1280, 720, true, true, ResolveInitialRendererAPI())
+			: Application("Candy Engine",
+				ResolveStartupOptions().Width,
+				ResolveStartupOptions().Height,
+				true, true,
+				ResolveStartupOptions().RendererAPI,
+				ResolveStartupOptions().Maximized)
 		{
-			EditorSettings::Get().Load();
-
-			if (EditorSettings::Get().m_AutoOpenLastProject)
+			if (ResolveStartupOptions().AutoOpenProject)
 			{
-				auto recentProjects = RecentProjects::Load();
-				if (!recentProjects.empty())
-				{
-					LoadProject(recentProjects[0].Path);
-					PushLayer(new EditorLayer());
-					return;
-				}
+				LoadProject(ResolveStartupOptions().LastProjectPath);
+				PushLayer(new EditorLayer());
+				return;
 			}
 			PushLayer(new ProjectManagerLayer());
 		}

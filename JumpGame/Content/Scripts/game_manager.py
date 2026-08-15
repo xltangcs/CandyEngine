@@ -136,7 +136,7 @@ class GameManager(candy.ScriptObject):
         # Script component (obstacle.py)
         obs.add_component("ScriptComponent")
         sc = obs.get_component("ScriptComponent")
-        sc.ScriptPath = "VFS://Game/Scripts/obstacle.py"
+        sc.ScriptPath = "VFS://Game/Content/Scripts/obstacle.py"
         sc.ClassName = "Obstacle"
 
         # Register with Box2D physics

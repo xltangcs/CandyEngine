@@ -1,4 +1,4 @@
-Scene: Scenes/TestScene
+Scene: Content/Scenes/TestScene
 Entities:
   - Entity: 11875080259632199413
     TagComponent:
@@ -8,7 +8,7 @@ Entities:
       Rotation: [0, 0, 0]
       Scale: [1, 1, 1]
     ScriptComponent:
-      ScriptPath: VFS://Game/Scripts/hud.py
+      ScriptPath: VFS://Game/Content/Scripts/hud.py
       ClassName: HUD
     UITextBlockComponent:
       TextBlocks:
@@ -53,10 +53,10 @@ Entities:
       Restitution: 0
       RestitutionThreshold: 0
     ScriptComponent:
-      ScriptPath: VFS://Game/Scripts/cube.py
+      ScriptPath: VFS://Game/Content/Scripts/cube.py
       ClassName: Cube
     AudioSourceComponent:
-      SoundPath: VFS://Game/Audio/jump.mp3
+      SoundPath: VFS://Game/Content/Audio/jump.mp3
       Volume: 1
       Looping: false
       PlayOnStart: false
@@ -104,5 +104,5 @@ Entities:
       Rotation: [0, 0, 0]
       Scale: [1, 1, 1]
     ScriptComponent:
-      ScriptPath: VFS://Game/Scripts/game_manager.py
+      ScriptPath: VFS://Game/Content/Scripts/game_manager.py
       ClassName: GameManager

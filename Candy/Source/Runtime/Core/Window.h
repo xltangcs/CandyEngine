@@ -17,11 +17,16 @@ namespace Candy {
 		uint32_t Height;
 		bool Resizable = true;
 
+		// Create the window already maximized. Lets the swap chain be born at
+		// the final size — avoids a post-create resize at startup.
+		bool Maximized = false;
+
 		WindowProps(const std::string& title = "Candy Engine",
 			uint32_t width = 1280,
 			uint32_t height = 720,
-			bool resizable = true)
-			: Title(title), Width(width), Height(height), Resizable(resizable)
+			bool resizable = true,
+			bool maximized = false)
+			: Title(title), Width(width), Height(height), Resizable(resizable), Maximized(maximized)
 		{
 		}
 	};

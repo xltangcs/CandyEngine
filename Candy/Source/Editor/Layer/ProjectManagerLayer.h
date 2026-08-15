@@ -11,8 +11,12 @@ namespace Candy {
 		ProjectManagerLayer();
 		virtual ~ProjectManagerLayer() = default;
 
+		// The Project Manager is a compact launcher window of its own (like
+		// Godot's), distinct from the persisted editor geometry in EditorState.
+		static constexpr uint32_t ProjectManagerWidth = 1024;
+		static constexpr uint32_t ProjectManagerHeight = 640;
+
 		virtual void OnAttach() override;
-		virtual void OnDetach() override;
 		virtual void OnImGuiRender() override;
 
 	private:

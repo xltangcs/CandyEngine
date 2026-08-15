@@ -24,7 +24,8 @@ namespace Candy {
 			uint32_t height = 720,
 			bool resizable = true,
 			bool isEditor = true,
-			const std::string& rendererAPI = "D3D12");
+			const std::string& rendererAPI = "D3D12",
+			bool maximized = false);
 		virtual ~Application();
 
 		void OnEvent(Event& e);

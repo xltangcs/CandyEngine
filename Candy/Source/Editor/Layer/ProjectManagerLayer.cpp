@@ -21,28 +21,25 @@ namespace Candy {
 
 	void ProjectManagerLayer::OnAttach()
 	{
-		auto& editorState = EditorState::Get();
-		editorState.Load();
-		
-		auto& editorSettings = EditorSettings::Get();
-		editorSettings.Load();
-		
+		// The Project Manager runs in its own compact, centered window. This
+		// also applies when returning from the editor, whose OnAttach restores
+		// the persisted (larger) editor geometry. Window geometry is NOT saved
+		// here — EditorState only persists the editor window size.
 		GLFWwindow* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow());
-		if (editorState.WindowMaximized)
-			glfwMaximizeWindow(window);
-		else
-			glfwSetWindowSize(window, editorState.WindowWidth, editorState.WindowHeight);
-		
-		m_RecentProjects = RecentProjects::Load();
-	}
+		glfwRestoreWindow(window); // un-maximize before shrinking (no-op otherwise)
+		glfwSetWindowSize(window, ProjectManagerWidth, ProjectManagerHeight);
 
-	void ProjectManagerLayer::OnDetach()
-	{
-		EditorState::Get().Save();
+		// Center on the primary monitor work area (excludes the taskbar).
+		int wx, wy, ww, wh;
+		glfwGetMonitorWorkarea(glfwGetPrimaryMonitor(), &wx, &wy, &ww, &wh);
+		glfwSetWindowPos(window, wx + (ww - (int)ProjectManagerWidth) / 2, wy + (wh - (int)ProjectManagerHeight) / 2);
+
+		m_RecentProjects = RecentProjects::Load();
 	}
 
 	void ProjectManagerLayer::OnImGuiRender()
 	{
+		ImGui::PushFont(ImGui::GetIO().FontDefault, EditorSettings::Get().m_FontSize);
 		ImGuiViewport* viewport = ImGui::GetMainViewport();
 		ImGui::SetNextWindowPos(viewport->Pos);
 		ImGui::SetNextWindowSize(viewport->Size);
@@ -162,6 +159,8 @@ namespace Candy {
 			RenderNewProjectDialog();
 
 		ImGui::End();
+		
+		ImGui::PopFont();
 	}
 
 	void ProjectManagerLayer::OpenProject()

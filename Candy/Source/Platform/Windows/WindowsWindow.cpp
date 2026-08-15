@@ -59,6 +59,12 @@ namespace Candy {
 		#endif
 
 		glfwWindowHint(GLFW_RESIZABLE, props.Resizable ? GLFW_TRUE : GLFW_FALSE);
+
+		// Create the window at its final size/maximized state so the swap chain
+		// is born at the right dimensions — no post-create resize at startup.
+		if (props.Maximized)
+			glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
+
 		m_Window = glfwCreateWindow((int)props.Width, (int)props.Height, m_Data.Title.c_str(), nullptr, nullptr);
 		
 		s_GLFWWindowCount ++;

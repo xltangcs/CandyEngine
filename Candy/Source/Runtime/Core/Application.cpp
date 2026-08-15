@@ -20,7 +20,7 @@
 namespace Candy {
 	Application* Application::s_Instance = nullptr;
 
-	Application::Application(const std::string& name, uint32_t width, uint32_t height, bool resizable, bool isEditor, const std::string& rendererAPI)
+	Application::Application(const std::string& name, uint32_t width, uint32_t height, bool resizable, bool isEditor, const std::string& rendererAPI, bool maximized)
 		: m_IsEditor(isEditor)
 	{
 		CANDY_CORE_ASSERT(!s_Instance, "Application already exists!");
@@ -34,7 +34,7 @@ namespace Candy {
 		RendererAPI::SetAPI(RendererAPI::APIFromString(rendererAPI));
 		CANDY_CORE_INFO("Application: RHI backend = '{}'", RendererAPI::StringFromAPI(RendererAPI::GetAPI()));
 
-		m_Window = Window::Create(WindowProps(name, width, height, resizable));
+		m_Window = Window::Create(WindowProps(name, width, height, resizable, maximized));
 		m_Window->SetEventCallback(CANDY_BIND_EVENT_FN(Application::OnEvent));
 
 		// Mount Engine + Game content. The strategy (directory vs .pak) depends
