@@ -230,11 +230,19 @@ namespace Candy {
 		{
 			// The game UI belongs INSIDE the viewport: composite it into the
 			// target framebuffer instead of presenting the swap chain.
-			RenderToFramebuffer(drawData, static_cast<D3D12Framebuffer*>(target));
+			RenderToFramebuffer(drawData, dynamic_cast<D3D12Framebuffer*>(target));
+			return;
 		}
-		else
+		
+		// Multi-viewport platform windows (drag ImGui windows out of the main window).
+		// The imgui_impl_dx12 backend self-manages per-viewport swap chains using the
+		// Device/CommandQueue from InitInfo; we only need to drive the per-frame update.
+		RenderToSwapChain(drawData);
+		ImGuiIO& io = ImGui::GetIO();
+		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 		{
-			RenderToSwapChain(drawData);
+			ImGui::UpdatePlatformWindows();
+			ImGui::RenderPlatformWindowsDefault();
 		}
 	}
 

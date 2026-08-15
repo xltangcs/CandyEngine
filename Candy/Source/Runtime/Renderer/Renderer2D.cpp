@@ -162,7 +162,7 @@ namespace Candy {
 		}
 
 		// --- Shader modules: per-API source directory; one multi-stage file per primitive ---
-		const char* shaderDir = (Renderer::GetAPI() == RendererAPI::API::D3D12) ? "DX12" : "OpenGL";
+		const char* shaderDir = (Renderer::GetAPI() == RendererAPI::API::D3D12) ? "D3D12" : "OpenGL";
 		const char* shaderExt = (Renderer::GetAPI() == RendererAPI::API::D3D12) ? "hlsl" : "glsl";
 		auto loadModule = [&](const char* file, ShaderStage stage, const char* entry) -> Ref<RHIShaderModule> {
 			std::string path = std::string("VFS://Engine/Content/Shaders/") + shaderDir + "/" + file + "." + shaderExt;

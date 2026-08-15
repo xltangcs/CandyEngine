@@ -14,7 +14,7 @@ namespace Candy {
 		auto& editorSetting = EditorSettings::Get();
 		auto& editorState = EditorState::Get();
 
-		ImGui::SetNextWindowSizeConstraints(ImVec2(200, 100), ImVec2(FLT_MAX, FLT_MAX));
+		ImGui::SetNextWindowSizeConstraints(ImVec2(960, 540), ImVec2(FLT_MAX, FLT_MAX));
 		ImGui::Begin("Editor Settings", &editorState.ShowEditorSettings);
 
 		if (ImGuiUtils::DrawSliderFloat("Font Size", editorSetting.m_FontSize, 12.0f, 48.0f, "%.0f px"))

@@ -13,8 +13,7 @@ namespace Candy {
 	{
 		if (str == "OpenGL" || str == "opengl") return API::OpenGL;
 		if (str == "Vulkan" || str == "vulkan") return API::Vulkan;
-		if (str == "D3D12" || str == "d3d12" || str == "DX12" || str == "dx12")
-			return API::D3D12;
+		if (str == "D3D12" || str == "d3d12")	return API::D3D12;
 		return API::OpenGL;
 	}
 

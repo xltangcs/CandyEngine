@@ -1,0 +1,6 @@
+Project:
+  ProjectName: 3DDemo
+  DefaultScene: ""
+  DefaultWidth: 1280
+  DefaultHeight: 720
+  RendererAPI: D3D12

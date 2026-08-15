@@ -28,7 +28,7 @@ namespace Candy {
 		void ShutdownContext() override;
 		void Shutdown() override;
 
-		bool SupportsPlatformWindows() const override { return false; }
+		bool SupportsPlatformWindows() const override { return true; }
 
 		void NewFrame() override;
 		void NewFrameGameUI() override;

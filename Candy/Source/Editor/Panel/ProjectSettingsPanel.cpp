@@ -17,6 +17,7 @@ namespace Candy {
 		auto project = Application::Get().GetProject();
 		auto& editorState = EditorState::Get();
 
+		ImGui::SetNextWindowSizeConstraints(ImVec2(960, 540), ImVec2(FLT_MAX, FLT_MAX));
 		ImGui::Begin("Project Settings", &editorState.ShowProjectSettings);
 
 		if (!project)
