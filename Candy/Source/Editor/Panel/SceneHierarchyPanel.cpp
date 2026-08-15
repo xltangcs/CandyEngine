@@ -80,7 +80,7 @@ namespace Candy {
 				m_SelectionContext = {};
 
 			// Right-click on blank space
-			if (ImGui::BeginPopupContextWindow(0, 1 | ImGuiPopupFlags_NoOpenOverItems))
+			if (ImGui::BeginPopupContextWindow("##HierarchyBlankContext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
 			{
 				if (ImGui::MenuItem("Create Empty Entity"))
 					m_Context->CreateEntity("Empty Entity");
@@ -136,11 +136,12 @@ namespace Candy {
 	{
 		auto& tag = entity.GetComponent<TagComponent>().Tag;
 
-		ImGuiTreeNodeFlags flags = ((m_SelectionContext == entity) ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_OpenOnArrow;
-		
-		flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
+		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
-		bool opened = ImGui::TreeNodeEx((void*)(uint64_t)(uint32_t)entity, flags, tag.c_str());
+		if (m_SelectionContext == entity)
+			flags |= ImGuiTreeNodeFlags_Selected;
+
+		ImGui::TreeNodeEx((void*)(uint64_t)(uint32_t)entity, flags, tag.c_str());
 		if (ImGui::IsItemClicked())
 		{
 			m_SelectionContext = entity;
@@ -153,41 +154,6 @@ namespace Candy {
 				entityDeleted = true;
 
 			ImGui::EndPopup();
-		}
-
-		// Drag-drop target for .py script files
-		if (ImGui::BeginDragDropTarget())
-		{
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
-			{
-				const char* path = (const char*)payload->Data;
-				VfsPath vp = VfsPath::Parse(path);
-				std::filesystem::path relPath(vp.relativePath);
-				if (vp.IsValid() && relPath.extension() == ".py")
-				{
-					auto& sc = entity.HasComponent<ScriptComponent>()
-						? entity.GetComponent<ScriptComponent>()
-						: entity.AddComponent<ScriptComponent>();
-					sc.ScriptPath = vp.ToString();
-					auto content = FileSystem::Get().ReadText(vp.ToString());
-					if (content)
-					{
-						std::string parsedName = ParsePythonClassNameFromContent(*content);
-						if (!parsedName.empty())
-							sc.ClassName = parsedName;
-					}
-				}
-			}
-			ImGui::EndDragDropTarget();
-		}
-
-		if (opened)
-		{
-			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
-			bool opened = ImGui::TreeNodeEx((void*)9817239, flags, tag.c_str());
-			if (opened)
-				ImGui::TreePop();
-			ImGui::TreePop();
 		}
 
 		if (entityDeleted)
