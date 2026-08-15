@@ -60,6 +60,7 @@ msbuild CandyEngine.sln /p:Configuration=Debug
 - **渲染后端扩展**：重新启用 Vulkan 后端（当前冻结，按 D3D12↔Vulkan 概念映射平移）；远期考虑 Metal。
 - **可视化脚本**：类 UE Blueprint 的节点化脚本系统。
 - **SerializeRuntime**：补全运行时场景的序列化能力。
+- **场景层级面板（目录树）**：在编辑器中实现类 Godot / 文件夹目录树风格的场景层级面板。实体以可折叠的目录树形式展示，支持拖拽调整父子关系、图标、组件徽章、搜索/过滤以及多选。
 
 ### 项目结构
 

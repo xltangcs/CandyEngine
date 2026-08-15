@@ -60,6 +60,7 @@ Build configuration macros: `Debug` → `CANDY_DEBUG`, `Release` → `CANDY_RELE
 - **Render Backend Expansion**: re-enable the Vulkan backend (currently frozen; ported by mapping D3D12 ↔ Vulkan concepts); Metal is a longer-term consideration.
 - **Visual Scripting**: a node-based, UE Blueprint-like scripting system.
 - **SerializeRuntime**: complete runtime scene serialization.
+- **Scene Hierarchy Panel (Tree View)**: Implement a Godot-style / folder-tree-style Scene Hierarchy Panel in the editor. Entities are shown in a collapsible directory tree with drag-and-drop parenting, icons, component badges, search/filter, and multi-select.
 
 ### Project Structure
 
