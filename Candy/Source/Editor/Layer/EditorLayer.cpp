@@ -84,10 +84,6 @@ namespace Candy {
 			if (scenePathOpt && std::filesystem::exists(*scenePathOpt))
 				OpenScene(*scenePathOpt);
 		}
-		else if (!editorState.LastScenePath.empty() && std::filesystem::exists(editorState.LastScenePath))
-		{
-			OpenScene(editorState.LastScenePath);
-		}
 
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 
@@ -310,7 +306,10 @@ namespace Candy {
 						for (const auto& entry : m_RecentProjects)
 						{
 							if (ImGui::MenuItem(entry.Name.c_str()))
+							{
 								OpenRecent(entry.Path);
+								break;
+							}
 						}
 					}
 					ImGui::EndMenu();
@@ -725,7 +724,6 @@ namespace Candy {
 		m_ActiveScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 		m_EditorScenePath = std::filesystem::path();
-		EditorState::Get().LastScenePath.clear();
 		m_HoveredEntity = {};
 		m_CameraPreviewEntity = {};
 		m_CameraPreviewPinned = false;
@@ -764,7 +762,6 @@ namespace Candy {
 			m_HoveredEntity = {};
 			m_CameraPreviewEntity = {};
 			m_CameraPreviewPinned = false;
-			EditorState::Get().LastScenePath = path.string();
 		}
 	}
 

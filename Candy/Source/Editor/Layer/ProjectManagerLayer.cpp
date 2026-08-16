@@ -117,6 +117,7 @@ namespace Candy {
 					Application::Get().LoadProject(entry.Path);
 					if (Application::Get().GetProject())
 					{
+						RecentProjects::Add(entry.Name, entry.Path);
 						Application::Get().SchedulePopLayer(this);
 						Application::Get().SchedulePushLayer(new EditorLayer());
 					}

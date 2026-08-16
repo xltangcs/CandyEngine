@@ -1,18 +1,28 @@
 #pragma once
 
 #include <string>
+#include <vector>
+#include "Runtime/Project/RecentProjects.h"
 
 namespace Candy {
 
+	/// Persisted to Saved/EditorState.candy — the single file backing both the
+	/// editor session state (window geometry, last opened project) and the
+	/// recent projects list shown in the Project Manager.
 	class EditorState
 	{
 	public:
 		static EditorState& Get();
 
-		void Save();
 		void Load();
+		/// Captures the current window geometry into the fields and writes the file.
+		void Save();
+		/// Writes the in-memory state to disk without re-querying window geometry
+		/// (used mid-session, e.g. RecentProjects::Add from the Project Manager).
+		void WriteFile();
 
-		std::string LastScenePath;
+		std::vector<RecentProjectEntry> RecentProjects;
+		std::string LastOpenProject;
 		int WindowWidth = 1280;
 		int WindowHeight = 720;
 		bool WindowMaximized = false;
@@ -25,6 +35,7 @@ namespace Candy {
 
 	private:
 		EditorState() = default;
+		bool m_Loaded = false;
 	};
 
 }

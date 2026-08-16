@@ -1,6 +1,5 @@
 #include <Candy.h>
 #include <Runtime/Core/EntryPoint.h>
-#include <Runtime/Project/RecentProjects.h>
 
 #include "Layer/EditorLayer.h"
 #include "Layer/ProjectManagerLayer.h"
@@ -36,8 +35,10 @@ namespace Candy {
 			EditorSettings::Get().Load();
 			EditorState::Get().Load();
 
-			auto recents = RecentProjects::Load();
-			opts.AutoOpenProject = EditorSettings::Get().m_AutoOpenLastProject && !recents.empty();
+			const auto& lastProject = EditorState::Get().LastOpenProject;
+			opts.AutoOpenProject = EditorSettings::Get().m_AutoOpenLastProject
+				&& !lastProject.empty()
+				&& std::filesystem::exists(lastProject);
 			if (!opts.AutoOpenProject)
 			{
 				// Project Manager: compact launcher window of its own.
@@ -50,7 +51,7 @@ namespace Candy {
 			opts.Width = (uint32_t)EditorState::Get().WindowWidth;
 			opts.Height = (uint32_t)EditorState::Get().WindowHeight;
 			opts.Maximized = EditorState::Get().WindowMaximized;
-			opts.LastProjectPath = recents[0].Path;
+			opts.LastProjectPath = lastProject;
 
 			// Peek the auto-opened last project's `.candyproj` YAML directly
 			// and return its `RendererAPI` field (fallback: "D3D12"). This is
