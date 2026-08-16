@@ -88,10 +88,18 @@ namespace Candy {
 		CANDY_PROPERTY()
 		std::string MeshPath;
 
+		// One .mat VFS path per Submesh (indexed by Submesh::MaterialIndex).
+		// Serialized for save/load; each entry points at a shared material asset.
+		// May be empty (meaning "use the mesh's imported default material").
+		CANDY_PROPERTY()
+		std::vector<std::string> MaterialPaths;
+
 		// Runtime imported data (not serialized). Populated from MeshPath via
-		// MeshImporter when the scene is loaded / the path changes.
+		// MeshImporter when the scene is loaded / the path changes, then refined
+		// by MaterialCache so each MaterialPaths[i] resolves to a shared material.
 		Ref<StaticMeshResource> Mesh;
 		// One material per Submesh (indexed by Submesh::MaterialIndex).
+		// Shared via MaterialCache when MaterialPaths[i] is set.
 		std::vector<Ref<Material>> Materials;
 
 		StaticMeshComponent() = default;

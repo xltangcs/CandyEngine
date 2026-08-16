@@ -1,0 +1,15 @@
+Material:
+  Name: Lemon
+  BaseColor: [1, 1, 1]
+  Metallic: 0
+  Roughness: 0.5
+  EmissiveColor: [0, 0, 0]
+  EmissiveIntensity: 0
+  BlendMode: Opaque
+  ShadingModel: Lit
+  BaseColorMap: ""
+  NormalMap: ""
+  MetallicRoughnessMap: ""
+  EmissiveMap: ""
+  UVTiling: [1, 1]
+  UVOffset: [0, 0]

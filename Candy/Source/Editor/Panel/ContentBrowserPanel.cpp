@@ -1,11 +1,13 @@
 #include "CandyPCH.h"
 #include "ContentBrowserPanel.h"
+#include "EditorSelection.h"
 #include "Setting/EditorSettings.h"
 
 #include <imgui/imgui.h>
 #include <imgui/misc/cpp/imgui_stdlib.h>
 #include "Runtime/Core/Application.h"
 #include "Runtime/Renderer/Renderer.h"
+#include "Runtime/Asset/Material.h"
 
 #include <algorithm>
 #include <cctype>
@@ -72,6 +74,65 @@ namespace Candy {
 			? Application::Get().GetProject()->GetProjectDirectory()
 			: kEngineRoot;
 		return root / rel;
+	}
+
+	Ref<Texture2D> ContentBrowserPanel::GetIconForFile(const std::filesystem::path& filename, bool isDirectory) const
+	{
+		if (isDirectory)
+			return m_DirectoryIcon;
+		// Future: per-extension icons (e.g. .mat -> MaterialIcon.png). For now
+		// all files share the generic file icon.
+		return m_FileIcon;
+	}
+
+	std::filesystem::path ContentBrowserPanel::MakeUniquePath(
+		const std::filesystem::path& baseDir,
+		const std::string& baseName,
+		const std::string& extension)
+	{
+		std::filesystem::path candidate = baseDir / (baseName + extension);
+		if (!std::filesystem::exists(candidate))
+			return candidate;
+
+		for (int i = 1; i < 10000; ++i)
+		{
+			candidate = baseDir / (baseName + "_" + std::to_string(i) + extension);
+			if (!std::filesystem::exists(candidate))
+				return candidate;
+		}
+		// Fallback (extremely unlikely to reach).
+		return baseDir / (baseName + "_overflow" + extension);
+	}
+
+	void ContentBrowserPanel::CreateNewFolder()
+	{
+		auto currentDir = ResolveDiskPath(m_CurrentDomain, m_CurrentRelDir);
+		auto target = MakeUniquePath(currentDir, "NewFolder", "");
+		std::error_code ec;
+		if (!std::filesystem::create_directory(target, ec))
+		{
+			CANDY_CORE_ERROR("ContentBrowser: failed to create folder '{}': {}",
+				target.string(), ec.message());
+		}
+	}
+
+	void ContentBrowserPanel::CreateNewMaterial()
+	{
+		auto currentDir = ResolveDiskPath(m_CurrentDomain, m_CurrentRelDir);
+		auto target = MakeUniquePath(currentDir, "NewMaterial", ".mat");
+
+		// Build VFS path for the new file and write a default Material.
+		std::string relPath = std::filesystem::relative(target,
+			ResolveDiskPath(m_CurrentDomain, std::filesystem::path())).generic_string();
+		VfsPath vp(ToVfsDomain(m_CurrentDomain), relPath);
+		std::string vfsPath = vp.ToString();
+
+		Ref<Material> mat = CreateRef<Material>();
+		mat->Name = target.stem().string();
+		if (!mat->Serialize(vfsPath))
+		{
+			CANDY_CORE_ERROR("ContentBrowser: failed to write new material at '{}'", vfsPath);
+		}
 	}
 
 	void ContentBrowserPanel::OnImGuiRender()
@@ -276,6 +337,8 @@ namespace Candy {
 
 		if (!std::filesystem::exists(currentDir))
 		{
+			// Even if the dir vanished, still allow right-click on the grid for
+			// future folder creation in the (now restored) parent.
 			ImGui::Columns(1);
 			return;
 		}
@@ -310,9 +373,22 @@ namespace Candy {
 			VfsPath vp(ToVfsDomain(m_CurrentDomain), relativeToDomain.generic_string());
 			std::string vfsPathStr = vp.ToString();
 
+			bool isSelected = (m_SelectedAsset == vfsPathStr);
+
 			ImGui::PushID(filenameString.c_str());
-			Ref<Texture2D> icon = directoryEntry.is_directory() ? m_DirectoryIcon : m_FileIcon;
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+			Ref<Texture2D> icon = GetIconForFile(path.filename(), directoryEntry.is_directory());
+
+			// Highlight selected item.
+			if (isSelected)
+			{
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.24f, 0.45f, 0.78f, 0.55f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.26f, 0.50f, 0.85f, 0.75f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.20f, 0.40f, 0.72f, 0.85f));
+			}
+			else
+			{
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+			}
 			// UV flip: OpenGL framebuffers are bottom-up (V=0 is bottom); D3D12/Vulkan
 			// are top-down (V=0 is top), so the flip would show icons upside down.
 			ImVec2 uv0{ 0, 1 }, uv1{ 1, 0 };
@@ -330,14 +406,38 @@ namespace Candy {
 				ImGui::EndDragDropSource();
 			}
 
-			ImGui::PopStyleColor();
+			// Right-click on item: per-file context menu (placeholder for now).
+			if (ImGui::BeginPopupContextItem())
+			{
+				ImGui::TextDisabled("%s", filenameString.c_str());
+				ImGui::Separator();
+				ImGui::MenuItem("Rename...", nullptr, false, false);
+				ImGui::MenuItem("Delete", nullptr, false, false);
+				ImGui::EndPopup();
+			}
 
+			ImGui::PopStyleColor(isSelected ? 3 : 1);
+
+			// Single-click → select locally (highlight only). Does NOT publish to
+			// EditorSelection: the Properties panel is only opened on double-click,
+			// matching the UE/Godot habit of "click to select, double-click to edit".
+			if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+			{
+				m_SelectedAsset = vfsPathStr;
+			}
+
+			// Double-click → publish the asset to the Properties panel so it can be
+			// inspected/edited there. A double-click on a folder still enters it.
 			if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 			{
 				if (directoryEntry.is_directory())
 				{
 					m_CurrentRelDir /= path.filename();
 					m_SelectedTreePath = DomainLabel(m_CurrentDomain) + "/" + m_CurrentRelDir.generic_string();
+				}
+				else
+				{
+					EditorSelection::Get().SelectAsset(vfsPathStr);
 				}
 			}
 
@@ -347,6 +447,21 @@ namespace Candy {
 		}
 
 		ImGui::Columns(1);
+
+		// Right-click on empty grid area: New Folder / New Material.
+		if (ImGui::BeginPopupContextWindow("##ContentBrowserBlankContext",
+		    ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
+		{
+			if (ImGui::MenuItem("New Folder"))
+			{
+				CreateNewFolder();
+			}
+			if (ImGui::MenuItem("New Material"))
+			{
+				CreateNewMaterial();
+			}
+			ImGui::EndPopup();
+		}
 	}
 
 }

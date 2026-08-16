@@ -6,6 +6,7 @@
 #include "Runtime/Core/VfsPath.h"
 #include "Runtime/Renderer/Texture.h"
 #include "Runtime/Asset/MeshImporter.h"
+#include "Runtime/Asset/MaterialCache.h"
 
 #include <fstream>
 #include <yaml-cpp/yaml.h>
@@ -215,6 +216,17 @@ namespace Candy {
 			auto& staticMeshComponent = entity.GetComponent<StaticMeshComponent>();
 			if (!staticMeshComponent.MeshPath.empty())
 				out << YAML::Key << "MeshPath" << YAML::Value << staticMeshComponent.MeshPath;
+
+			// Material overrides: one .mat VFS path per submesh slot. Only
+			// serialized when the component has any (avoids bloating every mesh).
+			if (!staticMeshComponent.MaterialPaths.empty())
+			{
+				out << YAML::Key << "MaterialPaths" << YAML::Value;
+				out << YAML::BeginSeq;
+				for (const auto& p : staticMeshComponent.MaterialPaths)
+					out << YAML::Value << p;
+				out << YAML::EndSeq;
+			}
 
 			out << YAML::EndMap; // StaticMeshComponent
 		}
@@ -512,6 +524,27 @@ namespace Candy {
 							}
 							else
 								CANDY_CORE_WARN("SceneSerializer: failed to import mesh {0}", smc.MeshPath);
+						}
+					}
+
+					// Material overrides: resolve each .mat path through the cache
+					// so a mesh that referenced a shared .mat stays shared after load.
+					if (auto mpNode = staticMeshComponent["MaterialPaths"])
+					{
+						for (const auto& p : mpNode)
+							smc.MaterialPaths.push_back(p.as<std::string>());
+					}
+					if (!smc.MaterialPaths.empty())
+					{
+						// Ensure the materials list has at least as many slots as
+						// overrides, then replace each slot with the cached asset.
+						if (smc.Materials.size() < smc.MaterialPaths.size())
+							smc.Materials.resize(smc.MaterialPaths.size());
+						for (size_t i = 0; i < smc.MaterialPaths.size(); i++)
+						{
+							auto mat = MaterialCache::Get().Load(smc.MaterialPaths[i]);
+							if (mat)
+								smc.Materials[i] = mat;
 						}
 					}
 				}

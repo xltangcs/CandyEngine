@@ -427,8 +427,11 @@ namespace Candy {
 		}
 		// ImGui::PopStyleVar();
 		
-		m_SceneHierarchyPanel.OnImGuiRender();
+		// Content Browser first so that a single click publishes its selection
+		// before the Scene Hierarchy's Properties window renders in the same frame,
+		// avoiding a one-frame delay when inspecting an asset.
 		m_ContentBrowserPanel.OnImGuiRender();
+		m_SceneHierarchyPanel.OnImGuiRender();
 
 		ImGui::Begin("Stats");
 

@@ -9,6 +9,8 @@ Entities:
       Scale: [1, 1, 1]
     StaticMeshComponent:
       MeshPath: VFS://Game/Model/lemon/lemon_1k.gltf
+      MaterialPaths:
+        - VFS://Game/Model/lemon/NewMaterial.mat
   - Entity: 11274287526476274019
     TagComponent:
       Tag: Cube

@@ -9,7 +9,10 @@
 
 #include "Runtime/Scene/Components.h"
 #include "Runtime/Asset/MeshImporter.h"
+#include "Runtime/Asset/Material.h"
+#include "Runtime/Asset/MaterialCache.h"
 #include "Runtime/Utils/PlatformUtils.h"
+#include "EditorSelection.h"
 
 #include <cstring>
 #include <regex>
@@ -92,6 +95,95 @@ namespace
 
 		return ParsePythonClassNameFromContent(content);
 	}
+
+	// Renders the inspector for the currently-selected asset (VFS path).
+	// Supports material (.mat) for now; other types show a placeholder.
+	void DrawMaterialInspector(const std::string& vfsPath)
+	{
+		Ref<Material> mat = Material::Load(vfsPath);
+		if (!mat)
+		{
+			ImGui::TextDisabled("Failed to load material");
+			ImGui::TextWrapped("%s", vfsPath.c_str());
+			return;
+		}
+
+		// Any modification is buffered then written back in one go per frame
+		// so Material::Serialize is not called on every drag-step.
+		bool dirty = false;
+
+		// Identity
+		dirty |= ImGuiUtils::DrawInputText("Name", mat->Name);
+
+		// Surface
+		ImGuiUtils::DrawVec3Control("Base Color", mat->BaseColor);
+		dirty |= ImGuiUtils::DrawDragFloat("Metallic",  mat->Metallic,  0.01f, 0.0f, 1.0f);
+		dirty |= ImGuiUtils::DrawDragFloat("Roughness", mat->Roughness, 0.01f, 0.0f, 1.0f);
+
+		ImGui::Separator();
+
+		// Emissive
+		ImGuiUtils::DrawVec3Control("Emissive Color", mat->EmissiveColor);
+		dirty |= ImGuiUtils::DrawDragFloat("Emissive Intensity", mat->EmissiveIntensity, 0.01f, 0.0f, 100.0f);
+
+		ImGui::Separator();
+
+		// Blend / Shading
+		const char* blendItems[] = { "Opaque", "Masked", "Transparent" };
+		int blendIdx = (int)mat->BlendMode;
+		if (ImGuiUtils::DrawCombo("Blend Mode", blendItems, 3, blendIdx))
+		{
+			mat->BlendMode = (MaterialBlendMode)blendIdx;
+			dirty = true;
+		}
+		const char* shadingItems[] = { "Lit", "Unlit" };
+		int shadingIdx = (int)mat->ShadingModel;
+		if (ImGuiUtils::DrawCombo("Shading Model", shadingItems, 2, shadingIdx))
+		{
+			mat->ShadingModel = (MaterialShadingModel)shadingIdx;
+			dirty = true;
+		}
+
+		ImGui::Separator();
+
+		// Texture paths (DrawPathInput supports dropping files from the
+		// Content Browser directly onto the field).
+		dirty |= ImGuiUtils::DrawPathInput("Base Color Map", mat->BaseColorMap);
+		dirty |= ImGuiUtils::DrawPathInput("Normal Map",     mat->NormalMap);
+		dirty |= ImGuiUtils::DrawPathInput("Metallic-Roughness Map", mat->MetallicRoughnessMap);
+		dirty |= ImGuiUtils::DrawPathInput("Emissive Map",   mat->EmissiveMap);
+
+		ImGui::Separator();
+
+		// UV transform
+		dirty |= ImGuiUtils::DrawDragFloat2("UV Tiling",  mat->UVTiling,  0.01f);
+		dirty |= ImGuiUtils::DrawDragFloat2("UV Offset",  mat->UVOffset,  0.01f);
+
+		ImGui::Separator();
+
+		// Info / actions
+		ImGui::TextDisabled("Path: %s", vfsPath.c_str());
+
+		if (ImGui::Button("Save"))
+		{
+			mat->Serialize(vfsPath);
+			dirty = false;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Reload"))
+		{
+			mat = Material::Load(vfsPath);
+			dirty = false;
+		}
+
+		// Auto-save on any modification.
+		if (dirty)
+		{
+			if (!mat->Serialize(vfsPath))
+				CANDY_CORE_ERROR("Failed to serialize material {}", vfsPath);
+		}
+	}
+
 }
 
 	SceneHierarchyPanel::SceneHierarchyPanel(const Ref<Scene>& context)
@@ -103,6 +195,7 @@ namespace
 	{
 		m_Context = context;
 		m_SelectionContext = {};
+		EditorSelection::Get().Clear();
 	}
 
 	void SceneHierarchyPanel::OnImGuiRender()
@@ -120,7 +213,10 @@ namespace
 			}
 
 			if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
+			{
 				m_SelectionContext = {};
+				EditorSelection::Get().Clear();
+			}
 
 			// Right-click on blank space
 			if (ImGui::BeginPopupContextWindow("##HierarchyBlankContext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
@@ -135,7 +231,12 @@ namespace
 		ImGui::End();
 
 		ImGui::Begin("Properties");
-		if (m_SelectionContext)
+		auto& selection = EditorSelection::Get();
+		if (selection.HasAssetSelection())
+		{
+			DrawSelectedAsset(selection.GetSelectedAsset());
+		}
+		else if (m_SelectionContext)
 		{
 			DrawComponents(m_SelectionContext);
 		}
@@ -173,6 +274,31 @@ namespace
 	void SceneHierarchyPanel::SetSelectedEntity(Entity entity)
 	{
 		m_SelectionContext = entity;
+		// Clicking an entity in the hierarchy clears any asset selection so the
+		// Properties panel flips back to component editing.
+		EditorSelection::Get().SelectEntity(entity);
+	}
+
+	void SceneHierarchyPanel::DrawSelectedAsset(const std::string& vfsPath)
+	{
+		if (vfsPath.empty())
+		{
+			ImGui::TextDisabled("No asset selected");
+			return;
+		}
+
+		ImGui::TextDisabled("Asset Inspector");
+		ImGui::Separator();
+
+		if (EditorSelection::IsMaterial(vfsPath))
+		{
+			DrawMaterialInspector(vfsPath);
+		}
+		else
+		{
+			ImGui::Text("No inspector available for this asset type.");
+			ImGui::TextWrapped("%s", vfsPath.c_str());
+		}
 	}
 
 	void SceneHierarchyPanel::DrawEntityNode(Entity entity)
@@ -188,6 +314,7 @@ namespace
 		if (ImGui::IsItemClicked())
 		{
 			m_SelectionContext = entity;
+			EditorSelection::Get().SelectEntity(entity);
 		}
 
 		bool entityDeleted = false;
@@ -203,7 +330,10 @@ namespace
 		{
 			m_Context->DestroyEntity(entity);
 			if (m_SelectionContext == entity)
+			{
 				m_SelectionContext = {};
+				EditorSelection::Get().Clear();
+			}
 		}
 
 	}
@@ -442,11 +572,34 @@ namespace
 							CANDY_WARN("Could not import static mesh {0}", component.MeshPath);
 					}
 				}
-			// if (ImGuiUtils::DrawPathInput("Mesh Path", component.MeshPath))
-			// {
-			// 	
-			// }
 			
+				size_t submeshCount = component.Mesh ? component.Mesh->Submeshes.size() : 0;
+				if (submeshCount == 0)
+				{
+					ImGui::TextDisabled("Load a mesh to assign materials");
+					return;
+				}
+			
+				// Keep MaterialPaths in sync with the submesh count.
+				component.MaterialPaths.resize(submeshCount);
+
+				for (size_t i = 0; i < submeshCount; i++)
+				{
+					const auto& submesh = component.Mesh->Submeshes[i];
+					std::string label = submesh.Name.empty()
+						? "Material " + std::to_string(i)
+						: submesh.Name;
+
+					if (ImGuiUtils::DrawPathInput(label, component.MaterialPaths[i]))
+					{
+						if (!component.MaterialPaths[i].empty() && i < component.Materials.size())
+						{
+							auto mat = MaterialCache::Get().Load(component.MaterialPaths[i]);
+							if (mat)
+								component.Materials[i] = mat;
+						}
+					}
+				}
 			});
 	
 
