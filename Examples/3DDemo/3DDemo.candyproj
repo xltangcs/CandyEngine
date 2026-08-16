@@ -1,6 +1,6 @@
 Project:
   ProjectName: 3DDemo
-  DefaultScene: ""
+  DefaultScene: VFS://Game/Scene/3DDemo.candy
   DefaultWidth: 1280
   DefaultHeight: 720
   RendererAPI: D3D12
