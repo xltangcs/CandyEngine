@@ -4,6 +4,15 @@
 
 namespace Candy {
 
+	// Mount roots are native paths (backslashes on Windows) while VFS relative
+	// parts come from "VFS://Game/..." strings (forward slashes); path::operator/
+	// keeps both, producing mixed separators. Always normalize to the preferred
+	// platform separator.
+	static std::filesystem::path JoinMountPath(const std::filesystem::path& root, const std::string& relPath)
+	{
+		return (root / relPath).lexically_normal();
+	}
+
 	FileSystem& FileSystem::Get()
 	{
 		static FileSystem instance;
@@ -95,7 +104,7 @@ namespace Candy {
 		}
 		else
 		{
-			std::filesystem::path fullPath = mp->path / relPath;
+			std::filesystem::path fullPath = JoinMountPath(mp->path, relPath);
 			if (!std::filesystem::exists(fullPath))
 				return std::nullopt;
 
@@ -134,7 +143,7 @@ namespace Candy {
 		}
 		else
 		{
-			return std::filesystem::exists(mp->path / relPath);
+			return std::filesystem::exists(JoinMountPath(mp->path, relPath));
 		}
 	}
 
@@ -145,7 +154,7 @@ namespace Candy {
 		if (!mp || mp->isPak)
 			return false;
 
-		std::filesystem::path fullPath = mp->path / relPath;
+		std::filesystem::path fullPath = JoinMountPath(mp->path, relPath);
 		std::filesystem::create_directories(fullPath.parent_path());
 
 		std::ofstream file(fullPath, std::ios::binary);
@@ -168,7 +177,7 @@ namespace Candy {
 		if (!mp || mp->isPak)
 			return std::nullopt;
 
-		std::filesystem::path fullPath = mp->path / relPath;
+		std::filesystem::path fullPath = JoinMountPath(mp->path, relPath);
 		return fullPath;
 	}
 
@@ -197,7 +206,7 @@ namespace Candy {
 		if (!vp.IsValid())
 			return std::nullopt;
 
-		auto tempPath = std::filesystem::temp_directory_path() / "CandyGame" / vp.DomainLabel() / vp.relativePath;
+		auto tempPath = (std::filesystem::temp_directory_path() / "CandyGame" / vp.DomainLabel() / vp.relativePath).lexically_normal();
 		std::filesystem::create_directories(tempPath.parent_path());
 		{
 			std::ofstream out(tempPath, std::ios::binary);
@@ -265,7 +274,7 @@ namespace Candy {
 		}
 		else
 		{
-			std::filesystem::path diskDir = mp->path / relPath;
+			std::filesystem::path diskDir = JoinMountPath(mp->path, relPath);
 			if (!std::filesystem::exists(diskDir))
 				return result;
 

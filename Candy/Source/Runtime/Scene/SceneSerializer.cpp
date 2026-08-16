@@ -5,6 +5,7 @@
 #include "Runtime/Scene/SceneSerializer.h"
 #include "Runtime/Core/VfsPath.h"
 #include "Runtime/Renderer/Texture.h"
+#include "Runtime/Asset/MeshImporter.h"
 
 #include <fstream>
 #include <yaml-cpp/yaml.h>
@@ -204,6 +205,18 @@ namespace Candy {
 				out << YAML::Key << "TexturePath" << YAML::Value << spriteRendererComponent.TexturePath;
 
 			out << YAML::EndMap; // SpriteRendererComponent
+		}
+
+		if (entity.HasComponent<StaticMeshComponent>())
+		{
+			out << YAML::Key << "StaticMeshComponent";
+			out << YAML::BeginMap; // StaticMeshComponent
+
+			auto& staticMeshComponent = entity.GetComponent<StaticMeshComponent>();
+			if (!staticMeshComponent.MeshPath.empty())
+				out << YAML::Key << "MeshPath" << YAML::Value << staticMeshComponent.MeshPath;
+
+			out << YAML::EndMap; // StaticMeshComponent
 		}
 
 		if (entity.HasComponent<CircleRendererComponent>())
@@ -477,6 +490,28 @@ namespace Candy {
 								src.Texture = tex;
 							else
 								CANDY_CORE_WARN("SceneSerializer: failed to load texture {0}", src.TexturePath);
+						}
+					}
+				}
+
+				auto staticMeshComponent = entity["StaticMeshComponent"];
+				if (staticMeshComponent)
+				{
+					auto& smc = deserializedEntity.AddComponent<StaticMeshComponent>();
+					if (auto mp = staticMeshComponent["MeshPath"])
+					{
+						std::string raw = mp.as<std::string>();
+						if (!raw.empty())
+						{
+							smc.MeshPath = raw;
+							auto imported = MeshImporter::ImportStaticMesh(smc.MeshPath);
+							if (imported && imported->Mesh)
+							{
+								smc.Mesh = imported->Mesh;
+								smc.Materials = imported->Materials;
+							}
+							else
+								CANDY_CORE_WARN("SceneSerializer: failed to import mesh {0}", smc.MeshPath);
 						}
 					}
 				}

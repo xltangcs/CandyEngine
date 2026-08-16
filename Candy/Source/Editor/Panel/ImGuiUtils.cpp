@@ -8,7 +8,7 @@
 
 namespace Candy {
 
-	bool ImGuiUtils::DrawContentPathControl(const std::string& label, std::string& path)
+	bool ImGuiUtils::DrawPathInput(const std::string& label, std::string& path)
 	{
 		bool modified = false;
 
@@ -29,7 +29,7 @@ namespace Candy {
 		{
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 			{
-				path = (const char*)payload->Data;
+				path = static_cast<const char*>(payload->Data);
 				modified = true;
 			}
 			ImGui::EndDragDropTarget();

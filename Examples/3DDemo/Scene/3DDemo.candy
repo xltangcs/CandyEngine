@@ -2,8 +2,20 @@ Scene: 3DDemo
 Entities:
   - Entity: 12854884733615300658
     TagComponent:
-      Tag: Empty Entity
+      Tag: Lemon
     TransformComponent:
       Translation: [0, 0, 0]
       Rotation: [0, 0, 0]
       Scale: [1, 1, 1]
+    StaticMeshComponent:
+      MeshPath: VFS://Game/Model/lemon/lemon_1k.gltf
+  - Entity: 11274287526476274019
+    TagComponent:
+      Tag: Cube
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SpriteRendererComponent:
+      Color: [1, 1, 1, 1]
+      TexturePath: VFS://Game/Model/lemon/textures/lemon_arm_1k.jpg

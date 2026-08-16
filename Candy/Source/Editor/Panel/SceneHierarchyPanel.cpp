@@ -8,6 +8,7 @@
 #include "ImGuiUtils.h"
 
 #include "Runtime/Scene/Components.h"
+#include "Runtime/Asset/MeshImporter.h"
 #include "Runtime/Utils/PlatformUtils.h"
 
 #include <cstring>
@@ -29,7 +30,49 @@
 
 namespace Candy {
 	
-	static std::string ParsePythonClassNameFromContent(const std::string& content)
+namespace
+{
+	template<typename T, typename UIFunction>
+	void DrawComponent(const std::string& name, Entity entity, UIFunction uiFunction)
+	{
+		const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_FramePadding;
+		if (entity.HasComponent<T>())
+		{
+			auto& component = entity.GetComponent<T>();
+			ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();
+
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
+			float lineHeight = ImGui::GetFrameHeight();
+			ImGui::Separator();
+			bool open = ImGui::TreeNodeEx((void*)typeid(T).hash_code(), treeNodeFlags, name.c_str());
+			ImGui::PopStyleVar(
+			);
+			ImGui::SameLine(contentRegionAvailable.x - lineHeight * 0.5f);
+			if (ImGui::Button("+", ImVec2{ lineHeight, lineHeight }))
+			{
+				ImGui::OpenPopup("ComponentSettings");
+			}
+
+			bool removeComponent = false;
+			if (ImGui::BeginPopup("ComponentSettings"))
+			{
+				if (ImGui::MenuItem("Remove component"))
+					removeComponent = true;
+
+				ImGui::EndPopup();
+			}
+
+			if (open)
+			{
+				uiFunction(component);
+				ImGui::TreePop();
+			}
+
+			if (removeComponent)
+				entity.RemoveComponent<T>();
+		}
+	}
+	std::string ParsePythonClassNameFromContent(const std::string& content)
 	{
 		std::regex pattern(R"(class\s+(\w+)\s*\([^)]*\bcandy\b\s*\.\s*ScriptObject\b[^)]*\))");
 		std::smatch match;
@@ -38,8 +81,7 @@ namespace Candy {
 
 		return {};
 	}
-
-	static std::string ParsePythonClassName(const std::filesystem::path& filePath)
+	std::string ParsePythonClassName(const std::filesystem::path& filePath)
 	{
 		std::filesystem::path absPath = std::filesystem::absolute(filePath);
 		std::ifstream file(absPath);
@@ -50,6 +92,7 @@ namespace Candy {
 
 		return ParsePythonClassNameFromContent(content);
 	}
+}
 
 	SceneHierarchyPanel::SceneHierarchyPanel(const Ref<Scene>& context)
 	{
@@ -164,48 +207,7 @@ namespace Candy {
 		}
 
 	}
-
-	template<typename T, typename UIFunction>
-
-	static void DrawComponent(const std::string& name, Entity entity, UIFunction uiFunction)
-	{
-		const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_FramePadding;
-		if (entity.HasComponent<T>())
-		{
-			auto& component = entity.GetComponent<T>();
-			ImVec2 contentRegionAvailable = ImGui::GetContentRegionAvail();
-
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
-			float lineHeight = ImGui::GetFrameHeight();
-			ImGui::Separator();
-			bool open = ImGui::TreeNodeEx((void*)typeid(T).hash_code(), treeNodeFlags, name.c_str());
-			ImGui::PopStyleVar(
-			);
-			ImGui::SameLine(contentRegionAvailable.x - lineHeight * 0.5f);
-			if (ImGui::Button("+", ImVec2{ lineHeight, lineHeight }))
-			{
-				ImGui::OpenPopup("ComponentSettings");
-			}
-
-			bool removeComponent = false;
-			if (ImGui::BeginPopup("ComponentSettings"))
-			{
-				if (ImGui::MenuItem("Remove component"))
-					removeComponent = true;
-
-				ImGui::EndPopup();
-			}
-
-			if (open)
-			{
-				uiFunction(component);
-				ImGui::TreePop();
-			}
-
-			if (removeComponent)
-				entity.RemoveComponent<T>();
-		}
-	}
+	
 	void SceneHierarchyPanel::DrawComponents(Entity entity)
 	{
 		if (entity.HasComponent<TagComponent>())
@@ -245,6 +247,15 @@ namespace Candy {
 				if (ImGui::MenuItem("Sprite Renderer"))
 				{
 					m_SelectionContext.AddComponent<SpriteRendererComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
+			if (!m_SelectionContext.HasComponent<StaticMeshComponent>())
+			{
+				if (ImGui::MenuItem("Static Mesh"))
+				{
+					m_SelectionContext.AddComponent<StaticMeshComponent>();
 					ImGui::CloseCurrentPopup();
 				}
 			}
@@ -381,7 +392,7 @@ namespace Candy {
 			{
 				ImGuiUtils::DrawColorEdit4("Color", component.Color);
 
-				if (ImGuiUtils::DrawContentPathControl("Texture", component.TexturePath))
+				if (ImGuiUtils::DrawPathInput("Texture", component.TexturePath))
 				{
 					Ref<Texture2D> tex = Texture2D::Create(component.TexturePath);
 					if (tex && tex->IsLoaded())
@@ -394,6 +405,50 @@ namespace Candy {
 
 				ImGuiUtils::DrawDragFloat("Tiling Factor", component.TilingFactor, 0.1f, 0.0f, 100.0f);
 			});
+
+		DrawComponent<StaticMeshComponent>("Static Mesh", entity, [](auto& component)
+			{
+				if (ImGuiUtils::DrawPathInput("Mesh Path", component.MeshPath, [&component]()->void
+				{
+					if (component.Mesh)
+					{
+						ImGui::Text("Vertices: %zu", component.Mesh->Vertices.size());
+						ImGui::Text("Indices : %zu", component.Mesh->Indices.size());
+						ImGui::Text("Submeshes: %zu", component.Mesh->Submeshes.size());
+						ImGui::Text("Materials: %zu", component.Materials.size());
+					}
+					else
+					{
+						ImGui::TextDisabled("No mesh loaded");
+					}
+				}))
+				{
+					if (component.MeshPath.empty())
+					{
+						component.Mesh.reset();
+						component.Materials.clear();
+					}
+					else
+					{
+						auto imported = MeshImporter::ImportStaticMesh(component.MeshPath);
+						if (imported && imported->Mesh)
+						{
+							component.Mesh = imported->Mesh;
+							component.Materials = imported->Materials;
+							CANDY_INFO("Loaded static mesh '{}' ({} verts, {} submeshes)",
+								component.MeshPath, component.Mesh->Vertices.size(), component.Mesh->Submeshes.size());
+						}
+						else
+							CANDY_WARN("Could not import static mesh {0}", component.MeshPath);
+					}
+				}
+			// if (ImGuiUtils::DrawPathInput("Mesh Path", component.MeshPath))
+			// {
+			// 	
+			// }
+			
+			});
+	
 
 		DrawComponent<CircleRendererComponent>("Circle Renderer", entity, [](auto& component)
 			{
@@ -434,7 +489,7 @@ namespace Candy {
 
 		DrawComponent<ScriptComponent>("Script", entity, [](auto& component)
 		{
-			if (ImGuiUtils::DrawContentPathControl("Script Path", component.ScriptPath))
+			if (ImGuiUtils::DrawPathInput("Script Path", component.ScriptPath))
 			{
 				auto content = FileSystem::Get().ReadText(component.ScriptPath);
 				if (content)
@@ -450,7 +505,7 @@ namespace Candy {
 
 		DrawComponent<AudioSourceComponent>("Audio Source", entity, [](auto& component)
 		{
-			ImGuiUtils::DrawContentPathControl("Sound Path", component.SoundPath);
+			ImGuiUtils::DrawPathInput("Sound Path", component.SoundPath);
 			ImGuiUtils::DrawDragFloat("Volume", component.Volume, 0.01f, 0.0f, 1.0f);
 			ImGuiUtils::DrawCheckbox("Looping", component.Looping);
 			ImGuiUtils::DrawCheckbox("Play On Start", component.PlayOnStart);
