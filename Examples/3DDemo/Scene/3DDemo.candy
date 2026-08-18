@@ -4,7 +4,7 @@ Entities:
     TagComponent:
       Tag: Lemon
     TransformComponent:
-      Translation: [-3.70000005, 0.5, -17.7000008]
+      Translation: [-3.70000005, 0.5, -20]
       Rotation: [0, 0, 0]
       Scale: [100, 100, 100]
     StaticMeshComponent:
@@ -15,7 +15,7 @@ Entities:
     TagComponent:
       Tag: Camera
     TransformComponent:
-      Translation: [0, 0, 4.19999981]
+      Translation: [0, 0, 10]
       Rotation: [0, 0, 0]
       Scale: [1, 1, 1]
     CameraComponent:
