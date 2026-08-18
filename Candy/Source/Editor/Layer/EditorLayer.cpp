@@ -246,8 +246,8 @@ namespace Candy {
 		ImGuiIO& io = ImGui::GetIO();
 
 		ImGuiStyle& style = ImGui::GetStyle();
-		float minWinSizeX = style.WindowMinSize.x;
-		style.WindowMinSize.x = 370.0f;
+		ImVec2 defaultMinSize = style.WindowMinSize;
+		style.WindowMinSize = ImVec2(250.0f, 250.0f);
 
 		if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
 		{
@@ -280,7 +280,7 @@ namespace Candy {
 			}
 		}
 
-		style.WindowMinSize.x = minWinSizeX;
+		style.WindowMinSize = defaultMinSize;
 
 		// ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 8));
 		if (ImGui::BeginMenuBar())
