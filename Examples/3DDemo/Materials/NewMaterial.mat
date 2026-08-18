@@ -1,0 +1,10 @@
+Material:
+  Name: NewMaterial
+  ShaderPath: VFS://Engine/Content/Shaders/D3D12/PBR.hlsl
+  Params:
+    u_BaseColor: [1, 1, 1, 1]
+    u_Metallic: 0
+    u_Roughness: 0.5
+    u_BaseColorMap: VFS://Game/Model/lemon/textures/lemon_diff_1k.jpg
+    u_MetallicRoughnessMap: VFS://Game/Model/lemon/textures/lemon_arm_1k.jpg
+    u_NormalMap: VFS://Game/Model/lemon/textures/lemon_nor_gl_1k.jpg

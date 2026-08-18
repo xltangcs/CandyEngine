@@ -2,8 +2,39 @@ Scene: 3DDemo
 Entities:
   - Entity: 12854884733615300658
     TagComponent:
-      Tag: Empty Entity
+      Tag: Lemon
+    TransformComponent:
+      Translation: [-3.29999995, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [100, 100, 100]
+    StaticMeshComponent:
+      MeshPath: VFS://Game/Model/lemon/lemon_1k.gltf
+      MaterialPaths:
+        - VFS://Game/Materials/NewMaterial.mat
+  - Entity: 11072840433712713403
+    TagComponent:
+      Tag: Camera
     TransformComponent:
       Translation: [0, 0, 0]
       Rotation: [0, 0, 0]
       Scale: [1, 1, 1]
+    CameraComponent:
+      Camera:
+        ProjectionType: 1
+        PerspectiveFOV: 0.785398185
+        PerspectiveNear: 0.00999999978
+        PerspectiveFar: 1000
+        OrthographicSize: 10
+        OrthographicNear: -1
+        OrthographicFar: 1
+      FixedAspectRatio: false
+  - Entity: 5326433964858723625
+    TagComponent:
+      Tag: Texture
+    TransformComponent:
+      Translation: [5.80000019, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SpriteRendererComponent:
+      Color: [1, 1, 1, 1]
+      TexturePath: VFS://Game/Model/lemon/textures/lemon_diff_1k.jpg
