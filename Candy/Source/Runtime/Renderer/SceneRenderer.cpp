@@ -21,14 +21,18 @@ namespace Candy {
 
 	// ---- GPU constant layouts (byte-for-byte with PBR.hlsl / Sprite.hlsl) --
 
-	// CameraCB (b0): float4x4 u_ViewProjection + float3 u_CameraPosition
+	// CameraCB (b0): float4x4 u_ViewProjection + float3 u_CameraPosition +
+	// float4x4 u_InvViewProjection (skybox direction reconstruction; appended
+	// at the end so existing shaders that declare only the first members stay
+	// offset-compatible).
 	struct CameraUniforms
 	{
 		glm::mat4 ViewProjection = glm::mat4(1.0f);
 		glm::vec3 CameraPosition = glm::vec3(0.0f);
 		float     _Pad = 1.0f;
+		glm::mat4 InvViewProjection = glm::mat4(1.0f);
 	};
-	static_assert(sizeof(CameraUniforms) == 80, "CameraUniforms must match CameraCB (80B)");
+	static_assert(sizeof(CameraUniforms) == 144, "CameraUniforms must match CameraCB (144B)");
 
 	// MaterialCB (b1) — 3D PBR layout (PBR.hlsl): u_World + surface params +
 	// flags + entity id. The 2D sprite layout lives in SpriteUniforms below.
@@ -66,7 +70,8 @@ namespace Candy {
 	};
 	static_assert(sizeof(SpriteUniforms) == 120, "SpriteUniforms must match Sprite.hlsl MaterialCB (120B)");
 
-	// LightCB (b2): fixed light array + ambient. Byte-for-byte with PBR.hlsl.
+	// LightCB (b2): fixed light array + ambient + IBL params. Byte-for-byte
+	// with PBR.hlsl.
 	struct GPULight
 	{
 		glm::vec3 Direction   = glm::vec3(0.0f);
@@ -85,9 +90,22 @@ namespace Candy {
 		GPULight    Lights[SceneRenderer::kMaxLights];
 		glm::vec3   AmbientColor = glm::vec3(0.03f);
 		int32_t     NumLights    = 0;
+		float       IBLIntensity = 1.0f;
+		float       MaxReflectionLod = 5.0f;
+		int32_t     IBLEnabled   = 0;
+		float       _Pad         = 0.0f;
 	};
-	static_assert(sizeof(LightUniforms) == SceneRenderer::kMaxLights * 64 + 16,
-		"LightUniforms must match PBR.hlsl LightCB (1040B)");
+	static_assert(sizeof(LightUniforms) == SceneRenderer::kMaxLights * 64 + 32,
+		"LightUniforms must match PBR.hlsl LightCB (1056B)");
+
+	// SkyboxCB (b1): per-frame skybox parameters (byte-for-byte with Skybox.hlsl).
+	struct SkyboxUniforms
+	{
+		float Exposure  = 1.0f;
+		float Intensity = 1.0f;
+		float _Pad[2]   = { 0.0f, 0.0f };
+	};
+	static_assert(sizeof(SkyboxUniforms) == 16, "SkyboxUniforms must match Skybox.hlsl SkyboxCB (16B)");
 
 	// ---- Frustum culling (Gribb-Hartmann) ----------------------------------
 
@@ -161,6 +179,7 @@ namespace Candy {
 	// Built-in 2D shader path: materials bound to Sprite.hlsl use the sprite
 	// PSO + the 120B SpriteUniforms layout (exact match — no filename sniffing).
 	static constexpr const char* kSpriteShaderPath = "VFS://Engine/Content/Shaders/D3D12/Sprite.hlsl";
+	static constexpr const char* kSkyboxShaderPath = "VFS://Engine/Content/Shaders/D3D12/Skybox.hlsl";
 
 	// Packed per-material GPU state (rebuilt every frame; textures cached).
 	struct MaterialState
@@ -186,12 +205,15 @@ namespace Candy {
 		Ref<RHIBuffer>           CameraCB;   // 256B allocation (D3D12 root CBV alignment)
 		Ref<RHIBuffer>           MaterialCB; // 256B-aligned slices, one per draw (grows on demand)
 		uint32_t                 MaterialCBSlices = 0; // capacity of MaterialCB in slices
-		Ref<RHIBuffer>           LightCB;    // packed scene lights + ambient (PBR path only)
+		Ref<RHIBuffer>           LightCB;    // packed scene lights + ambient + IBL (PBR path only)
+		Ref<RHIBuffer>           SkyboxCB;   // per-frame skybox params (Exposure/Intensity)
 		Ref<RHIGraphicsPipeline> OpaquePipeline;
 		Ref<RHIGraphicsPipeline> TransparentPipeline;
 		Ref<RHIGraphicsPipeline> SpriteTransparentPipeline; // Sprite.hlsl (2D sprites/circles)
 		Ref<RHIGraphicsPipeline> LinePipeline;
+		Ref<RHIGraphicsPipeline> SkyboxPipeline; // fullscreen triangle, depth LessEqual
 		Ref<Texture2D>           WhiteTexture;
+		Ref<RHITexture>          DefaultBlackCube; // 1x1 black cube, IBL fallback slots
 
 		// Per-frame state
 		SceneView View;
@@ -205,6 +227,11 @@ namespace Candy {
 		std::array<SceneLight, SceneRenderer::kMaxLights> Lights;
 		uint32_t LightCount = 0;
 		glm::vec3 AmbientColor = glm::vec3(0.03f);
+
+		// Per-frame skybox (submitted via SubmitSkybox)
+		Ref<TextureCubemap> SkyboxCubemap;
+		float               SkyboxIntensity = 1.0f;
+		float               SkyboxExposure  = 1.0f;
 
 		// Debug line dynamic vertex buffer (grows on demand)
 		Ref<RHIBuffer> LineVB;
@@ -418,6 +445,33 @@ namespace Candy {
 		uint32_t white = 0xffffffff;
 		s_Data.WhiteTexture->SetData(&white, sizeof(white));
 
+		// Default 1x1 black cubemap: IBL fallback slots (the PBR shader may
+		// declare TextureCube t4/t5 even when no skybox is present, so the
+		// bound descriptors must be valid cubemaps).
+		{
+			TextureDesc cubeDesc;
+			cubeDesc.Width     = 1;
+			cubeDesc.Height    = 1;
+			cubeDesc.MipLevels = 1;
+			cubeDesc.Format    = RHIFormat::R32G32B32A32Float;
+			cubeDesc.Usage     = ResourceUsage::ShaderRead | ResourceUsage::CopyDst;
+			cubeDesc.Type      = TextureType::Cubemap;
+			cubeDesc.DebugName = "SceneRenderer_DefaultBlackCube";
+			s_Data.DefaultBlackCube = dev->CreateTexture(cubeDesc);
+			if (s_Data.DefaultBlackCube)
+			{
+				std::array<float, 6 * 4> black = {};
+				std::array<TextureSubresourceData, 6> subs;
+				for (uint32_t f = 0; f < 6; ++f)
+				{
+					subs[f].Data       = black.data();
+					subs[f].RowPitch   = 4 * sizeof(float);
+					subs[f].SlicePitch = 4 * sizeof(float);
+				}
+				s_Data.DefaultBlackCube->WriteSubresources(subs.data(), 6);
+			}
+		}
+
 		// Constant buffers (D3D12 root CBV requires 256B-aligned allocation size)
 		{
 			BufferDesc cb;
@@ -437,6 +491,16 @@ namespace Candy {
 			cb.CPUAccessible = true;
 			cb.DebugName     = "SceneRenderer_LightCB";
 			s_Data.LightCB = dev->CreateBuffer(cb);
+		}
+
+		// SkyboxCB: per-frame skybox params (16B payload, 256B allocation).
+		{
+			BufferDesc cb;
+			cb.Size          = 256;
+			cb.Usage         = ResourceUsage::ConstantBuffer;
+			cb.CPUAccessible = true;
+			cb.DebugName     = "SceneRenderer_SkyboxCB";
+			s_Data.SkyboxCB = dev->CreateBuffer(cb);
 		}
 
 		// MaterialCB: one 256B-aligned slice per draw (grows on demand in EndFrame).
@@ -581,6 +645,47 @@ namespace Candy {
 			}
 		}
 
+		// ---- Skybox pipeline (fullscreen triangle, depth LessEqual) --------
+		// Draws first inside the render pass: covers everything the scene
+		// doesn't (opaque geometry writes z < 1.0). Cull none + no vertex
+		// input (SV_VertexID in the shader). Entity-ID attachment gets -1 so
+		// clicking the sky deselects.
+		{
+			auto src = FileSystem::Get().ReadText(kSkyboxShaderPath);
+			if (!src)
+			{
+				CANDY_CORE_ERROR("SceneRenderer: failed to load shader '{}'", kSkyboxShaderPath);
+			}
+			else
+			{
+				auto skyVS = dev->CreateShaderModuleFromSource(src->c_str(), ShaderStage::Vertex,   "VSMain", "Skybox_VS");
+				auto skyPS = dev->CreateShaderModuleFromSource(src->c_str(), ShaderStage::Fragment, "PSMain", "Skybox_PS");
+				if (!skyVS || !skyPS)
+				{
+					CANDY_CORE_ERROR("SceneRenderer: failed to compile Skybox.hlsl");
+				}
+				else
+				{
+					GraphicsPipelineDesc sd;
+					sd.Topology            = PrimitiveTopology::Triangles;
+					sd.Rasterizer.Cull     = CullMode::None;
+					sd.Rasterizer.Fill     = FillMode::Solid;
+					sd.Rasterizer.FrontCounterClockwise = true;
+					sd.DepthStencil.DepthTestEnable  = true;
+					sd.DepthStencil.DepthWriteEnable = false;
+					sd.DepthStencil.DepthCompareOp   = CompareOp::LessEqual;
+					sd.DepthStencilFormat = RHIFormat::D24UnormS8Uint;
+					sd.Blend.BlendEnable  = false;
+					sd.RenderTargetFormats = { RHIFormat::R8G8B8A8Unorm, RHIFormat::R32Sint };
+					// No vertex input: fullscreen triangle driven by SV_VertexID.
+
+					s_Data.SkyboxPipeline = dev->CreateGraphicsPipeline(sd, skyVS, skyPS);
+					if (!s_Data.SkyboxPipeline)
+						CANDY_CORE_ERROR("SceneRenderer: failed to create skybox pipeline");
+				}
+			}
+		}
+
 		CANDY_CORE_INFO("SceneRenderer: initialized ({} backend)", RendererAPI::StringFromAPI(Renderer::GetAPI()));
 	}
 
@@ -589,13 +694,17 @@ namespace Candy {
 		s_Data.CameraCB.reset();
 		s_Data.MaterialCB.reset();
 		s_Data.LightCB.reset();
+		s_Data.SkyboxCB.reset();
 		s_Data.OpaquePipeline.reset();
 		s_Data.TransparentPipeline.reset();
 		s_Data.SpriteTransparentPipeline.reset();
 		s_Data.LinePipeline.reset();
+		s_Data.SkyboxPipeline.reset();
 		s_Data.LineVB.reset();
 		s_Data.LineVBCapacity = 0;
 		s_Data.WhiteTexture.reset();
+		s_Data.DefaultBlackCube.reset();
+		s_Data.SkyboxCubemap.reset();
 		s_Data.ActiveRenderTarget.reset();
 		s_Data.ActiveRenderTargetPendingClear = true;
 		s_Data.MeshCache.clear();
@@ -612,6 +721,9 @@ namespace Candy {
 		s_Data.LineVertices.clear();
 		s_Data.MaterialStates.clear();
 		s_Data.LightCount = 0;
+		s_Data.SkyboxCubemap.reset();
+		s_Data.SkyboxIntensity = 1.0f;
+		s_Data.SkyboxExposure  = 1.0f;
 		s_Data.Stats = {};
 	}
 
@@ -651,6 +763,13 @@ namespace Candy {
 		s_Data.AmbientColor = color;
 	}
 
+	void SceneRenderer::SubmitSkybox(const Ref<TextureCubemap>& cubemap, float intensity, float exposure)
+	{
+		s_Data.SkyboxCubemap = cubemap;
+		s_Data.SkyboxIntensity = intensity;
+		s_Data.SkyboxExposure  = exposure;
+	}
+
 	void SceneRenderer::SubmitLine(const glm::vec3& p0, const glm::vec3& p1, const glm::vec4& color, int entityID)
 	{
 		s_Data.LineVertices.push_back({ p0, color, entityID });
@@ -685,6 +804,7 @@ namespace Candy {
 		CameraUniforms camera;
 		camera.ViewProjection = s_Data.View.ViewProjection;
 		camera.CameraPosition = s_Data.View.CameraPosition;
+		camera.InvViewProjection = glm::inverse(s_Data.View.ViewProjection);
 		if (!s_Data.CameraCB->Write(&camera, sizeof(camera)))
 		{
 			CANDY_CORE_ERROR("SceneRenderer::EndFrame - CameraCB upload failed");
@@ -693,8 +813,8 @@ namespace Candy {
 			return false;
 		}
 
-		// Upload packed scene lights + ambient (PBR path only; sprite/line
-		// shaders never read b2).
+		// Upload packed scene lights + ambient + IBL params (PBR path only;
+		// sprite/line shaders never read b2).
 		LightUniforms lights;
 		for (uint32_t i = 0; i < s_Data.LightCount; ++i)
 		{
@@ -710,8 +830,24 @@ namespace Candy {
 		}
 		lights.AmbientColor = s_Data.AmbientColor;
 		lights.NumLights    = static_cast<int32_t>(s_Data.LightCount);
+		const bool hasSkybox = s_Data.SkyboxCubemap && s_Data.SkyboxCubemap->IsLoaded();
+		lights.IBLEnabled   = hasSkybox ? 1 : 0;
+		lights.IBLIntensity = s_Data.SkyboxIntensity;
+		lights.MaxReflectionLod = hasSkybox
+			? static_cast<float>(s_Data.SkyboxCubemap->GetPrefilteredMap()->GetDesc().MipLevels - 1)
+			: 0.0f;
 		if (!s_Data.LightCB->Write(&lights, sizeof(lights)))
 			CANDY_CORE_ERROR("SceneRenderer::EndFrame - LightCB upload failed");
+
+		// Upload skybox params (Exposure/Intensity) — used by Skybox.hlsl.
+		if (hasSkybox)
+		{
+			SkyboxUniforms sky;
+			sky.Exposure  = s_Data.SkyboxExposure;
+			sky.Intensity = s_Data.SkyboxIntensity;
+			if (!s_Data.SkyboxCB->Write(&sky, sizeof(sky)))
+				CANDY_CORE_ERROR("SceneRenderer::EndFrame - SkyboxCB upload failed");
+		}
 
 		// Frustum cull + pass split (may produce zero draws — the render pass
 		// below still runs so an empty scene clears the target; without this,
@@ -838,6 +974,38 @@ namespace Candy {
 		}
 		cmd->SetViewport(0, 0, static_cast<float>(vpW), static_cast<float>(vpH));
 		cmd->SetScissor(0, 0, vpW, vpH);
+
+		// ---- Skybox pass: fullscreen triangle first (depth LessEqual, so it
+		// only fills where no opaque geometry sits), then IBL table (t4-t6)
+		// bound once — the descriptor table persists across every PBR draw.
+		if (hasSkybox && s_Data.SkyboxPipeline && s_Data.SkyboxCB)
+		{
+			Ref<RHITexture> env = s_Data.SkyboxCubemap->GetRHITexture();
+			cmd->SetPipeline(s_Data.SkyboxPipeline);
+			cmd->SetConstantBuffer(0, 0, s_Data.CameraCB);
+			cmd->SetConstantBuffer(1, 0, s_Data.SkyboxCB);
+			cmd->SetTextures(2, 1, &env);
+			cmd->Draw(3);
+			s_Data.Stats.DrawCalls++;
+		}
+
+		// IBL texture set (irradiance cube / prefiltered cube / BRDF LUT), or
+		// valid fallbacks when no skybox is active (PBR shader skips sampling
+		// via u_IBLEnabled, but the bound descriptors must stay valid).
+		std::array<Ref<RHITexture>, 3> iblTextures;
+		if (hasSkybox)
+		{
+			iblTextures[0] = s_Data.SkyboxCubemap->GetIrradianceMap();
+			iblTextures[1] = s_Data.SkyboxCubemap->GetPrefilteredMap();
+			iblTextures[2] = s_Data.SkyboxCubemap->GetBRDFLUT();
+		}
+		else
+		{
+			iblTextures[0] = s_Data.DefaultBlackCube;
+			iblTextures[1] = s_Data.DefaultBlackCube;
+			iblTextures[2] = s_Data.WhiteTexture->GetRHITexture();
+		}
+		cmd->SetTextures(4, 3, iblTextures.data());
 
 		uint32_t nextSlice = 0;
 		RenderPass(cmd.get(), opaqueDraws, false, nextSlice);

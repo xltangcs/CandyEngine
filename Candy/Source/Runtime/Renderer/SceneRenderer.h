@@ -3,6 +3,7 @@
 #include "Runtime/Renderer/Camera.h"
 #include "Runtime/Renderer/EditorCamera.h"
 #include "Runtime/Renderer/Texture.h"
+#include "Runtime/Renderer/TextureCubemap.h"
 #include "Runtime/RHI/RHI.h"
 #include "Runtime/Asset/StaticMeshResource.h"
 #include "Runtime/Asset/Material.h"
@@ -118,6 +119,14 @@ namespace Candy {
 		static constexpr uint32_t kMaxLights = 16;
 		static void SubmitLight(const SceneLight& light);
 		static void SetAmbientLight(const glm::vec3& color);
+
+		// ---- Skybox / IBL ---------------------------------------------------
+		/// Submits the environment cubemap for this frame. Drawn first inside
+		/// the render pass (depth LessEqual, writes -1 into the picking
+		/// attachment); its irradiance / prefiltered / BRDF-LUT textures feed
+		/// image-based lighting on the PBR path.
+		static void SubmitSkybox(const Ref<TextureCubemap>& cubemap,
+		                         float intensity = 1.0f, float exposure = 1.0f);
 
 		// ---- Debug line pass (editor collider wireframes, overlay) --------
 		static void SubmitLine(const glm::vec3& p0, const glm::vec3& p1, const glm::vec4& color, int entityID = -1);

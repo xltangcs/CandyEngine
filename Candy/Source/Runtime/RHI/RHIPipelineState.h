@@ -124,4 +124,15 @@ namespace Candy {
 		virtual ~RHIGraphicsPipeline() = default;
 	};
 
+	// =========================================================================
+	// RHIComputePipeline — opaque compute pipeline state object.
+	// Compute support is D3D12-only for now (IBL baking); other backends
+	// return nullptr from RHIDevice::CreateComputePipeline.
+	// =========================================================================
+	class RHIComputePipeline : public RHITrackable
+	{
+	public:
+		virtual ~RHIComputePipeline() = default;
+	};
+
 } // namespace Candy

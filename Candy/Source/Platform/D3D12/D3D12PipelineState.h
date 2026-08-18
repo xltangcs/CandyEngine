@@ -33,4 +33,24 @@ namespace Candy {
 		Microsoft::WRL::ComPtr<ID3D12RootSignature>   m_RootSignature;
 	};
 
+	// =========================================================================
+	// D3D12ComputePipeline — wraps ID3D12PipelineState + compute root signature
+	// =========================================================================
+	class D3D12ComputePipeline : public RHIComputePipeline
+	{
+	public:
+		D3D12ComputePipeline() = default;
+		virtual ~D3D12ComputePipeline();
+
+		void SetNativePipeline(Microsoft::WRL::ComPtr<ID3D12PipelineState> pso,
+		                       Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig);
+
+		[[nodiscard]] ID3D12PipelineState* GetNativePipelineState() const { return m_PSO.Get(); }
+		[[nodiscard]] ID3D12RootSignature* GetRootSignature()       const { return m_RootSignature.Get(); }
+
+	private:
+		Microsoft::WRL::ComPtr<ID3D12PipelineState>   m_PSO;
+		Microsoft::WRL::ComPtr<ID3D12RootSignature>   m_RootSignature;
+	};
+
 } // namespace Candy

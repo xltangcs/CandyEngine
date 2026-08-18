@@ -533,7 +533,9 @@ float4 main(PSInput input) : SV_TARGET
 			RHIShaderLibrary::HashBytes(source, strlen(source)), stage, entryPoint);
 
 		return GetShaderLibrary().GetOrCreate(key, stage, debugName, [&]() -> Ref<RHIShaderModule> {
-			const char* target = (stage == ShaderStage::Vertex) ? "vs_5_0" : "ps_5_0";
+			const char* target = (stage == ShaderStage::Vertex) ? "vs_5_0"
+			                  : (stage == ShaderStage::Compute) ? "cs_5_0"
+			                                                    : "ps_5_0";
 			auto blob = CompileHLSL(source, entryPoint.c_str(), target, debugName);
 			if (!blob)
 				return nullptr;
@@ -656,7 +658,10 @@ float4 main(PSInput input) : SV_TARGET
 		// than the bound descriptors makes the GPU read uninitialized heap
 		// slots (undefined behavior, driver crash).
 		// Parameter 3: CBV (b2)  ---- packed scene lights + ambient (PBR path)
-		D3D12_ROOT_PARAMETER rootParams[4] = {};
+		// Parameter 4: descriptor table with 3 SRVs (t4-t6) — IBL environment
+		// maps (irradiance cube / prefiltered cube / BRDF LUT). Bound once per
+		// pass; shaders that don't declare t4-t6 simply ignore the table.
+		D3D12_ROOT_PARAMETER rootParams[5] = {};
 
 		rootParams[0].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_CBV;
 		rootParams[0].Descriptor       = {};
@@ -691,6 +696,20 @@ float4 main(PSInput input) : SV_TARGET
 		rootParams[3].Descriptor.RegisterSpace  = 0;
 		rootParams[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
+		// IBL environment maps: 3-SRV table (t4 = irradiance, t5 = prefiltered
+		// specular, t6 = BRDF LUT). Bound once per render pass by SceneRenderer.
+		D3D12_DESCRIPTOR_RANGE iblRange = {};
+		iblRange.RangeType          = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		iblRange.NumDescriptors     = 3;
+		iblRange.BaseShaderRegister = 4;
+		iblRange.RegisterSpace      = 0;
+		iblRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		rootParams[4].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParams[4].DescriptorTable.NumDescriptorRanges = 1;
+		rootParams[4].DescriptorTable.pDescriptorRanges   = &iblRange;
+		rootParams[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
 		// Static sampler (s0) ---- linear wrap
 		D3D12_STATIC_SAMPLER_DESC staticSampler = {};
 		staticSampler.Filter           = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -707,7 +726,7 @@ float4 main(PSInput input) : SV_TARGET
 		staticSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
 		D3D12_ROOT_SIGNATURE_DESC rootSigDesc = {};
-		rootSigDesc.NumParameters     = 4;
+		rootSigDesc.NumParameters     = 5;
 		rootSigDesc.pParameters       = rootParams;
 		rootSigDesc.NumStaticSamplers = 1;
 		rootSigDesc.pStaticSamplers   = &staticSampler;
@@ -739,6 +758,128 @@ float4 main(PSInput input) : SV_TARGET
 		}
 
 		return rootSig;
+	}
+
+	ComPtr<ID3D12RootSignature> D3D12Device::CreateComputeRootSignature()
+	{
+		// Parameter 0: CBV (b0)    ---- per-dispatch bake parameters
+		// Parameter 1: SRV table   ---- t0: source texture (equirect / env cube)
+		// Parameter 2: UAV table   ---- u0: output (cube array / 2D LUT)
+		D3D12_ROOT_PARAMETER rootParams[3] = {};
+
+		rootParams[0].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		rootParams[0].Descriptor       = {};
+		rootParams[0].Descriptor.ShaderRegister = 0;
+		rootParams[0].Descriptor.RegisterSpace  = 0;
+		rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+		D3D12_DESCRIPTOR_RANGE srvRange = {};
+		srvRange.RangeType          = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		srvRange.NumDescriptors     = 1;
+		srvRange.BaseShaderRegister = 0;
+		srvRange.RegisterSpace      = 0;
+		srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		rootParams[1].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParams[1].DescriptorTable.NumDescriptorRanges = 1;
+		rootParams[1].DescriptorTable.pDescriptorRanges   = &srvRange;
+		rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+		D3D12_DESCRIPTOR_RANGE uavRange = {};
+		uavRange.RangeType          = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+		uavRange.NumDescriptors     = 1;
+		uavRange.BaseShaderRegister = 0;
+		uavRange.RegisterSpace      = 0;
+		uavRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		rootParams[2].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParams[2].DescriptorTable.NumDescriptorRanges = 1;
+		rootParams[2].DescriptorTable.pDescriptorRanges   = &uavRange;
+		rootParams[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+		D3D12_STATIC_SAMPLER_DESC staticSampler = {};
+		staticSampler.Filter           = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+		staticSampler.AddressU         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		staticSampler.AddressV         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		staticSampler.AddressW         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		staticSampler.MipLODBias       = 0.0f;
+		staticSampler.MaxAnisotropy    = 1;
+		staticSampler.ComparisonFunc   = D3D12_COMPARISON_FUNC_NEVER;
+		staticSampler.MinLOD           = 0.0f;
+		staticSampler.MaxLOD           = D3D12_FLOAT32_MAX;
+		staticSampler.ShaderRegister   = 0;
+		staticSampler.RegisterSpace    = 0;
+		staticSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+		D3D12_ROOT_SIGNATURE_DESC rootSigDesc = {};
+		rootSigDesc.NumParameters     = 3;
+		rootSigDesc.pParameters       = rootParams;
+		rootSigDesc.NumStaticSamplers = 1;
+		rootSigDesc.pStaticSamplers   = &staticSampler;
+		rootSigDesc.Flags             = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+
+		ComPtr<ID3DBlob> signature;
+		ComPtr<ID3DBlob> error;
+		HRESULT hr = D3D12SerializeRootSignature(
+			&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+			&signature, &error);
+
+		if (FAILED(hr))
+		{
+			if (error)
+				CANDY_CORE_ERROR("D3D12Device: ComputeRootSignature error:\n{}",
+				                 static_cast<const char*>(error->GetBufferPointer()));
+			return nullptr;
+		}
+
+		ComPtr<ID3D12RootSignature> rootSig;
+		hr = m_NativeDevice->CreateRootSignature(
+			0, signature->GetBufferPointer(), signature->GetBufferSize(),
+			IID_PPV_ARGS(&rootSig));
+
+		if (FAILED(hr))
+		{
+			CANDY_CORE_ERROR("D3D12Device: CreateComputeRootSignature failed");
+			return nullptr;
+		}
+
+		return rootSig;
+	}
+
+	Ref<RHIComputePipeline> D3D12Device::CreateComputePipeline(const Ref<RHIShaderModule>& cs)
+	{
+		if (!cs || !m_NativeDevice)
+		{
+			CANDY_CORE_ERROR("D3D12Device::CreateComputePipeline: null compute shader");
+			return nullptr;
+		}
+
+		// Shared compute root signature (created once, reused by all compute PSOs).
+		if (!m_ComputeRootSignature)
+			m_ComputeRootSignature = CreateComputeRootSignature();
+		if (!m_ComputeRootSignature)
+			return nullptr;
+
+		D3D12_COMPUTE_PIPELINE_STATE_DESC desc = {};
+		desc.pRootSignature = m_ComputeRootSignature.Get();
+		desc.CS             = { cs->GetBytecode(), cs->GetBytecodeSize() };
+
+		ComPtr<ID3D12PipelineState> pso;
+		HRESULT hr = m_NativeDevice->CreateComputePipelineState(&desc, IID_PPV_ARGS(&pso));
+		if (FAILED(hr))
+		{
+			CANDY_CORE_ERROR("D3D12Device::CreateComputePipeline: CreateComputePipelineState failed");
+			DumpInfoQueueMessages(m_InfoQueue.Get());
+			return nullptr;
+		}
+
+		auto pipeline = CreateRef<D3D12ComputePipeline>();
+		pipeline->SetNativePipeline(std::move(pso), m_ComputeRootSignature);
+		pipeline->SetRHITracking(&GetResourceManager(),
+			GetResourceManager().Register(ResourceType::ComputePipeline, pipeline.get(), "ComputePipeline"));
+
+		CANDY_CORE_INFO("D3D12Device::CreateComputePipeline: pipeline created");
+		return pipeline;
 	}
 
 	// ---- Resource creation ---------------------------------------------------

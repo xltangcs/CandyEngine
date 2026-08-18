@@ -537,6 +537,15 @@ namespace
 				}
 			}
 
+			if (!m_SelectionContext.HasComponent<SkyboxComponent>())
+			{
+				if (ImGui::MenuItem("Skybox"))
+				{
+					m_SelectionContext.AddComponent<SkyboxComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
 			if (!m_SelectionContext.HasComponent<SpriteRendererComponent>())
 			{
 				if (ImGui::MenuItem("Sprite Renderer"))
@@ -705,6 +714,35 @@ namespace
 				}
 
 				ImGuiUtils::DrawDragFloat("Tiling Factor", component.TilingFactor, 0.1f, 0.0f, 100.0f);
+			});
+
+		DrawComponent<SkyboxComponent>("Skybox", entity, [](auto& component)
+			{
+				if (ImGuiUtils::DrawPathInput("Cubemap (equirect)", component.CubemapPath))
+				{
+					if (component.CubemapPath.empty())
+						component.Cubemap.reset();
+					else
+					{
+						Ref<TextureCubemap> cubemap = TextureCubemap::CreateFromEquirect(component.CubemapPath);
+						if (cubemap)
+							component.Cubemap = cubemap;
+						else
+						{
+							component.Cubemap.reset();
+							CANDY_WARN("Could not load cubemap {0}", component.CubemapPath);
+						}
+					}
+				}
+
+				ImGuiUtils::DrawDragFloat("Intensity (IBL)", component.Intensity, 0.05f, 0.0f, 10.0f);
+				ImGuiUtils::DrawDragFloat("Exposure", component.Exposure, 0.05f, 0.0f, 10.0f);
+
+				if (component.Cubemap)
+					ImGui::TextDisabled("%ux%u cube, %u mips", component.Cubemap->GetFaceSize(),
+						component.Cubemap->GetFaceSize(), component.Cubemap->GetMipLevels());
+				else
+					ImGui::TextDisabled("No cubemap loaded");
 			});
 
 		DrawComponent<StaticMeshComponent>("Static Mesh", entity, [](auto& component)

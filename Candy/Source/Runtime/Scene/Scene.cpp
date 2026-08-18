@@ -95,6 +95,7 @@ namespace Candy {
 		CopyComponent<CircleRendererComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<CameraComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<LightComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<SkyboxComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<NativeScriptComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<Rigidbody2DComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<BoxCollider2DComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
@@ -373,6 +374,7 @@ namespace Candy {
 
 		{
 			SceneRenderer::BeginFrame(*mainCamera, cameraTransform);
+			SubmitSkybox();
 			SubmitSceneLights();
 			SubmitStaticMeshDraws();
 			SubmitSpriteAndCircleDraws();
@@ -451,6 +453,7 @@ namespace Candy {
 		CopyComponentIfExists<CircleRendererComponent>(newEntity, entity);
 		CopyComponentIfExists<CameraComponent>(newEntity, entity);
 		CopyComponentIfExists<LightComponent>(newEntity, entity);
+		CopyComponentIfExists<SkyboxComponent>(newEntity, entity);
 		CopyComponentIfExists<NativeScriptComponent>(newEntity, entity);
 		CopyComponentIfExists<Rigidbody2DComponent>(newEntity, entity);
 		CopyComponentIfExists<BoxCollider2DComponent>(newEntity, entity);
@@ -618,6 +621,7 @@ namespace Candy {
 		// Render 3D (static meshes) + 2D (sprites/circles) in one pipeline.
 		SceneRenderer::BeginFrame(camera);
 
+		SubmitSkybox();
 		SubmitSceneLights();
 		SubmitStaticMeshDraws();
 		SubmitSpriteAndCircleDraws();
@@ -628,9 +632,37 @@ namespace Candy {
 		// Render 3D (static meshes) + 2D (sprites/circles) in one pipeline.
 		SceneRenderer::BeginFrame(cameraComp.Camera, cameraTransform);
 
+		SubmitSkybox();
 		SubmitSceneLights();
 		SubmitStaticMeshDraws();
 		SubmitSpriteAndCircleDraws();
+	}
+
+	void Scene::SubmitSkybox()
+	{
+		// First SkyboxComponent wins; a broken/empty path falls through to the
+		// next one. The baked cubemap is cached per path by TextureCubemap, so
+		// repeated lookups cost nothing after the first bake.
+		auto view = m_Registry.view<SkyboxComponent>();
+		for (auto entity : view)
+		{
+			auto& sb = view.get<SkyboxComponent>(entity);
+			if (sb.CubemapPath.empty())
+				continue;
+
+			if (!sb.Cubemap)
+			{
+				sb.Cubemap = TextureCubemap::CreateFromEquirect(sb.CubemapPath);
+				if (!sb.Cubemap)
+				{
+					CANDY_CORE_WARN("Scene::SubmitSkybox: failed to load cubemap '{}'", sb.CubemapPath);
+					continue;
+				}
+			}
+
+			SceneRenderer::SubmitSkybox(sb.Cubemap, sb.Intensity, sb.Exposure);
+			return;
+		}
 	}
 
 	void Scene::SubmitSceneLights()
@@ -705,6 +737,11 @@ namespace Candy {
 
 	template<>
 	void Scene::OnComponentAdded<LightComponent>(Entity entity, LightComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<SkyboxComponent>(Entity entity, SkyboxComponent& component)
 	{
 	}
 

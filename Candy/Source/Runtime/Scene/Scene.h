@@ -100,6 +100,9 @@ namespace Candy {
 		/// Sets the scene's ambient light on the renderer and submits every
 		/// LightComponent entity as a SceneRenderer light.
 		void SubmitSceneLights();
+		/// Submits the first SkyboxComponent entity (if any) as the frame's
+		/// skybox + IBL environment.
+		void SubmitSkybox();
 	private:
 		entt::registry m_Registry;
 		uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;

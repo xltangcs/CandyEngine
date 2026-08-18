@@ -54,3 +54,14 @@ Entities:
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
       TexturePath: VFS://Game/Model/lemon/textures/lemon_diff_1k.jpg
+  - Entity: 7777777777777777777
+    TagComponent:
+      Tag: Skybox
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SkyboxComponent:
+      CubemapPath: VFS://Game/Texture/autumn_field_puresky_1k.hdr
+      Intensity: 1
+      Exposure: 1

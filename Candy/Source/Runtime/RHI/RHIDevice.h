@@ -32,6 +32,16 @@ namespace Candy {
 	// =========================================================================
 	// Texture descriptor
 	// =========================================================================
+	/// One CPU-side mip/array-slice payload for RHITexture::WriteSubresources.
+	/// Subresources follow D3D12 ordering (mip-major): all mips of slice 0,
+	/// then all mips of slice 1, ... (face-major for cubemaps).
+	struct TextureSubresourceData
+	{
+		const void* Data = nullptr;
+		uint32_t    RowPitch = 0;  ///< bytes per row in `Data`
+		uint32_t    SlicePitch = 0; ///< bytes per 2D slice (face) in `Data`
+	};
+
 	struct TextureDesc
 	{
 		uint32_t      Width      = 1;
@@ -42,6 +52,7 @@ namespace Candy {
 		RHIFormat     Format     = RHIFormat::R8G8B8A8Unorm;
 		ResourceUsage Usage      = ResourceUsage::ShaderRead;
 		uint32_t      SampleCount = 1;
+		TextureType   Type       = TextureType::Texture2D;
 		std::string   DebugName;
 	};
 
@@ -105,6 +116,16 @@ namespace Candy {
 		virtual ~RHITexture() = default;
 
 		virtual const TextureDesc& GetDesc() const = 0;
+
+		/// Upload multiple subresources (mips × array slices) in one GPU copy.
+		/// `data` must contain `MipLevels * ArrayLayers` entries. Returns false
+		/// when the backend does not support subresource uploads (2D-only
+		/// paths may leave it unimplemented).
+		virtual bool WriteSubresources(const TextureSubresourceData* data, uint32_t count)
+		{
+			(void)data; (void)count;
+			return false;
+		}
 	};
 
 	// =========================================================================
@@ -124,6 +145,7 @@ namespace Candy {
 	class RHIShaderModule;
 	class RHISwapChain;
 	class RHICommandQueue;
+	class RHIComputePipeline;
 
 	class RHIDevice
 	{
@@ -145,6 +167,15 @@ namespace Candy {
 		virtual Ref<RHIShaderModule> CreateShaderModuleFromSource(const char* source, ShaderStage stage, const std::string& entryPoint, const std::string& debugName = "") = 0;
 
 		virtual Ref<RHIGraphicsPipeline> CreateGraphicsPipeline(const GraphicsPipelineDesc& desc, const Ref<RHIShaderModule>& vs, const Ref<RHIShaderModule>& fs) = 0;
+
+		/// Create a compute pipeline from a compute shader module. Default
+		/// implementation returns nullptr (compute is D3D12-only for now;
+		/// OpenGL/Vulkan do not override).
+		virtual Ref<RHIComputePipeline> CreateComputePipeline(const Ref<RHIShaderModule>& cs)
+		{
+			(void)cs;
+			return nullptr;
+		}
 
 		virtual Ref<RHISwapChain> CreateSwapChain(const SwapChainDesc& desc) = 0;
 

@@ -3,6 +3,7 @@
 #include "Runtime/Scene/SceneCamera.h"
 #include "Runtime/Core/UUID.h"
 #include "Runtime/Renderer/Texture.h"
+#include "Runtime/Renderer/TextureCubemap.h"
 #include "Runtime/Asset/StaticMeshResource.h"
 #include "Runtime/Asset/Material.h"
 
@@ -148,6 +149,29 @@ namespace Candy {
 
 		LightComponent() = default;
 		LightComponent(const LightComponent&) = default;
+	};
+
+	CANDY_CLASS()
+	struct SkyboxComponent
+	{
+		/// VFS:// path to an equirectangular panorama (.hdr or LDR image).
+		/// Converted + CPU-baked into a cubemap + IBL set on load (cached).
+		CANDY_PROPERTY()
+		std::string CubemapPath;
+
+		/// Multiplier on the IBL (irradiance + specular) contribution.
+		CANDY_PROPERTY()
+		float Intensity = 1.0f;
+
+		/// Exposure applied to the skybox itself before tonemapping.
+		CANDY_PROPERTY()
+		float Exposure = 1.0f;
+
+		/// Runtime baked cubemap (not serialized; re-created from CubemapPath).
+		Ref<TextureCubemap> Cubemap;
+
+		SkyboxComponent() = default;
+		SkyboxComponent(const SkyboxComponent&) = default;
 	};
 
 	// Forward declaration

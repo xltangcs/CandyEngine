@@ -28,4 +28,16 @@ namespace Candy {
 		m_RootSignature = std::move(rootSig);
 	}
 
+	D3D12ComputePipeline::~D3D12ComputePipeline()
+	{
+		CANDY_CORE_INFO("D3D12ComputePipeline: destroyed");
+	}
+
+	void D3D12ComputePipeline::SetNativePipeline(ComPtr<ID3D12PipelineState> pso,
+	                                             ComPtr<ID3D12RootSignature> rootSig)
+	{
+		m_PSO          = std::move(pso);
+		m_RootSignature = std::move(rootSig);
+	}
+
 } // namespace Candy

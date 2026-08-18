@@ -20,6 +20,7 @@ namespace Candy {
 		Sampler,
 		ShaderModule,
 		GraphicsPipeline,
+		ComputePipeline,
 		Framebuffer,
 		SwapChain,
 		Fence,

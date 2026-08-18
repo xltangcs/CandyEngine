@@ -25,6 +25,15 @@ namespace Candy {
 			m_TrackingHandle  = handle;
 		}
 
+		/// Detach from the resource manager. Called by RHIResourceManager on
+		/// destruction so trackables that outlive the device never touch a
+		/// destroyed manager (static caches etc.).
+		void ClearRHITracking()
+		{
+			m_ResourceManager = nullptr;
+			m_TrackingHandle  = {};
+		}
+
 	private:
 		RHIResourceManager* m_ResourceManager = nullptr;
 		RHIHandle           m_TrackingHandle{};

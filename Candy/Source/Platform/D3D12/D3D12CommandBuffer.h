@@ -55,6 +55,16 @@ namespace Candy {
 		void SetTextures(uint32_t slot, uint32_t count, const Candy::Ref<RHITexture>* textures) override;
 		void SetSampler(uint32_t slot, uint32_t binding, const Candy::Ref<RHISampler>& sampler) override;
 
+		// ---- Compute (D3D12) -----------------------------------------------
+
+		void SetComputePipeline(const Candy::Ref<RHIComputePipeline>& pipeline) override;
+		void SetComputeConstantBuffer(uint32_t slot, const Candy::Ref<RHIBuffer>& buffer, uint64_t offset = 0) override;
+		void SetComputeTextures(uint32_t slot, uint32_t count, const Candy::Ref<RHITexture>* textures) override;
+		void SetComputeUAVs(uint32_t slot, uint32_t count, const Candy::Ref<RHITexture>* textures,
+		                    uint32_t mipSlice = 0) override;
+		void Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) override;
+		void UAVBarrier() override;
+
 		// ---- Draw calls ----------------------------------------------------
 
 		void Draw(uint32_t vertexCount,

@@ -14,6 +14,7 @@ namespace Candy {
 	class RHISampler;
 	class RHIGraphicsPipeline;
 	class RHIFramebuffer;
+	class RHIComputePipeline;
 
 	// =========================================================================
 	// RHICommandBuffer — records GPU commands for later submission
@@ -60,6 +61,36 @@ namespace Candy {
 		/// other's texture bindings within a command list.
 		virtual void SetTextures(uint32_t slot, uint32_t count, const Ref<RHITexture>* textures) = 0;
 		virtual void SetSampler(uint32_t slot, uint32_t binding, const Ref<RHISampler>& sampler) = 0;
+
+		// ---- Compute (D3D12-only; other backends inherit no-op defaults) ----
+
+		virtual void SetComputePipeline(const Ref<RHIComputePipeline>& pipeline) { (void)pipeline; }
+		/// Binds a constant buffer to compute root parameter `slot` (CBV b0..).
+		virtual void SetComputeConstantBuffer(uint32_t slot, const Ref<RHIBuffer>& buffer, uint64_t offset = 0)
+		{
+			(void)slot; (void)buffer; (void)offset;
+		}
+		/// Binds `count` textures as an SRV table at compute root parameter `slot`.
+		virtual void SetComputeTextures(uint32_t slot, uint32_t count, const Ref<RHITexture>* textures)
+		{
+			(void)slot; (void)count; (void)textures;
+		}
+		/// Binds `count` textures as a UAV table at compute root parameter `slot`.
+		/// `mipSlice` selects the mip level of each UAV view (cubemap bakes
+		/// write one mip per dispatch).
+		virtual void SetComputeUAVs(uint32_t slot, uint32_t count, const Ref<RHITexture>* textures,
+		                            uint32_t mipSlice = 0)
+		{
+			(void)slot; (void)count; (void)textures; (void)mipSlice;
+		}
+		/// Dispatch `groupCountX/Y/Z` thread groups.
+		virtual void Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
+		{
+			(void)groupCountX; (void)groupCountY; (void)groupCountZ;
+		}
+		/// Insert a UAV barrier so previous dispatches' writes are visible to
+		/// subsequent reads/writes of the same resource.
+		virtual void UAVBarrier() {}
 
 		// ---- Draw calls ----------------------------------------------------
 

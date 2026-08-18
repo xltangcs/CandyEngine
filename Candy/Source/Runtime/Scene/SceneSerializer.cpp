@@ -5,6 +5,7 @@
 #include "Runtime/Scene/SceneSerializer.h"
 #include "Runtime/Core/VfsPath.h"
 #include "Runtime/Renderer/Texture.h"
+#include "Runtime/Renderer/TextureCubemap.h"
 #include "Runtime/Asset/MeshImporter.h"
 #include "Runtime/Asset/MaterialCache.h"
 
@@ -233,6 +234,20 @@ namespace Candy {
 			out << YAML::Key << "CastShadows" << YAML::Value << lc.CastShadows;
 
 			out << YAML::EndMap; // LightComponent
+		}
+
+		if (entity.HasComponent<SkyboxComponent>())
+		{
+			out << YAML::Key << "SkyboxComponent";
+			out << YAML::BeginMap; // SkyboxComponent
+
+			auto& sb = entity.GetComponent<SkyboxComponent>();
+			if (!sb.CubemapPath.empty())
+				out << YAML::Key << "CubemapPath" << YAML::Value << sb.CubemapPath;
+			out << YAML::Key << "Intensity" << YAML::Value << sb.Intensity;
+			out << YAML::Key << "Exposure" << YAML::Value << sb.Exposure;
+
+			out << YAML::EndMap; // SkyboxComponent
 		}
 
 		if (entity.HasComponent<SpriteRendererComponent>())
@@ -541,6 +556,27 @@ namespace Candy {
 					lc.InnerConeAngle = lightComponent["InnerConeAngle"].as<float>();
 					lc.OuterConeAngle = lightComponent["OuterConeAngle"].as<float>();
 					lc.CastShadows = lightComponent["CastShadows"].as<bool>();
+				}
+
+				auto skyboxComponent = entity["SkyboxComponent"];
+				if (skyboxComponent)
+				{
+					auto& sb = deserializedEntity.AddComponent<SkyboxComponent>();
+					if (auto cp = skyboxComponent["CubemapPath"])
+					{
+						std::string raw = cp.as<std::string>();
+						if (!raw.empty())
+						{
+							sb.CubemapPath = raw;
+							sb.Cubemap = TextureCubemap::CreateFromEquirect(sb.CubemapPath);
+							if (!sb.Cubemap)
+								CANDY_CORE_WARN("SceneSerializer: failed to load cubemap {0}", sb.CubemapPath);
+						}
+					}
+					if (auto in = skyboxComponent["Intensity"])
+						sb.Intensity = in.as<float>();
+					if (auto ex = skyboxComponent["Exposure"])
+						sb.Exposure = ex.as<float>();
 				}
 
 				auto spriteRendererComponent = entity["SpriteRendererComponent"];

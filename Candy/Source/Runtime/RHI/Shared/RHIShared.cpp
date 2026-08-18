@@ -3,6 +3,7 @@
 
 #include "Runtime/Core/Log.h"
 #include "Runtime/RHI/RHIShader.h"
+#include "Runtime/RHI/Shared/RHITracking.h"
 
 #include <algorithm>
 #include <cstring>
@@ -17,7 +18,19 @@ namespace Candy {
 RHIResourceManager::~RHIResourceManager()
 {
 	if (!m_Resources.empty())
+	{
 		CANDY_CORE_WARN("RHIResourceManager: {} resources still registered on shutdown", m_Resources.size());
+		// Detach any still-registered trackables (e.g. static session caches
+		// that outlive the device) so their destructors never touch a manager
+		// whose storage is already gone.
+		for (auto& [handle, entry] : m_Resources)
+		{
+			(void)handle;
+			if (auto* trackable = static_cast<RHITrackable*>(entry.RawPtr))
+				trackable->ClearRHITracking();
+		}
+		m_Resources.clear();
+	}
 }
 
 Candy::RHIHandle RHIResourceManager::Register(ResourceType type, void* rawPtr, std::string_view name)
@@ -273,6 +286,18 @@ void RHICommandValidator::OnDrawIndexed(uint32_t indexCount)
 	CANDY_CORE_ASSERT(m_PipelineSet, "RHICommandValidator: DrawIndexed() called without SetPipeline()");
 	CANDY_CORE_ASSERT(m_IndexBufferBound, "RHICommandValidator: DrawIndexed() called without SetIndexBuffer()");
 	(void)indexCount;
+}
+
+void RHICommandValidator::OnSetComputePipeline()
+{
+	CANDY_CORE_ASSERT(m_Recording, "RHICommandValidator: SetComputePipeline() called outside recording");
+}
+
+void RHICommandValidator::OnDispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
+{
+	CANDY_CORE_ASSERT(m_Recording, "RHICommandValidator: Dispatch() called outside recording");
+	CANDY_CORE_ASSERT(!m_InRenderPass, "RHICommandValidator: Dispatch() called inside a render pass");
+	(void)groupCountX; (void)groupCountY; (void)groupCountZ;
 }
 
 // =========================================================================

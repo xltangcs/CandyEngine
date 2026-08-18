@@ -33,6 +33,8 @@ namespace Candy {
 
 		Candy::Ref<RHIGraphicsPipeline> CreateGraphicsPipeline(const GraphicsPipelineDesc& desc, const Candy::Ref<RHIShaderModule>& vs, const Candy::Ref<RHIShaderModule>& fs) override;
 
+		Candy::Ref<RHIComputePipeline> CreateComputePipeline(const Candy::Ref<RHIShaderModule>& cs) override;
+
 		/// Create a graphics pipeline with a specific root signature (for textured batch rendering).
 		Candy::Ref<RHIGraphicsPipeline> CreateGraphicsPipelineWithRootSig(
 			const GraphicsPipelineDesc& desc,
@@ -89,6 +91,11 @@ namespace Candy {
 		/// Parameter 0: CBV (b0), Parameter 1: descriptor table 32 SRV (t0-t31), Static sampler (s0).
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateTexturedRootSignature();
 
+		/// Create the shared compute root signature used by all compute
+		/// pipelines (IBL baking): CBV b0 + SRV table t0 + UAV table u0 +
+		/// static sampler s0.
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateComputeRootSignature();
+
 		/// Get the built-in triangle VS bytecode (compiled on first call).
 		const std::vector<uint8_t>& GetTriangleVSBytecode();
 		/// Get the built-in triangle PS bytecode (compiled on first call).
@@ -143,6 +150,9 @@ namespace Candy {
 		// Built-in shader cache
 		std::vector<uint8_t> m_TriangleVS;
 		std::vector<uint8_t> m_TrianglePS;
+
+		// Shared compute root signature (created lazily by CreateComputePipeline).
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> m_ComputeRootSignature;
 	};
 
 } // namespace Candy

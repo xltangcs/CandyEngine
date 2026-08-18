@@ -8,8 +8,10 @@
 // Layout conventions (SceneRenderer MaterialUniforms matches byte-for-byte):
 //   CameraCB   (b0): u_ViewProjection, u_CameraPosition
 //   MaterialCB (b1): u_World, surface params, u_TextureFlags, u_EntityID
-//   LightCB    (b2): u_Lights[16], u_AmbientColor, u_NumLights
+//   LightCB    (b2): u_Lights[16], u_AmbientColor, u_NumLights, IBL params
 //   Textures (t0-t3): base color / metallic-roughness / normal / emissive
+//   Textures (t4-t6): IBL — irradiance cube / prefiltered cube / BRDF LUT
+//                     (bound once per pass by SceneRenderer, not @param)
 
 cbuffer CameraCB : register(b0)
 {
@@ -50,6 +52,10 @@ cbuffer LightCB : register(b2)
 	LightData u_Lights[16];
 	float3    u_AmbientColor;
 	int       u_NumLights;
+	float     u_IBLIntensity;      // multiplier on the IBL contribution
+	float     u_MaxReflectionLod;  // prefiltered map mips - 1
+	int       u_IBLEnabled;        // 0 = legacy ambient, 1 = split-sum IBL
+	float     _IBLPad;
 };
 
 Texture2D    u_BaseColorMap;         // @param texture "Base Color Map"
@@ -57,6 +63,11 @@ Texture2D    u_MetallicRoughnessMap; // @param texture "Metallic-Roughness Map" 
 Texture2D    u_NormalMap;            // @param texture "Normal Map"
 Texture2D    u_EmissiveMap;          // @param texture "Emissive Map"
 SamplerState u_Sampler : register(s0);
+
+// IBL environment maps (bound once per pass by SceneRenderer).
+TextureCube u_IrradianceMap   : register(t4);
+TextureCube u_PrefilteredMap  : register(t5);
+Texture2D   u_BRDFLUT         : register(t6);
 
 // =============================================================================
 // PBR lighting — simplified Cook-Torrance, forward light loop (max 16 lights)
@@ -206,25 +217,45 @@ PSOutput PSMain(VSOutput input)
 		float3 f0      = lerp(float3(0.04, 0.04, 0.04), baseColor.rgb, metallic);
 		float3 diffuse = (1.0 - f0) * (1.0 - metallic) * baseColor.rgb;
 
-		float3 direct = 0.0;
-		for (int i = 0; i < u_NumLights; ++i)
-		{
-			float3 L;
-			float3 radiance = EvaluateLight(i, input.WorldPosition, L);
+			float3 direct = 0.0;
+			for (int i = 0; i < u_NumLights; ++i)
+			{
+				float3 L;
+				float3 radiance = EvaluateLight(i, input.WorldPosition, L);
 
-			float NdotL = saturate(dot(N, L));
-			float3 H = normalize(V + L);
-			float NdotH = saturate(dot(N, H));
-			float VdotH = saturate(dot(V, H));
+				float NdotL = saturate(dot(N, L));
+				float3 H = normalize(V + L);
+				float NdotH = saturate(dot(N, H));
+				float VdotH = saturate(dot(V, H));
 
-			float D   = D_GGX(NdotH, roughness);
-			float Vis = V_SmithGGXCorrelated(NdotV, NdotL, roughness);
-			float3 spec = F_Schlick(f0, VdotH) * D * Vis;
+				float D   = D_GGX(NdotH, roughness);
+				float Vis = V_SmithGGXCorrelated(NdotV, NdotL, roughness);
+				float3 spec = F_Schlick(f0, VdotH) * D * Vis;
 
-			direct += (diffuse + spec) * radiance * NdotL;
-		}
+				direct += (diffuse + spec) * radiance * NdotL;
+			}
 
-		color = direct + u_AmbientColor * baseColor.rgb;
+			// --- Image-based lighting (split-sum, CPU-baked environment) ----
+			float3 ambient;
+			if (u_IBLEnabled > 0)
+			{
+				float3 irradiance = u_IrradianceMap.Sample(u_Sampler, N).rgb;
+
+				float3 R = reflect(-V, N);
+				float3 prefiltered = u_PrefilteredMap.SampleLevel(
+					u_Sampler, R, roughness * u_MaxReflectionLod).rgb;
+
+				float2 brdf = u_BRDFLUT.Sample(u_Sampler, float2(NdotV, roughness)).rg;
+
+				ambient = diffuse * irradiance + prefiltered * (f0 * brdf.x + brdf.y);
+				ambient *= u_IBLIntensity;
+			}
+			else
+			{
+				ambient = u_AmbientColor * baseColor.rgb;
+			}
+
+			color = direct + ambient;
 	}
 
 	// --- Emissive -----------------------------------------------------------

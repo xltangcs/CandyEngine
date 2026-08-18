@@ -40,6 +40,10 @@ namespace Candy {
 		void OnSetVertexBuffer(uint32_t slot);
 		void OnSetIndexBuffer();
 
+		/// Compute state (D3D12-only; validators on other backends no-op).
+		void OnSetComputePipeline();
+		void OnDispatch(uint32_t x, uint32_t y, uint32_t z);
+
 		void OnDraw(uint32_t vertexCount);
 		void OnDrawIndexed(uint32_t indexCount);
 
@@ -54,6 +58,7 @@ namespace Candy {
 		bool m_PipelineSet       = false;
 		bool m_VertexBufferBound = false;
 		bool m_IndexBufferBound  = false;
+		bool m_ComputePipelineSet = false;
 	};
 
 } // namespace Candy

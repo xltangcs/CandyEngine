@@ -371,6 +371,108 @@ namespace Candy {
 		CANDY_CORE_TRACE("D3D12CommandBuffer::SetSampler({}, {}) — relying on static sampler", slot, binding);
 	}
 
+	// ---- Compute --------------------------------------------------------------
+
+	void D3D12CommandBuffer::SetComputePipeline(const Ref<RHIComputePipeline>& pipeline)
+	{
+		auto* d3d12pipeline = dynamic_cast<D3D12ComputePipeline*>(pipeline.get());
+		if (!d3d12pipeline || !m_CommandList)
+			return;
+
+		m_Validator.OnSetComputePipeline();
+		m_CommandList->SetPipelineState(d3d12pipeline->GetNativePipelineState());
+		m_CommandList->SetComputeRootSignature(d3d12pipeline->GetRootSignature());
+	}
+
+	void D3D12CommandBuffer::SetComputeConstantBuffer(uint32_t slot, const Ref<RHIBuffer>& buffer, uint64_t offset)
+	{
+		auto* d3d12buffer = dynamic_cast<D3D12Buffer*>(buffer.get());
+		if (!d3d12buffer || !m_CommandList)
+			return;
+
+		m_CommandList->SetComputeRootConstantBufferView(slot, d3d12buffer->GetGPUVirtualAddress() + offset);
+	}
+
+	void D3D12CommandBuffer::SetComputeTextures(uint32_t slot, uint32_t count, const Ref<RHITexture>* textures)
+	{
+		if (!m_CBVSRVUAVHeap || !m_CommandList)
+			return;
+
+		// Same dynamic-range allocation as SetTextures (descriptor-table GPU
+		// addresses must be 256B aligned; bump by the 8-aligned size).
+		const uint32_t alignedCount = (count + 7u) & ~7u;
+		if (m_NextDynamicSRVSlot + alignedCount > m_DynamicSRVCapacity)
+		{
+			CANDY_CORE_ERROR("D3D12CommandBuffer::SetComputeTextures: dynamic SRV region exhausted ({} needed, {} used/{})",
+			                 alignedCount, m_NextDynamicSRVSlot, m_DynamicSRVCapacity);
+			return;
+		}
+
+		const uint32_t base = m_DynamicSRVBase + m_NextDynamicSRVSlot;
+		for (uint32_t i = 0; i < count; ++i)
+		{
+			auto* d3d12tex = dynamic_cast<D3D12Texture*>(textures[i].get());
+			if (d3d12tex && d3d12tex->GetResource())
+				d3d12tex->CreateSRV(m_CBVSRVUAVHeap, base + i, m_CBVSRVDescriptorSize);
+		}
+		m_NextDynamicSRVSlot += alignedCount;
+
+		D3D12_GPU_DESCRIPTOR_HANDLE gpuBase = m_CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart();
+		gpuBase.ptr += static_cast<SIZE_T>(base) * m_CBVSRVDescriptorSize;
+		m_CommandList->SetComputeRootDescriptorTable(slot, gpuBase);
+	}
+
+	void D3D12CommandBuffer::SetComputeUAVs(uint32_t slot, uint32_t count, const Ref<RHITexture>* textures,
+	                                        uint32_t mipSlice)
+	{
+		if (!m_CBVSRVUAVHeap || !m_CommandList)
+			return;
+
+		const uint32_t alignedCount = (count + 7u) & ~7u;
+		if (m_NextDynamicSRVSlot + alignedCount > m_DynamicSRVCapacity)
+		{
+			CANDY_CORE_ERROR("D3D12CommandBuffer::SetComputeUAVs: dynamic SRV region exhausted ({} needed, {} used/{})",
+			                 alignedCount, m_NextDynamicSRVSlot, m_DynamicSRVCapacity);
+			return;
+		}
+
+		const uint32_t base = m_DynamicSRVBase + m_NextDynamicSRVSlot;
+		for (uint32_t i = 0; i < count; ++i)
+		{
+			auto* d3d12tex = dynamic_cast<D3D12Texture*>(textures[i].get());
+			if (d3d12tex && d3d12tex->GetResource())
+				d3d12tex->CreateUAV(m_CBVSRVUAVHeap, base + i, m_CBVSRVDescriptorSize, mipSlice);
+		}
+		m_NextDynamicSRVSlot += alignedCount;
+
+		D3D12_GPU_DESCRIPTOR_HANDLE gpuBase = m_CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart();
+		gpuBase.ptr += static_cast<SIZE_T>(base) * m_CBVSRVDescriptorSize;
+		m_CommandList->SetComputeRootDescriptorTable(slot, gpuBase);
+	}
+
+	void D3D12CommandBuffer::Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
+	{
+		if (!m_CommandList)
+			return;
+
+		m_Validator.OnDispatch(groupCountX, groupCountY, groupCountZ);
+		m_CommandList->Dispatch(groupCountX, groupCountY, groupCountZ);
+	}
+
+	void D3D12CommandBuffer::UAVBarrier()
+	{
+		if (!m_CommandList)
+			return;
+
+		// Full UAV barrier: makes all previous UAV writes visible to later
+		// reads/writes across every resource (simple and cheap for the bake
+		// paths that use it).
+		D3D12_RESOURCE_BARRIER barrier = {};
+		barrier.Type  = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+		barrier.UAV.pResource = nullptr;
+		m_CommandList->ResourceBarrier(1, &barrier);
+	}
+
 	// ---- Draw calls ----------------------------------------------------------
 
 	void D3D12CommandBuffer::Draw(uint32_t vertexCount,

@@ -25,12 +25,32 @@ namespace Candy {
 		/// executes the copy on the device queue and waits for it to finish).
 		void SetData(const void* data, uint32_t rowPitch, uint32_t slicePitch = 0);
 
+		/// Upload mip × slice subresources in one copy (cubemaps, mip chains).
+		bool WriteSubresources(const TextureSubresourceData* data, uint32_t count) override;
+
 		[[nodiscard]] ID3D12Resource* GetResource() const { return m_Resource.Get(); }
 		[[nodiscard]] D3D12_RESOURCE_STATES GetState() const { return m_State; }
 		void SetState(D3D12_RESOURCE_STATES state) { m_State = state; }
 
 		/// Write SRV descriptor into the device CBV_SRV_UAV heap at the given slot.
 		void CreateSRV(ID3D12DescriptorHeap* heap, uint32_t slotIndex, uint32_t descriptorSize) const;
+
+		/// Write a UAV descriptor into the device CBV_SRV_UAV heap at the given
+		/// slot. `mipSlice` selects the mip level (cubemaps map to a
+		/// Texture2DArray UAV over the 6 faces).
+		void CreateUAV(ID3D12DescriptorHeap* heap, uint32_t slotIndex, uint32_t descriptorSize,
+		               uint32_t mipSlice = 0) const;
+
+		/// Insert a transition barrier for the whole resource on `list` and
+		/// update the tracked state.
+		void Transition(ID3D12GraphicsCommandList* list, D3D12_RESOURCE_STATES to);
+		/// Insert a transition barrier for one subresource (mip*arrayLayer).
+		/// The caller tracks per-subresource states (bake pipelines); the
+		/// whole-resource tracked state is left untouched.
+		void TransitionSubresource(ID3D12GraphicsCommandList* list, uint32_t subresource,
+		                           D3D12_RESOURCE_STATES from, D3D12_RESOURCE_STATES to);
+		/// Insert a UAV barrier for this resource (dispatch write visibility).
+		void UAVBarrier(ID3D12GraphicsCommandList* list) const;
 
 	private:
 		TextureDesc                           m_Desc;
