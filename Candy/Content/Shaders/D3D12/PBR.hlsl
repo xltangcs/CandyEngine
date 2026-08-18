@@ -8,6 +8,7 @@
 // Layout conventions (SceneRenderer MaterialUniforms matches byte-for-byte):
 //   CameraCB   (b0): u_ViewProjection, u_CameraPosition
 //   MaterialCB (b1): u_World, surface params, u_TextureFlags, u_EntityID
+//   LightCB    (b2): u_Lights[16], u_AmbientColor, u_NumLights
 //   Textures (t0-t3): base color / metallic-roughness / normal / emissive
 
 cbuffer CameraCB : register(b0)
@@ -32,6 +33,25 @@ cbuffer MaterialCB : register(b1)
 	int    u_EntityID;
 };
 
+struct LightData
+{
+	float3 Direction;            // world-space travel direction (Directional/Spot)
+	float  Type;                 // 0 Directional, 1 Point, 2 Spot
+	float3 Position;             // world position (Point/Spot)
+	float  Range;                // Point/Spot range
+	float3 Color;
+	float  Intensity;
+	float2 ConeCos;              // spot (inner, outer) cosines, precomputed CPU-side
+	float2 _Pad;
+};
+
+cbuffer LightCB : register(b2)
+{
+	LightData u_Lights[16];
+	float3    u_AmbientColor;
+	int       u_NumLights;
+};
+
 Texture2D    u_BaseColorMap;         // @param texture "Base Color Map"
 Texture2D    u_MetallicRoughnessMap; // @param texture "Metallic-Roughness Map" (G = roughness, B = metallic)
 Texture2D    u_NormalMap;            // @param texture "Normal Map"
@@ -39,13 +59,45 @@ Texture2D    u_EmissiveMap;          // @param texture "Emissive Map"
 SamplerState u_Sampler : register(s0);
 
 // =============================================================================
-// PBR lighting — simplified Cook-Torrance, single directional light
+// PBR lighting — simplified Cook-Torrance, forward light loop (max 16 lights)
 // =============================================================================
 
-static const float3 kLightDir     = normalize(float3(0.4, 1.0, 0.3)); // towards light
-static const float3 kLightColor   = float3(1.0, 0.95, 0.88);
-static const float  kAmbient      = 0.03;
-static const float  kMaskCutoff   = 0.5;
+static const float kMaskCutoff = 0.5;
+
+// Accumulates radiance + attenuation for one light; returns (L, radiance).
+float3 EvaluateLight(int index, float3 worldPos, out float3 L)
+{
+	LightData light = u_Lights[index];
+
+	float3 radiance;
+	float  attenuation = 1.0;
+
+	if (light.Type < 0.5) // Directional: fixed direction, no attenuation
+	{
+		L = -normalize(light.Direction);
+	}
+	else if (light.Type < 1.5) // Point: inverse-distance with range falloff
+	{
+		float3 toLight = light.Position - worldPos;
+		float  dist    = length(toLight);
+		L = toLight / max(dist, 1e-4);
+		float rangeFade = saturate(1.0 - dist / max(light.Range, 0.001));
+		attenuation = rangeFade * rangeFade;
+	}
+	else // Spot: point falloff * smooth cone (inner/outer cosines)
+	{
+		float3 toLight = light.Position - worldPos;
+		float  dist    = length(toLight);
+		L = toLight / max(dist, 1e-4);
+		float rangeFade = saturate(1.0 - dist / max(light.Range, 0.001));
+		float cosTheta  = saturate(dot(-L, normalize(light.Direction)));
+		float coneFade  = saturate((cosTheta - light.ConeCos.y) / max(light.ConeCos.x - light.ConeCos.y, 1e-5));
+		attenuation = rangeFade * rangeFade * coneFade * coneFade;
+	}
+
+	radiance = light.Color * light.Intensity * attenuation;
+	return radiance;
+}
 
 float3 F_Schlick(float3 f0, float VdotH)
 {
@@ -147,24 +199,32 @@ PSOutput PSMain(VSOutput input)
 	}
 	else
 	{
-		// --- Lighting (simplified Cook-Torrance, single directional light) ---
+		// --- Lighting (simplified Cook-Torrance, forward light loop) --------
 		float3 V = normalize(u_CameraPosition - input.WorldPosition);
-		float3 L = normalize(kLightDir);
-		float3 H = normalize(V + L);
-
-		float NdotL = saturate(dot(N, L));
 		float NdotV = max(dot(N, V), 1e-4);
-		float NdotH = saturate(dot(N, H));
-		float VdotH = saturate(dot(V, H));
 
 		float3 f0      = lerp(float3(0.04, 0.04, 0.04), baseColor.rgb, metallic);
 		float3 diffuse = (1.0 - f0) * (1.0 - metallic) * baseColor.rgb;
 
-		float D   = D_GGX(NdotH, roughness);
-		float Vis = V_SmithGGXCorrelated(NdotV, NdotL, roughness);
-		float3 spec = F_Schlick(f0, VdotH) * D * Vis;
+		float3 direct = 0.0;
+		for (int i = 0; i < u_NumLights; ++i)
+		{
+			float3 L;
+			float3 radiance = EvaluateLight(i, input.WorldPosition, L);
 
-		color = (diffuse + spec) * kLightColor * NdotL + kAmbient * baseColor.rgb;
+			float NdotL = saturate(dot(N, L));
+			float3 H = normalize(V + L);
+			float NdotH = saturate(dot(N, H));
+			float VdotH = saturate(dot(V, H));
+
+			float D   = D_GGX(NdotH, roughness);
+			float Vis = V_SmithGGXCorrelated(NdotV, NdotL, roughness);
+			float3 spec = F_Schlick(f0, VdotH) * D * Vis;
+
+			direct += (diffuse + spec) * radiance * NdotL;
+		}
+
+		color = direct + u_AmbientColor * baseColor.rgb;
 	}
 
 	// --- Emissive -----------------------------------------------------------

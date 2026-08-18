@@ -125,6 +125,31 @@ namespace Candy {
 		CameraComponent(const CameraComponent&) = default;
 	};
 
+	CANDY_CLASS()
+	struct LightComponent
+	{
+		CANDY_ENUM()
+		enum class LightType { Directional = 0, Point, Spot };
+
+		CANDY_PROPERTY()
+		LightType Type = LightType::Directional;
+		CANDY_PROPERTY()
+		glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
+		CANDY_PROPERTY()
+		float Intensity = 1.0f;
+		CANDY_PROPERTY()
+		float Range = 10.0f;           // Point / Spot
+		CANDY_PROPERTY()
+		float InnerConeAngle = 12.5f;  // Spot, degrees
+		CANDY_PROPERTY()
+		float OuterConeAngle = 45.0f;  // Spot, degrees
+		CANDY_PROPERTY()
+		bool CastShadows = false;      // reserved, not implemented yet
+
+		LightComponent() = default;
+		LightComponent(const LightComponent&) = default;
+	};
+
 	// Forward declaration
 	class ScriptableEntity;
 

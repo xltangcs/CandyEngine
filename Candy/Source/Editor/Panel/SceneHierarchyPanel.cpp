@@ -528,6 +528,15 @@ namespace
 				}
 			}
 
+			if (!m_SelectionContext.HasComponent<LightComponent>())
+			{
+				if (ImGui::MenuItem("Light"))
+				{
+					m_SelectionContext.AddComponent<LightComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
 			if (!m_SelectionContext.HasComponent<SpriteRendererComponent>())
 			{
 				if (ImGui::MenuItem("Sprite Renderer"))
@@ -764,6 +773,35 @@ namespace
 				}
 			});
 	
+
+		DrawComponent<LightComponent>("Light", entity, [](auto& component)
+			{
+				const char* lightTypeStrings[] = { "Directional", "Point", "Spot" };
+				int lightType = (int)component.Type;
+				if (ImGuiUtils::DrawCombo("Type", lightTypeStrings, 3, lightType))
+					component.Type = (LightComponent::LightType)lightType;
+
+				ImGuiUtils::DrawColorEdit3("Color", component.Color);
+
+				ImGuiUtils::DrawDragFloat("Intensity", component.Intensity, 0.05f, 0.0f);
+
+				if (component.Type != LightComponent::LightType::Directional)
+					ImGuiUtils::DrawDragFloat("Range", component.Range, 0.1f, 0.01f);
+
+				if (component.Type == LightComponent::LightType::Spot)
+				{
+					ImGuiUtils::DrawDragFloat("Inner Cone Angle", component.InnerConeAngle, 0.5f, 0.0f, 89.0f, "%.1f deg");
+					ImGuiUtils::DrawDragFloat("Outer Cone Angle", component.OuterConeAngle, 0.5f, 0.0f, 89.0f, "%.1f deg");
+					if (component.OuterConeAngle < component.InnerConeAngle)
+						component.OuterConeAngle = component.InnerConeAngle;
+				}
+
+				// Reserved for shadow mapping (not implemented yet).
+				ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+				ImGuiUtils::DrawCheckbox("Cast Shadows", component.CastShadows);
+				ImGui::PopStyleVar();
+				ImGui::TextDisabled("Shadow mapping is not implemented yet");
+			});
 
 		DrawComponent<CircleRendererComponent>("Circle Renderer", entity, [](auto& component)
 			{

@@ -66,6 +66,29 @@ namespace Candy {
 	};
 	static_assert(sizeof(SpriteUniforms) == 120, "SpriteUniforms must match Sprite.hlsl MaterialCB (120B)");
 
+	// LightCB (b2): fixed light array + ambient. Byte-for-byte with PBR.hlsl.
+	struct GPULight
+	{
+		glm::vec3 Direction   = glm::vec3(0.0f);
+		float     Type        = 0.0f;  // 0 Directional, 1 Point, 2 Spot
+		glm::vec3 Position    = glm::vec3(0.0f);
+		float     Range       = 0.0f;
+		glm::vec3 Color       = glm::vec3(0.0f);
+		float     Intensity   = 0.0f;
+		glm::vec2 ConeCos     = glm::vec2(1.0f, 0.0f); // (inner, outer)
+		glm::vec2 _Pad        = glm::vec2(0.0f);
+	};
+	static_assert(sizeof(GPULight) == 64, "GPULight must match PBR.hlsl LightData (64B)");
+
+	struct LightUniforms
+	{
+		GPULight    Lights[SceneRenderer::kMaxLights];
+		glm::vec3   AmbientColor = glm::vec3(0.03f);
+		int32_t     NumLights    = 0;
+	};
+	static_assert(sizeof(LightUniforms) == SceneRenderer::kMaxLights * 64 + 16,
+		"LightUniforms must match PBR.hlsl LightCB (1040B)");
+
 	// ---- Frustum culling (Gribb-Hartmann) ----------------------------------
 
 	struct FrustumPlane
@@ -163,6 +186,7 @@ namespace Candy {
 		Ref<RHIBuffer>           CameraCB;   // 256B allocation (D3D12 root CBV alignment)
 		Ref<RHIBuffer>           MaterialCB; // 256B-aligned slices, one per draw (grows on demand)
 		uint32_t                 MaterialCBSlices = 0; // capacity of MaterialCB in slices
+		Ref<RHIBuffer>           LightCB;    // packed scene lights + ambient (PBR path only)
 		Ref<RHIGraphicsPipeline> OpaquePipeline;
 		Ref<RHIGraphicsPipeline> TransparentPipeline;
 		Ref<RHIGraphicsPipeline> SpriteTransparentPipeline; // Sprite.hlsl (2D sprites/circles)
@@ -176,6 +200,11 @@ namespace Candy {
 		std::unordered_map<const Material*, MaterialState> MaterialStates;
 		Ref<RHIFramebuffer> ActiveRenderTarget;
 		bool ActiveRenderTargetPendingClear = true;
+
+		// Per-frame lights (submitted like draws, packed into LightCB at EndFrame)
+		std::array<SceneLight, SceneRenderer::kMaxLights> Lights;
+		uint32_t LightCount = 0;
+		glm::vec3 AmbientColor = glm::vec3(0.03f);
 
 		// Debug line dynamic vertex buffer (grows on demand)
 		Ref<RHIBuffer> LineVB;
@@ -399,6 +428,17 @@ namespace Candy {
 			s_Data.CameraCB = dev->CreateBuffer(cb);
 		}
 
+		// LightCB: 1040B of packed lights + ambient, rounded up to 256B
+		// alignment (D3D12 root CBV allocation rule).
+		{
+			BufferDesc cb;
+			cb.Size          = 1280;
+			cb.Usage         = ResourceUsage::ConstantBuffer;
+			cb.CPUAccessible = true;
+			cb.DebugName     = "SceneRenderer_LightCB";
+			s_Data.LightCB = dev->CreateBuffer(cb);
+		}
+
 		// MaterialCB: one 256B-aligned slice per draw (grows on demand in EndFrame).
 		s_Data.MaterialCB.reset();
 		s_Data.MaterialCBSlices = 0;
@@ -548,6 +588,7 @@ namespace Candy {
 	{
 		s_Data.CameraCB.reset();
 		s_Data.MaterialCB.reset();
+		s_Data.LightCB.reset();
 		s_Data.OpaquePipeline.reset();
 		s_Data.TransparentPipeline.reset();
 		s_Data.SpriteTransparentPipeline.reset();
@@ -570,6 +611,7 @@ namespace Candy {
 		s_Data.DrawCommands.clear();
 		s_Data.LineVertices.clear();
 		s_Data.MaterialStates.clear();
+		s_Data.LightCount = 0;
 		s_Data.Stats = {};
 	}
 
@@ -592,6 +634,21 @@ namespace Candy {
 	void SceneRenderer::Submit(const MeshDrawCommand& cmd)
 	{
 		s_Data.DrawCommands.push_back(cmd);
+	}
+
+	void SceneRenderer::SubmitLight(const SceneLight& light)
+	{
+		if (s_Data.LightCount >= kMaxLights)
+		{
+			CANDY_CORE_WARN("SceneRenderer: light count exceeded max ({0}); extra lights ignored", kMaxLights);
+			return;
+		}
+		s_Data.Lights[s_Data.LightCount++] = light;
+	}
+
+	void SceneRenderer::SetAmbientLight(const glm::vec3& color)
+	{
+		s_Data.AmbientColor = color;
 	}
 
 	void SceneRenderer::SubmitLine(const glm::vec3& p0, const glm::vec3& p1, const glm::vec4& color, int entityID)
@@ -635,6 +692,26 @@ namespace Candy {
 			s_Data.MaterialStates.clear();
 			return false;
 		}
+
+		// Upload packed scene lights + ambient (PBR path only; sprite/line
+		// shaders never read b2).
+		LightUniforms lights;
+		for (uint32_t i = 0; i < s_Data.LightCount; ++i)
+		{
+			const SceneLight& src = s_Data.Lights[i];
+			GPULight& dst         = lights.Lights[i];
+			dst.Direction = src.Direction;
+			dst.Type      = static_cast<float>(src.Type);
+			dst.Position  = src.Position;
+			dst.Range     = src.Range;
+			dst.Color     = src.Color;
+			dst.Intensity = src.Intensity;
+			dst.ConeCos   = glm::vec2(src.InnerConeCos, src.OuterConeCos);
+		}
+		lights.AmbientColor = s_Data.AmbientColor;
+		lights.NumLights    = static_cast<int32_t>(s_Data.LightCount);
+		if (!s_Data.LightCB->Write(&lights, sizeof(lights)))
+			CANDY_CORE_ERROR("SceneRenderer::EndFrame - LightCB upload failed");
 
 		// Frustum cull + pass split (may produce zero draws — the render pass
 		// below still runs so an empty scene clears the target; without this,
@@ -828,6 +905,11 @@ namespace Candy {
 			// Root CBVs must be recorded with the pipeline's root signature
 			// already bound — set them after SetPipeline, every draw.
 			cmd->SetConstantBuffer(0, 0, s_Data.CameraCB);
+
+			// Scene lights (b2): only the PBR pipelines' shaders declare the
+			// register; the sprite/line root signatures simply ignore it.
+			if (!state.IsSprite && s_Data.LightCB)
+				cmd->SetConstantBuffer(3, 0, s_Data.LightCB);
 
 			// 2D sprite draws pack SpriteUniforms (120B), 3D draws pack
 			// MaterialUniforms (136B); each draw still owns a 256B-aligned slice.

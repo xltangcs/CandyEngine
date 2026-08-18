@@ -68,6 +68,28 @@ namespace Candy {
 	};
 
 	// =========================================================================
+	// SceneLight — one light submitted per frame (packed into LightCB at
+	// EndFrame). Scene gathers LightComponent entities into these CPU structs;
+	// the renderer stays decoupled from scene components.
+	//
+	// Convention: Direction is the world-space direction the light travels
+	// (Directional: fixed; Point: ignored; Spot: cone axis). ConeCos are
+	// precomputed cosines of the spot inner/outer angles (CPU side, so the
+	// shader never does deg->rad).
+	// =========================================================================
+	struct SceneLight
+	{
+		glm::vec3 Direction    = glm::vec3(0.0f, -1.0f, 0.0f);
+		int       Type         = 0; // 0 Directional, 1 Point, 2 Spot
+		glm::vec3 Position     = glm::vec3(0.0f);
+		float     Range        = 10.0f;
+		glm::vec3 Color        = glm::vec3(1.0f);
+		float     Intensity    = 1.0f;
+		float     InnerConeCos = 1.0f;
+		float     OuterConeCos = 0.0f;
+	};
+
+	// =========================================================================
 	// SceneRenderer — per-frame scene renderer for static meshes
 	//
 	// UE-flavored pipeline in minimal form: collect (Submit) -> cull/sort ->
@@ -91,6 +113,11 @@ namespace Candy {
 		static void BeginFrame(const EditorCamera& camera);
 		static void BeginFrame(const Camera& camera, const glm::mat4& transform);
 		static void Submit(const MeshDrawCommand& cmd);
+
+		// ---- Lights (packed into LightCB b2 at EndFrame) -------------------
+		static constexpr uint32_t kMaxLights = 16;
+		static void SubmitLight(const SceneLight& light);
+		static void SetAmbientLight(const glm::vec3& color);
 
 		// ---- Debug line pass (editor collider wireframes, overlay) --------
 		static void SubmitLine(const glm::vec3& p0, const glm::vec3& p1, const glm::vec4& color, int entityID = -1);

@@ -344,6 +344,9 @@ namespace Candy {
 				if (ImGui::MenuItem("Editor Settings"))
 					EditorState::Get().ShowEditorSettings = true;
 
+				if (ImGui::MenuItem("Scene Settings"))
+					EditorState::Get().ShowSceneSettings = true;
+
 				ImGui::Separator();
 
 				// Editor Layout presets (Godot-style layout management).
@@ -599,6 +602,7 @@ namespace Candy {
 
 		if (EditorState::Get().ShowProjectSettings) ProjectSettingsPanel::OnImGuiRender();
 		if (EditorState::Get().ShowEditorSettings) EditorSettingsPanel::OnImGuiRender();
+		if (EditorState::Get().ShowSceneSettings) SceneSettingsPanel::OnImGuiRender(m_EditorScene);
 		UI_BuildDialog();
 		UI_LayoutDialogs();
 

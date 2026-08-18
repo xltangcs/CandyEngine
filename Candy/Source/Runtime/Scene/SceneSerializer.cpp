@@ -135,6 +135,29 @@ namespace Candy {
 		return Rigidbody2DComponent::BodyType::Static;
 	}
 
+	static std::string LightTypeToString(LightComponent::LightType type)
+	{
+		switch (type)
+		{
+		case LightComponent::LightType::Directional: return "Directional";
+		case LightComponent::LightType::Point:       return "Point";
+		case LightComponent::LightType::Spot:        return "Spot";
+		}
+
+		CANDY_CORE_ASSERT(false, "Unknown light type");
+		return {};
+	}
+
+	static LightComponent::LightType LightTypeFromString(const std::string& typeString)
+	{
+		if (typeString == "Directional") return LightComponent::LightType::Directional;
+		if (typeString == "Point")       return LightComponent::LightType::Point;
+		if (typeString == "Spot")        return LightComponent::LightType::Spot;
+
+		CANDY_CORE_ASSERT(false, "Unknown light type");
+		return LightComponent::LightType::Directional;
+	}
+
 	SceneSerializer::SceneSerializer(const Ref<Scene>& scene)
 		: m_Scene(scene)
 	{
@@ -193,6 +216,23 @@ namespace Candy {
 			out << YAML::Key << "FixedAspectRatio" << YAML::Value << cameraComponent.FixedAspectRatio;
 
 			out << YAML::EndMap; // CameraComponent
+		}
+
+		if (entity.HasComponent<LightComponent>())
+		{
+			out << YAML::Key << "LightComponent";
+			out << YAML::BeginMap; // LightComponent
+
+			auto& lc = entity.GetComponent<LightComponent>();
+			out << YAML::Key << "Type" << YAML::Value << LightTypeToString(lc.Type);
+			out << YAML::Key << "Color" << YAML::Value << lc.Color;
+			out << YAML::Key << "Intensity" << YAML::Value << lc.Intensity;
+			out << YAML::Key << "Range" << YAML::Value << lc.Range;
+			out << YAML::Key << "InnerConeAngle" << YAML::Value << lc.InnerConeAngle;
+			out << YAML::Key << "OuterConeAngle" << YAML::Value << lc.OuterConeAngle;
+			out << YAML::Key << "CastShadows" << YAML::Value << lc.CastShadows;
+
+			out << YAML::EndMap; // LightComponent
 		}
 
 		if (entity.HasComponent<SpriteRendererComponent>())
@@ -379,6 +419,7 @@ namespace Candy {
 		YAML::Emitter out;
 		out << YAML::BeginMap;
 		out << YAML::Key << "Scene" << YAML::Value << filename;
+		out << YAML::Key << "AmbientColor" << YAML::Value << m_Scene->m_AmbientColor;
 		out << YAML::Key << "Entities" << YAML::Value << YAML::BeginSeq;
 
 		for (const auto [entityID] : m_Scene->m_Registry.storage<entt::entity>().reach())
@@ -443,6 +484,9 @@ namespace Candy {
 		std::string sceneName = data["Scene"].as<std::string>();
 		CANDY_CORE_TRACE("Deserializing scene '{0}'", sceneName);
 
+		if (auto ambient = data["AmbientColor"])
+			m_Scene->m_AmbientColor = ambient.as<glm::vec3>();
+
 		auto entities = data["Entities"];
 		if (entities)
 		{
@@ -484,6 +528,19 @@ namespace Candy {
 					cc.Camera.SetOrthographicFarClip(cameraProps["OrthographicFar"].as<float>());
 
 					cc.FixedAspectRatio = cameraComponent["FixedAspectRatio"].as<bool>();
+				}
+
+				auto lightComponent = entity["LightComponent"];
+				if (lightComponent)
+				{
+					auto& lc = deserializedEntity.AddComponent<LightComponent>();
+					lc.Type = LightTypeFromString(lightComponent["Type"].as<std::string>());
+					lc.Color = lightComponent["Color"].as<glm::vec3>();
+					lc.Intensity = lightComponent["Intensity"].as<float>();
+					lc.Range = lightComponent["Range"].as<float>();
+					lc.InnerConeAngle = lightComponent["InnerConeAngle"].as<float>();
+					lc.OuterConeAngle = lightComponent["OuterConeAngle"].as<float>();
+					lc.CastShadows = lightComponent["CastShadows"].as<bool>();
 				}
 
 				auto spriteRendererComponent = entity["SpriteRendererComponent"];

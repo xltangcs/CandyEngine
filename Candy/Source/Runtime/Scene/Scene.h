@@ -69,6 +69,9 @@ namespace Candy {
 		/// (e.g. a crouch/shrink) at runtime. Repositions the body at the current transform.
 		/// </summary>
 		void RecreatePhysicsBody(Entity entity);
+
+		const glm::vec3& GetAmbientLight() const { return m_AmbientColor; }
+		void SetAmbientLight(const glm::vec3& color) { m_AmbientColor = color; }
 		template<typename... Components>
 		auto GetAllEntitiesWith()
 		{
@@ -94,6 +97,9 @@ namespace Candy {
 		/// Submits all StaticMeshComponent entities as SceneRenderer mesh draws
 		/// (one draw per submesh, opaque/masked/transparent by material).
 		void SubmitStaticMeshDraws();
+		/// Sets the scene's ambient light on the renderer and submits every
+		/// LightComponent entity as a SceneRenderer light.
+		void SubmitSceneLights();
 	private:
 		entt::registry m_Registry;
 		uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
@@ -103,6 +109,8 @@ namespace Candy {
 		SceneCamera m_FallbackCamera;
 
 		std::set<entt::entity> m_PendingDeletions;
+
+		glm::vec3 m_AmbientColor = glm::vec3(0.03f);
 
 		// Lazily-created shared rendering resources (sprite/circle migration)
 		Ref<StaticMeshResource> m_QuadMesh;

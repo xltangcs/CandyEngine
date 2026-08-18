@@ -655,7 +655,8 @@ float4 main(PSInput input) : SV_TARGET
 		// 32-wide table came from Renderer2D batch rendering; a wider table
 		// than the bound descriptors makes the GPU read uninitialized heap
 		// slots (undefined behavior, driver crash).
-		D3D12_ROOT_PARAMETER rootParams[3] = {};
+		// Parameter 3: CBV (b2)  ---- packed scene lights + ambient (PBR path)
+		D3D12_ROOT_PARAMETER rootParams[4] = {};
 
 		rootParams[0].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_CBV;
 		rootParams[0].Descriptor       = {};
@@ -683,6 +684,13 @@ float4 main(PSInput input) : SV_TARGET
 		rootParams[2].DescriptorTable.pDescriptorRanges   = &srvRange;
 		rootParams[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
+		// Scene lights: pixel-shader-only (PBR.hlsl reads b2 in PSMain).
+		rootParams[3].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		rootParams[3].Descriptor       = {};
+		rootParams[3].Descriptor.ShaderRegister = 2;
+		rootParams[3].Descriptor.RegisterSpace  = 0;
+		rootParams[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
 		// Static sampler (s0) ---- linear wrap
 		D3D12_STATIC_SAMPLER_DESC staticSampler = {};
 		staticSampler.Filter           = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -699,7 +707,7 @@ float4 main(PSInput input) : SV_TARGET
 		staticSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
 		D3D12_ROOT_SIGNATURE_DESC rootSigDesc = {};
-		rootSigDesc.NumParameters     = 3;
+		rootSigDesc.NumParameters     = 4;
 		rootSigDesc.pParameters       = rootParams;
 		rootSigDesc.NumStaticSamplers = 1;
 		rootSigDesc.pStaticSamplers   = &staticSampler;

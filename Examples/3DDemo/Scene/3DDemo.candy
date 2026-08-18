@@ -1,4 +1,5 @@
 Scene: 3DDemo
+AmbientColor: [0.03, 0.03, 0.03]
 Entities:
   - Entity: 12854884733615300658
     TagComponent:
@@ -11,6 +12,21 @@ Entities:
       MeshPath: VFS://Game/Model/lemon/lemon_1k.gltf
       MaterialPaths:
         - VFS://Game/Materials/NewMaterial.mat
+  - Entity: 18284943316315124677
+    TagComponent:
+      Tag: Sun
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [-1.107, 0.929, 0]
+      Scale: [1, 1, 1]
+    LightComponent:
+      Type: Directional
+      Color: [1, 0.95, 0.88]
+      Intensity: 1
+      Range: 10
+      InnerConeAngle: 12.5
+      OuterConeAngle: 45
+      CastShadows: false
   - Entity: 11072840433712713403
     TagComponent:
       Tag: Camera

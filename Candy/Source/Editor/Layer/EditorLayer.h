@@ -9,6 +9,7 @@
 #include "Panel/ContentBrowserPanel.h"
 #include "Panel/EditorSettingsPanel.h"
 #include "Panel/ProjectSettingsPanel.h"
+#include "Panel/SceneSettingsPanel.h"
 #include "Runtime/Renderer/EditorCamera.h"
 
 namespace Candy {

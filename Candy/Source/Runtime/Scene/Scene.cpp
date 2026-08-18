@@ -74,6 +74,7 @@ namespace Candy {
 
 		newScene->m_ViewportWidth = other->m_ViewportWidth;
 		newScene->m_ViewportHeight = other->m_ViewportHeight;
+		newScene->m_AmbientColor = other->m_AmbientColor;
 
 		auto& srcSceneRegistry = other->m_Registry;
 		auto& dstSceneRegistry = newScene->m_Registry;
@@ -93,6 +94,7 @@ namespace Candy {
 		CopyComponent<StaticMeshComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<CircleRendererComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<CameraComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<LightComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<NativeScriptComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<Rigidbody2DComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<BoxCollider2DComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
@@ -371,6 +373,7 @@ namespace Candy {
 
 		{
 			SceneRenderer::BeginFrame(*mainCamera, cameraTransform);
+			SubmitSceneLights();
 			SubmitStaticMeshDraws();
 			SubmitSpriteAndCircleDraws();
 		}
@@ -447,6 +450,7 @@ namespace Candy {
 		CopyComponentIfExists<StaticMeshComponent>(newEntity, entity);
 		CopyComponentIfExists<CircleRendererComponent>(newEntity, entity);
 		CopyComponentIfExists<CameraComponent>(newEntity, entity);
+		CopyComponentIfExists<LightComponent>(newEntity, entity);
 		CopyComponentIfExists<NativeScriptComponent>(newEntity, entity);
 		CopyComponentIfExists<Rigidbody2DComponent>(newEntity, entity);
 		CopyComponentIfExists<BoxCollider2DComponent>(newEntity, entity);
@@ -614,6 +618,7 @@ namespace Candy {
 		// Render 3D (static meshes) + 2D (sprites/circles) in one pipeline.
 		SceneRenderer::BeginFrame(camera);
 
+		SubmitSceneLights();
 		SubmitStaticMeshDraws();
 		SubmitSpriteAndCircleDraws();
 	}
@@ -623,8 +628,34 @@ namespace Candy {
 		// Render 3D (static meshes) + 2D (sprites/circles) in one pipeline.
 		SceneRenderer::BeginFrame(cameraComp.Camera, cameraTransform);
 
+		SubmitSceneLights();
 		SubmitStaticMeshDraws();
 		SubmitSpriteAndCircleDraws();
+	}
+
+	void Scene::SubmitSceneLights()
+	{
+		SceneRenderer::SetAmbientLight(m_AmbientColor);
+
+		auto view = m_Registry.view<TransformComponent, LightComponent>();
+		for (auto entity : view)
+		{
+			auto [tc, light] = view.get<TransformComponent, LightComponent>(entity);
+
+			SceneLight sceneLight;
+			sceneLight.Type       = static_cast<int>(light.Type);
+			sceneLight.Position   = tc.Translation;
+			sceneLight.Color      = light.Color;
+			sceneLight.Intensity  = light.Intensity;
+			sceneLight.Range      = light.Range;
+			// Directional/Spot shine along the entity's local -Z (camera
+			// convention): the light travels from the transform's forward.
+			sceneLight.Direction = glm::quat(tc.Rotation) * glm::vec3(0.0f, 0.0f, -1.0f);
+			sceneLight.InnerConeCos = glm::cos(glm::radians(light.InnerConeAngle));
+			sceneLight.OuterConeCos = glm::cos(glm::radians(light.OuterConeAngle));
+
+			SceneRenderer::SubmitLight(sceneLight);
+		}
 	}
 
 	void Scene::SubmitStaticMeshDraws()
@@ -670,6 +701,11 @@ namespace Candy {
 	void Scene::OnComponentAdded<CameraComponent>(Entity entity, CameraComponent& component)
 	{
 		component.Camera.SetViewportSize(m_ViewportWidth, m_ViewportHeight);
+	}
+
+	template<>
+	void Scene::OnComponentAdded<LightComponent>(Entity entity, LightComponent& component)
+	{
 	}
 
 	template<>

@@ -30,6 +30,8 @@ namespace Candy {
 
 		static bool DrawColorEdit4(const std::string& label, glm::vec4& color);
 
+		static bool DrawColorEdit3(const std::string& label, glm::vec3& color);
+
 		static void DrawLabelText(const std::string& label, const std::string& value);
 
 		static bool DrawCheckbox(const std::string& label, bool& value);
