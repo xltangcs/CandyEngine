@@ -8,10 +8,11 @@ namespace Candy {
 	// Manages editor docking layout presets (Godot-style).
 	//
 	// There are two kinds of layout presets:
-	//   - User layouts:      Saved/LayoutPreset/<name>.ini   (per-machine, saved at runtime)
-	//   - Built-in default:  Config/DefaultLayout.ini   (tracked by git)
+	//   - User layouts:      VFS://Engine/Saved/LayoutPreset/<name>.ini   (per-machine, saved at runtime)
+	//   - Built-in default:  VFS://Engine/Config/DefaultLayout.ini   (tracked by git)
 	// Both are stored as ImGui .ini snapshots and are intentionally separate from the
-	// runtime auto-saved Saved/imgui.ini (which is where the *current* layout lives).
+	// runtime auto-saved VFS://Engine/Saved/imgui.ini (which is where the *current*
+	// layout lives).
 	//
 	// A layout preset is the full ImGui ini data (docking tree + window DockIds),
 	// obtained via ImGui::SaveIniSettingsToMemory() and applied via
@@ -19,10 +20,10 @@ namespace Candy {
 	class LayoutPresetManager
 	{
 	public:
-		// Directories for user-saved presets.
-		static const char* GetUserPresetDirectory();   // "Saved/LayoutPreset"
+		// Directory for user-saved presets (VFS path).
+		static std::string GetUserPresetDirectory();   // "VFS://Engine/Saved/LayoutPreset"
 		static const char* GetDefaultPresetName();     // "DefaultLayout"
-		static std::string GetPresetPath(const std::string& name);   // Saved/LayoutPreset/<name>.ini
+		static std::string GetPresetPath(const std::string& name);   // VFS://Engine/Saved/LayoutPreset/<name>.ini
 
 		// List all user-saved presets on disk (excluding the built-in default).
 		static std::vector<std::string> ListPresets();

@@ -8,7 +8,7 @@
 
 namespace Candy {
 
-	bool ImGuiUtils::DrawContentPathControl(const std::string& label, std::string& path)
+	bool ImGuiUtils::DrawPathInput(const std::string& label, std::string& path)
 	{
 		bool modified = false;
 
@@ -29,7 +29,7 @@ namespace Candy {
 		{
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
 			{
-				path = (const char*)payload->Data;
+				path = static_cast<const char*>(payload->Data);
 				modified = true;
 			}
 			ImGui::EndDragDropTarget();
@@ -99,6 +99,50 @@ namespace Candy {
 
 		ImGui::PushItemWidth(-1.0f);
 		modified |= ImGui::DragFloat2("##value", glm::value_ptr(values), speed, min, max, format);
+		ImGui::PopItemWidth();
+
+		ImGui::Columns(1);
+		ImGui::PopID();
+
+		return modified;
+	}
+
+	bool ImGuiUtils::DrawDragFloat4(const std::string& label, glm::vec4& values, float speed, float min, float max, const char* format)
+	{
+		bool modified = false;
+
+		ImGui::PushID(label.c_str());
+
+		ImGui::Columns(2);
+		ImGui::SetColumnWidth(0, EditorSettings::Get().m_ColumnWidth);
+
+		ImGui::Text("%s", label.c_str());
+		ImGui::NextColumn();
+
+		ImGui::PushItemWidth(-1.0f);
+		modified |= ImGui::DragFloat4("##value", glm::value_ptr(values), speed, min, max, format);
+		ImGui::PopItemWidth();
+
+		ImGui::Columns(1);
+		ImGui::PopID();
+
+		return modified;
+	}
+
+	bool ImGuiUtils::DrawInputInt(const std::string& label, int& value)
+	{
+		bool modified = false;
+
+		ImGui::PushID(label.c_str());
+
+		ImGui::Columns(2);
+		ImGui::SetColumnWidth(0, EditorSettings::Get().m_ColumnWidth);
+
+		ImGui::Text("%s", label.c_str());
+		ImGui::NextColumn();
+
+		ImGui::PushItemWidth(-1.0f);
+		modified |= ImGui::InputInt("##value", &value);
 		ImGui::PopItemWidth();
 
 		ImGui::Columns(1);

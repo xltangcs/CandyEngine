@@ -23,7 +23,7 @@ namespace Candy {
 			editorSetting.Save();
 		}
 
-		if (ImGuiUtils::DrawContentPathControl("Font File", editorSetting.m_FontPath))
+		if (ImGuiUtils::DrawPathInput("Font File", editorSetting.m_FontPath))
 		{
 			ImGuiLayer::RebuildFont(editorSetting.m_FontPath);
 			editorSetting.Save();

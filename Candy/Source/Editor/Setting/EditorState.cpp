@@ -2,16 +2,16 @@
 #include "EditorState.h"
 
 #include <yaml-cpp/yaml.h>
-#include <fstream>
 #include <filesystem>
 #include <GLFW/glfw3.h>
 #include "Runtime/Core/Application.h"
+#include "Runtime/Core/FileSystem.h"
 
 namespace Candy {
 
-	static std::filesystem::path GetFilePath()
+	static std::string GetFilePath()
 	{
-		return std::filesystem::path("Saved") / "EditorState.candy";
+		return "VFS://Engine/Saved/EditorState.candy";
 	}
 
 	EditorState& EditorState::Get()
@@ -28,11 +28,11 @@ namespace Candy {
 			return;
 		m_Loaded = true;
 
-		auto path = GetFilePath();
-		if (!std::filesystem::exists(path))
+		auto text = FileSystem::Get().ReadText(GetFilePath());
+		if (!text)
 			return;
 
-		auto doc = YAML::LoadFile(path.string());
+		auto doc = YAML::Load(*text);
 		auto s = doc["EditorState"];
 		if (!s)
 			return;
@@ -71,8 +71,6 @@ namespace Candy {
 
 	void EditorState::WriteFile()
 	{
-		std::filesystem::create_directories(GetFilePath().parent_path());
-
 		YAML::Emitter out;
 		out << YAML::BeginMap;
 		out << YAML::Key << "EditorState" << YAML::Value << YAML::BeginMap;
@@ -92,8 +90,7 @@ namespace Candy {
 		out << YAML::Key << "WindowMaximized" << YAML::Value << WindowMaximized;
 		out << YAML::Key << "LayoutPresetApplied" << YAML::Value << LayoutPresetApplied;
 		out << YAML::EndMap << YAML::EndMap;
-		std::ofstream fout(GetFilePath());
-		fout << out.c_str();
+		FileSystem::Get().WriteText(GetFilePath(), out.c_str());
 	}
 
 }

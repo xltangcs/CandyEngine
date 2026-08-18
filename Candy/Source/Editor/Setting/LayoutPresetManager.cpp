@@ -1,18 +1,18 @@
 #include "CandyPCH.h"
 #include "LayoutPresetManager.h"
 
+#include "Runtime/Core/FileSystem.h"
+
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 
 #include <filesystem>
-#include <fstream>
-#include <sstream>
 
 namespace Candy {
 
-	const char* LayoutPresetManager::GetUserPresetDirectory()
+	std::string LayoutPresetManager::GetUserPresetDirectory()
 	{
-		return "Saved/LayoutPreset";
+		return "VFS://Engine/Saved/LayoutPreset";
 	}
 
 	const char* LayoutPresetManager::GetDefaultPresetName()
@@ -22,22 +22,18 @@ namespace Candy {
 
 	std::string LayoutPresetManager::GetPresetPath(const std::string& name)
 	{
-		return std::string(GetUserPresetDirectory()) + "/" + name + ".ini";
+		return GetUserPresetDirectory() + "/" + name + ".ini";
 	}
 
 	std::vector<std::string> LayoutPresetManager::ListPresets()
 	{
 		std::vector<std::string> presets;
-		std::error_code ec;
-		if (!std::filesystem::exists(GetUserPresetDirectory(), ec))
-			return presets;
 
-		for (const auto& entry : std::filesystem::directory_iterator(GetUserPresetDirectory(), ec))
+		for (const auto& vfsPath : FileSystem::Get().EnumerateDirectory(GetUserPresetDirectory()))
 		{
-			if (!entry.is_regular_file(ec))
-				continue;
-			std::string filename = entry.path().filename().string();
-			if (entry.path().extension() != ".ini")
+			size_t slash = vfsPath.find_last_of('/');
+			std::string filename = (slash == std::string::npos) ? vfsPath : vfsPath.substr(slash + 1);
+			if (filename.size() < 4 || filename.rfind(".ini") != filename.size() - 4)
 				continue;
 
 			// Strip the ".ini" extension.
@@ -59,32 +55,15 @@ namespace Candy {
 		if (!data)
 			return false;
 
-		std::error_code ec;
-		std::filesystem::create_directories(GetUserPresetDirectory(), ec);
-
-		std::ofstream out(GetPresetPath(name), std::ios::out | std::ios::binary);
-		if (!out.is_open())
-			return false;
-		out.write(data, (std::streamsize)size);
-		out.close();
-		return true;
+		return FileSystem::Get().WriteText(GetPresetPath(name), std::string(data, size));
 	}
 
-	// Read an .ini snapshot from disk and apply it to the current ImGui context.
+	// Read an .ini snapshot from VFS and apply it to the current ImGui context.
 	// Returns false if the file is missing or could not be read.
-	static bool ApplyIniFromFile(const std::string& path)
+	static bool ApplyIniFromVfs(const std::string& vfsPath)
 	{
-		if (!std::filesystem::exists(path))
-			return false;
-
-		std::ifstream in(path, std::ios::in | std::ios::binary);
-		if (!in.is_open())
-			return false;
-
-		std::stringstream ss;
-		ss << in.rdbuf();
-		std::string data = ss.str();
-		if (data.empty())
+		auto data = FileSystem::Get().ReadText(vfsPath);
+		if (!data || data->empty())
 			return false;
 
 		// Clear the current window/layout state, then apply the preset's ini data.
@@ -92,13 +71,13 @@ namespace Candy {
 		// currently cached settings. Works because EditorLayer's ImGui context at
 		// this point is the editor context.
 		ImGui::ClearIniSettings();
-		ImGui::LoadIniSettingsFromMemory(data.c_str(), data.size());
+		ImGui::LoadIniSettingsFromMemory(data->c_str(), data->size());
 		return true;
 	}
 
 	bool LayoutPresetManager::LoadPreset(const std::string& name)
 	{
-		return ApplyIniFromFile(GetPresetPath(name));
+		return ApplyIniFromVfs(GetPresetPath(name));
 	}
 
 	bool LayoutPresetManager::DeletePreset(const std::string& name)
@@ -106,11 +85,14 @@ namespace Candy {
 		if (name.empty())
 			return false;
 
-		std::string path = GetPresetPath(name);
-		std::error_code ec;
-		if (!std::filesystem::exists(path, ec))
+		auto diskPath = FileSystem::Get().ToDiskPath(GetPresetPath(name));
+		if (!diskPath)
 			return false;
-		return std::filesystem::remove(path, ec);
+
+		std::error_code ec;
+		if (!std::filesystem::exists(*diskPath, ec))
+			return false;
+		return std::filesystem::remove(*diskPath, ec);
 	}
 
 	// Programmatically build the default layout when no DefaultLayout.ini is present.

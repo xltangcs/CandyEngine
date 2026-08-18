@@ -1,10 +1,10 @@
 EditorSettings:
-  FontSize: 27
+  FontSize: 22
   FontPath: VFS://Engine/Content/Fonts/opensans/OpenSans-Regular.ttf
   ShowPhysicsColliders: false
   ThumbnailSize: 99.2679977
   ThumbnailPadding: 12.085
-  ContentBrowserTreeWidth: 379
+  ContentBrowserTreeWidth: 276
   ColumnWidth: 233
   AutoOpenLastProject: true
   HiddenExtensions:

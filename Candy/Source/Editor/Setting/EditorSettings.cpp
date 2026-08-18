@@ -2,10 +2,15 @@
 #include "EditorSettings.h"
 
 #include <yaml-cpp/yaml.h>
-#include <fstream>
 #include <filesystem>
+#include "Runtime/Core/FileSystem.h"
 
 namespace Candy {
+
+	static const char* GetFilePath()
+	{
+		return "VFS://Engine/Config/EditorSettings.candy";
+	}
 
 	EditorSettings& EditorSettings::Get()
 	{
@@ -43,14 +48,15 @@ namespace Candy {
 		out << YAML::Key << "HiddenExtensions" << YAML::Value << cleaned(m_HiddenExtensions);
 		out << YAML::Key << "HiddenFolderNames" << YAML::Value << cleaned(m_HiddenFolderNames);
 		out << YAML::EndMap << YAML::EndMap;
-		std::ofstream("Config/EditorSettings.candy") << out.c_str();
+		FileSystem::Get().WriteText(GetFilePath(), out.c_str());
 	}
 
 	void EditorSettings::Load()
 	{
-		auto path = std::filesystem::path("Config/EditorSettings.candy");
-		if (!std::filesystem::exists(path)) return;
-		auto doc = YAML::LoadFile(path.string());
+		auto text = FileSystem::Get().ReadText(GetFilePath());
+		if (!text)
+			return;
+		auto doc = YAML::Load(*text);
 		auto s = doc["EditorSettings"];
 		if (!s) return;
 		if (s["FontSize"])

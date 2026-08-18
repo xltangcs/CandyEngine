@@ -8,7 +8,12 @@
 #include "ImGuiUtils.h"
 
 #include "Runtime/Scene/Components.h"
+#include "Runtime/Asset/MeshImporter.h"
+#include "Runtime/Asset/Material.h"
+#include "Runtime/Asset/MaterialCache.h"
+#include "Runtime/Asset/ShaderCache.h"
 #include "Runtime/Utils/PlatformUtils.h"
+#include "EditorSelection.h"
 
 #include <cstring>
 #include <regex>
@@ -29,145 +34,10 @@
 
 namespace Candy {
 	
-	static std::string ParsePythonClassNameFromContent(const std::string& content)
-	{
-		std::regex pattern(R"(class\s+(\w+)\s*\([^)]*\bcandy\b\s*\.\s*ScriptObject\b[^)]*\))");
-		std::smatch match;
-		if (std::regex_search(content, match, pattern))
-			return match[1];
-
-		return {};
-	}
-
-	static std::string ParsePythonClassName(const std::filesystem::path& filePath)
-	{
-		std::filesystem::path absPath = std::filesystem::absolute(filePath);
-		std::ifstream file(absPath);
-		if (!file.is_open())
-			return {};
-
-		std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-
-		return ParsePythonClassNameFromContent(content);
-	}
-
-	SceneHierarchyPanel::SceneHierarchyPanel(const Ref<Scene>& context)
-	{
-		SetContext(context);
-	}
-
-	void SceneHierarchyPanel::SetContext(const Ref<Scene>& context)
-	{
-		m_Context = context;
-		m_SelectionContext = {};
-	}
-
-	void SceneHierarchyPanel::OnImGuiRender()
-	{
-		ImGui::Begin("Scene Hierarchy");
-
-		if (m_Context)
-		{
-			for (const auto [entityID] : m_Context->m_Registry.storage<entt::entity>().reach())
-			{
-				Entity entity{ entityID , m_Context.get() };
-				if (!entity)
-					return;
-				DrawEntityNode(entity);
-			}
-
-			if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
-				m_SelectionContext = {};
-
-			// Right-click on blank space
-			if (ImGui::BeginPopupContextWindow("##HierarchyBlankContext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
-			{
-				if (ImGui::MenuItem("Create Empty Entity"))
-					m_Context->CreateEntity("Empty Entity");
-
-				ImGui::EndPopup();
-			}
-		}
-
-		ImGui::End();
-
-		ImGui::Begin("Properties");
-		if (m_SelectionContext)
-		{
-			DrawComponents(m_SelectionContext);
-		}
-
-		ImGui::InvisibleButton("##ScriptDropZone", ImGui::GetContentRegionAvail());
-		
-		if (ImGui::BeginDragDropTarget())
-		{
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
-			{
-				const char* path = (const char*)payload->Data;
-				VfsPath vp = VfsPath::Parse(path);
-				std::filesystem::path relPath(vp.relativePath);
-				if (vp.IsValid() && relPath.extension() == ".py" && m_SelectionContext)
-				{
-					auto& sc = m_SelectionContext.HasComponent<ScriptComponent>()
-						? m_SelectionContext.GetComponent<ScriptComponent>()
-						: m_SelectionContext.AddComponent<ScriptComponent>();
-					sc.ScriptPath = vp.ToString();
-					auto content = FileSystem::Get().ReadText(vp.ToString());
-					if (content)
-					{
-						std::string parsedName = ParsePythonClassNameFromContent(*content);
-						if (!parsedName.empty())
-							sc.ClassName = parsedName;
-					}
-				}
-			}
-			ImGui::EndDragDropTarget();
-		}
-
-		ImGui::End();
-	}
-
-	void SceneHierarchyPanel::SetSelectedEntity(Entity entity)
-	{
-		m_SelectionContext = entity;
-	}
-
-	void SceneHierarchyPanel::DrawEntityNode(Entity entity)
-	{
-		auto& tag = entity.GetComponent<TagComponent>().Tag;
-
-		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-
-		if (m_SelectionContext == entity)
-			flags |= ImGuiTreeNodeFlags_Selected;
-
-		ImGui::TreeNodeEx((void*)(uint64_t)(uint32_t)entity, flags, tag.c_str());
-		if (ImGui::IsItemClicked())
-		{
-			m_SelectionContext = entity;
-		}
-
-		bool entityDeleted = false;
-		if (ImGui::BeginPopupContextItem())
-		{
-			if (ImGui::MenuItem("Delete Entity"))
-				entityDeleted = true;
-
-			ImGui::EndPopup();
-		}
-
-		if (entityDeleted)
-		{
-			m_Context->DestroyEntity(entity);
-			if (m_SelectionContext == entity)
-				m_SelectionContext = {};
-		}
-
-	}
-
+namespace
+{
 	template<typename T, typename UIFunction>
-
-	static void DrawComponent(const std::string& name, Entity entity, UIFunction uiFunction)
+	void DrawComponent(const std::string& name, Entity entity, UIFunction uiFunction)
 	{
 		const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_FramePadding;
 		if (entity.HasComponent<T>())
@@ -206,6 +76,421 @@ namespace Candy {
 				entity.RemoveComponent<T>();
 		}
 	}
+	std::string ParsePythonClassNameFromContent(const std::string& content)
+	{
+		std::regex pattern(R"(class\s+(\w+)\s*\([^)]*\bcandy\b\s*\.\s*ScriptObject\b[^)]*\))");
+		std::smatch match;
+		if (std::regex_search(content, match, pattern))
+			return match[1];
+
+		return {};
+	}
+	std::string ParsePythonClassName(const std::filesystem::path& filePath)
+	{
+		std::filesystem::path absPath = std::filesystem::absolute(filePath);
+		std::ifstream file(absPath);
+		if (!file.is_open())
+			return {};
+
+		std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+		return ParsePythonClassNameFromContent(content);
+	}
+
+	// Renders the inspector for the currently-selected asset (VFS path).
+	// Supports material (.mat) and shader (.hlsl/.glsl) for now.
+
+	// Draws an editable control for each reflected shader parameter. Changes
+	// are written straight into the material's override table, mirroring how
+	// Godot's inspector edits shader uniforms on a ShaderMaterial.
+	void DrawShaderParameterControls(const Ref<Material>& mat, std::vector<ShaderParameter>& params, bool& dirty)
+	{
+		for (auto& param : params)
+		{
+			const std::string label = param.DisplayName.empty() ? param.Name : param.DisplayName;
+
+			ImGui::PushID(param.Name.c_str());
+
+			if (param.IsEnum)
+			{
+				std::vector<const char*> labels;
+				labels.reserve(param.EnumLabels.size());
+				for (const auto& l : param.EnumLabels)
+					labels.push_back(l.c_str());
+
+				int index = 0;
+				if (std::holds_alternative<int>(param.Default))
+					index = std::get<int>(param.Default);
+				else if (std::holds_alternative<float>(param.Default))
+					index = static_cast<int>(std::get<float>(param.Default));
+
+				if (ImGuiUtils::DrawCombo(label, labels.data(), static_cast<int>(labels.size()), index))
+				{
+					param.Default = (param.Type == ShaderParamType::Int)
+						? ShaderParamValue(index)
+						: ShaderParamValue(static_cast<float>(index));
+					mat->ShaderParams[param.Name] = param.Default;
+					dirty = true;
+				}
+			}
+			else
+			{
+				switch (param.Type)
+				{
+					case ShaderParamType::Float:
+					{
+						float value = std::get<float>(param.Default);
+						bool modified = param.HasRange
+							? ImGuiUtils::DrawSliderFloat(label, value, param.Range.Min, param.Range.Max)
+							: ImGuiUtils::DrawDragFloat(label, value, param.Range.Step);
+						if (modified)
+						{
+							param.Default = value;
+							mat->ShaderParams[param.Name] = value;
+							dirty = true;
+						}
+						break;
+					}
+					case ShaderParamType::Int:
+					{
+						int value = std::get<int>(param.Default);
+						if (ImGuiUtils::DrawInputInt(label, value))
+						{
+							param.Default = value;
+							mat->ShaderParams[param.Name] = value;
+							dirty = true;
+						}
+						break;
+					}
+					case ShaderParamType::Bool:
+					{
+						bool value = std::get<bool>(param.Default);
+						if (ImGuiUtils::DrawCheckbox(label, value))
+						{
+							param.Default = value;
+							mat->ShaderParams[param.Name] = value;
+							dirty = true;
+						}
+						break;
+					}
+					case ShaderParamType::Vec2:
+					{
+						glm::vec2 value = std::get<glm::vec2>(param.Default);
+						if (ImGuiUtils::DrawDragFloat2(label, value))
+						{
+							param.Default = value;
+							mat->ShaderParams[param.Name] = value;
+							dirty = true;
+						}
+						break;
+					}
+					case ShaderParamType::Vec3:
+					{
+						glm::vec3 value = std::get<glm::vec3>(param.Default);
+						const glm::vec3 before = value;
+						ImGuiUtils::DrawVec3Control(label, value);
+						if (value != before)
+						{
+							param.Default = value;
+							mat->ShaderParams[param.Name] = value;
+							dirty = true;
+						}
+						break;
+					}
+					case ShaderParamType::Vec4:
+					{
+						glm::vec4 value = std::get<glm::vec4>(param.Default);
+						if (ImGuiUtils::DrawDragFloat4(label, value))
+						{
+							param.Default = value;
+							mat->ShaderParams[param.Name] = value;
+							dirty = true;
+						}
+						break;
+					}
+					case ShaderParamType::Color:
+					{
+						glm::vec4 value = std::get<glm::vec4>(param.Default);
+						if (ImGuiUtils::DrawColorEdit4(label, value))
+						{
+							param.Default = value;
+							mat->ShaderParams[param.Name] = value;
+							dirty = true;
+						}
+						break;
+					}
+					case ShaderParamType::Texture:
+					{
+						std::string path = std::get<std::string>(param.Default);
+						if (ImGuiUtils::DrawPathInput(label, path))
+						{
+							param.Default = path;
+							mat->ShaderParams[param.Name] = path;
+							dirty = true;
+						}
+						break;
+					}
+					default:
+						break;
+				}
+			}
+
+			ImGui::PopID();
+		}
+	}
+
+	// Shows the full shader source (double-click a .hlsl/.glsl in the Content
+	// Browser to open it). Read-only.
+	void DrawShaderInspector(const std::string& vfsPath)
+	{
+		ImGui::TextDisabled("Shader Source");
+		ImGui::Separator();
+		ImGui::TextWrapped("%s", vfsPath.c_str());
+
+		std::optional<std::string> text = FileSystem::Get().ReadText(vfsPath);
+		if (!text)
+		{
+			ImGui::TextDisabled("Unable to read shader file.");
+			return;
+		}
+
+		ImGui::Separator();
+		const ImVec2 avail = ImGui::GetContentRegionAvail();
+		ImGui::InputTextMultiline("##source", &*text, avail, ImGuiInputTextFlags_ReadOnly);
+	}
+
+	void DrawMaterialInspector(const std::string& vfsPath)
+	{
+		Ref<Material> mat = MaterialCache::Get().Load(vfsPath);
+		if (!mat)
+		{
+			ImGui::TextDisabled("Failed to load material");
+			ImGui::TextWrapped("%s", vfsPath.c_str());
+			return;
+		}
+
+		// Any modification is buffered then written back in one go per frame
+		// so Material::Serialize is not called on every drag-step.
+		bool dirty = false;
+
+		// Identity
+		dirty |= ImGuiUtils::DrawInputText("Name", mat->Name);
+
+		ImGui::Separator();
+
+		// Shader binding --- all editable parameters come from the shader's
+		// //@param reflection (Godot-style). No shader = no parameters.
+		if (ImGuiUtils::DrawPathInput("Shader", mat->ShaderPath,
+			[] { ImGui::Text("Drop a .hlsl / .glsl shader to define the editable parameters."); }))
+		{
+			dirty = true;
+		}
+
+		std::vector<ShaderParameter> shaderParams;
+		if (mat->GetShaderParameters(shaderParams))
+		{
+			ImGui::Separator();
+			ImGui::TextDisabled("Shader Parameters");
+			ImGui::Separator();
+			DrawShaderParameterControls(mat, shaderParams, dirty);
+		}
+
+		ImGui::Separator();
+
+		// Info / actions
+		ImGui::TextDisabled("Path: %s", vfsPath.c_str());
+
+		if (ImGui::Button("Save"))
+		{
+			if (mat->Serialize(vfsPath))
+				MaterialCache::Get().Touch(vfsPath);
+			dirty = false;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Reload"))
+		{
+			// Reload must drop the cached instances so the next Load re-reads
+			// both the .mat and the bound shader from disk.
+			MaterialCache::Get().Reload(vfsPath);
+			ShaderCache::Get().Invalidate(mat->ShaderPath);
+			mat = MaterialCache::Get().Load(vfsPath);
+			dirty = false;
+		}
+
+		// Auto-save on any modification.
+		if (dirty)
+		{
+			if (mat->Serialize(vfsPath))
+				MaterialCache::Get().Touch(vfsPath);
+			else
+				CANDY_CORE_ERROR("Failed to serialize material {}", vfsPath);
+		}
+	}
+
+}
+
+	SceneHierarchyPanel::SceneHierarchyPanel(const Ref<Scene>& context)
+	{
+		SetContext(context);
+	}
+
+	void SceneHierarchyPanel::SetContext(const Ref<Scene>& context)
+	{
+		m_Context = context;
+		m_SelectionContext = {};
+		EditorSelection::Get().Clear();
+	}
+
+	void SceneHierarchyPanel::OnImGuiRender()
+	{
+		ImGui::Begin("Scene Hierarchy");
+
+		if (m_Context)
+		{
+			std::vector<Entity> entitiesToDelete;
+			for (const auto [entityID] : m_Context->m_Registry.storage<entt::entity>().reach())
+			{
+				Entity entity{ entityID , m_Context.get() };
+				if (!entity)
+					continue;
+				if (DrawEntityNode(entity))
+				{
+					entitiesToDelete.push_back(entity);
+				}
+			}
+			for (Entity& entity : entitiesToDelete)
+				m_Context->DestroyEntity(entity);
+
+			if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
+			{
+				m_SelectionContext = {};
+				EditorSelection::Get().Clear();
+			}
+
+			// Right-click on blank space
+			if (ImGui::BeginPopupContextWindow("##HierarchyBlankContext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
+			{
+				if (ImGui::MenuItem("Create Empty Entity"))
+					m_Context->CreateEntity("Empty Entity");
+
+				ImGui::EndPopup();
+			}
+		}
+
+		ImGui::End();
+
+		ImGui::Begin("Properties");
+		auto& selection = EditorSelection::Get();
+		if (selection.HasAssetSelection())
+		{
+			DrawSelectedAsset(selection.GetSelectedAsset());
+		}
+		else if (m_SelectionContext)
+		{
+			DrawComponents(m_SelectionContext);
+		}
+
+		ImGui::InvisibleButton("##ScriptDropZone", ImGui::GetContentRegionAvail());
+		
+		if (ImGui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
+			{
+				const char* path = (const char*)payload->Data;
+				VfsPath vp = VfsPath::Parse(path);
+				std::filesystem::path relPath(vp.relativePath);
+				if (vp.IsValid() && relPath.extension() == ".py" && m_SelectionContext)
+				{
+					auto& sc = m_SelectionContext.HasComponent<ScriptComponent>()
+						? m_SelectionContext.GetComponent<ScriptComponent>()
+						: m_SelectionContext.AddComponent<ScriptComponent>();
+					sc.ScriptPath = vp.ToString();
+					auto content = FileSystem::Get().ReadText(vp.ToString());
+					if (content)
+					{
+						std::string parsedName = ParsePythonClassNameFromContent(*content);
+						if (!parsedName.empty())
+							sc.ClassName = parsedName;
+					}
+				}
+			}
+			ImGui::EndDragDropTarget();
+		}
+
+		ImGui::End();
+	}
+
+	void SceneHierarchyPanel::SetSelectedEntity(Entity entity)
+	{
+		m_SelectionContext = entity;
+		// Clicking an entity in the hierarchy clears any asset selection so the
+		// Properties panel flips back to component editing.
+		EditorSelection::Get().SelectEntity(entity);
+	}
+
+	void SceneHierarchyPanel::DrawSelectedAsset(const std::string& vfsPath)
+	{
+		if (vfsPath.empty())
+		{
+			ImGui::TextDisabled("No asset selected");
+			return;
+		}
+
+		ImGui::TextDisabled("Asset Inspector");
+		ImGui::Separator();
+
+		if (EditorSelection::IsMaterial(vfsPath))
+		{
+			DrawMaterialInspector(vfsPath);
+		}
+		else if (EditorSelection::IsShader(vfsPath))
+		{
+			DrawShaderInspector(vfsPath);
+		}
+		else
+		{
+			ImGui::Text("No inspector available for this asset type.");
+			ImGui::TextWrapped("%s", vfsPath.c_str());
+		}
+	}
+
+	bool SceneHierarchyPanel::DrawEntityNode(Entity entity)
+	{
+		auto& tag = entity.GetComponent<TagComponent>().Tag;
+
+		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+
+		if (m_SelectionContext == entity)
+			flags |= ImGuiTreeNodeFlags_Selected;
+
+		ImGui::TreeNodeEx((void*)(uint64_t)(uint32_t)entity, flags, tag.c_str());
+		if (ImGui::IsItemClicked())
+		{
+			m_SelectionContext = entity;
+			EditorSelection::Get().SelectEntity(entity);
+		}
+
+		bool entityDeleted = false;
+		if (ImGui::BeginPopupContextItem())
+		{
+			if (ImGui::MenuItem("Delete Entity"))
+				entityDeleted = true;
+
+			ImGui::EndPopup();
+		}
+
+		if (entityDeleted)
+		{
+			if (m_SelectionContext == entity)
+			{
+				m_SelectionContext = {};
+				EditorSelection::Get().Clear();
+			}
+			return true;
+		}
+		return false;
+	}
+	
 	void SceneHierarchyPanel::DrawComponents(Entity entity)
 	{
 		if (entity.HasComponent<TagComponent>())
@@ -245,6 +530,15 @@ namespace Candy {
 				if (ImGui::MenuItem("Sprite Renderer"))
 				{
 					m_SelectionContext.AddComponent<SpriteRendererComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
+			if (!m_SelectionContext.HasComponent<StaticMeshComponent>())
+			{
+				if (ImGui::MenuItem("Static Mesh"))
+				{
+					m_SelectionContext.AddComponent<StaticMeshComponent>();
 					ImGui::CloseCurrentPopup();
 				}
 			}
@@ -381,19 +675,92 @@ namespace Candy {
 			{
 				ImGuiUtils::DrawColorEdit4("Color", component.Color);
 
-				if (ImGuiUtils::DrawContentPathControl("Texture", component.TexturePath))
+				if (ImGuiUtils::DrawPathInput("Texture", component.TexturePath))
 				{
-					Ref<Texture2D> tex = Texture2D::Create(component.TexturePath);
-					if (tex && tex->IsLoaded())
-					{
-						component.Texture = tex;
-					}
+					if (component.TexturePath.empty())
+						component.Texture.reset();
 					else
-						CANDY_WARN("Could not load texture {0}", component.TexturePath);
+					{
+						Ref<Texture2D> tex = Texture2D::Create(component.TexturePath);
+						if (tex && tex->IsLoaded())
+							component.Texture = tex;
+						else
+						{
+							component.Texture.reset();
+							CANDY_WARN("Could not load texture {0}", component.TexturePath);
+						}
+					}
 				}
 
 				ImGuiUtils::DrawDragFloat("Tiling Factor", component.TilingFactor, 0.1f, 0.0f, 100.0f);
 			});
+
+		DrawComponent<StaticMeshComponent>("Static Mesh", entity, [](auto& component)
+			{
+				if (ImGuiUtils::DrawPathInput("Mesh Path", component.MeshPath, [&component]()->void
+				{
+					if (component.Mesh)
+					{
+						ImGui::Text("Vertices: %zu", component.Mesh->Vertices.size());
+						ImGui::Text("Indices : %zu", component.Mesh->Indices.size());
+						ImGui::Text("Submeshes: %zu", component.Mesh->Submeshes.size());
+						ImGui::Text("Materials: %zu", component.Materials.size());
+					}
+					else
+					{
+						ImGui::TextDisabled("No mesh loaded");
+					}
+				}))
+				{
+					if (component.MeshPath.empty())
+					{
+						component.Mesh.reset();
+						component.Materials.clear();
+					}
+					else
+					{
+						auto imported = MeshImporter::ImportStaticMesh(component.MeshPath);
+						if (imported && imported->Mesh)
+						{
+							component.Mesh = imported->Mesh;
+							component.Materials = imported->Materials;
+							CANDY_INFO("Loaded static mesh '{}' ({} verts, {} submeshes)",
+								component.MeshPath, component.Mesh->Vertices.size(), component.Mesh->Submeshes.size());
+						}
+						else
+							CANDY_WARN("Could not import static mesh {0}", component.MeshPath);
+					}
+				}
+			
+				size_t submeshCount = component.Mesh ? component.Mesh->Submeshes.size() : 0;
+				if (submeshCount == 0)
+				{
+					ImGui::TextDisabled("Load a mesh to assign materials");
+					return;
+				}
+			
+				// Keep MaterialPaths in sync with the submesh count.
+				component.MaterialPaths.resize(submeshCount);
+
+				for (size_t i = 0; i < submeshCount; i++)
+				{
+					const auto& submesh = component.Mesh->Submeshes[i];
+					std::string label = submesh.Name.empty()
+						? "Material " + std::to_string(i)
+						: submesh.Name;
+
+					if (ImGuiUtils::DrawPathInput(label, component.MaterialPaths[i]))
+					{
+						if (!component.MaterialPaths[i].empty() && i < component.Materials.size())
+						{
+							auto mat = MaterialCache::Get().Load(component.MaterialPaths[i]);
+							if (mat)
+								component.Materials[i] = mat;
+						}
+					}
+				}
+			});
+	
 
 		DrawComponent<CircleRendererComponent>("Circle Renderer", entity, [](auto& component)
 			{
@@ -434,7 +801,7 @@ namespace Candy {
 
 		DrawComponent<ScriptComponent>("Script", entity, [](auto& component)
 		{
-			if (ImGuiUtils::DrawContentPathControl("Script Path", component.ScriptPath))
+			if (ImGuiUtils::DrawPathInput("Script Path", component.ScriptPath))
 			{
 				auto content = FileSystem::Get().ReadText(component.ScriptPath);
 				if (content)
@@ -450,7 +817,7 @@ namespace Candy {
 
 		DrawComponent<AudioSourceComponent>("Audio Source", entity, [](auto& component)
 		{
-			ImGuiUtils::DrawContentPathControl("Sound Path", component.SoundPath);
+			ImGuiUtils::DrawPathInput("Sound Path", component.SoundPath);
 			ImGuiUtils::DrawDragFloat("Volume", component.Volume, 0.01f, 0.0f, 1.0f);
 			ImGuiUtils::DrawCheckbox("Looping", component.Looping);
 			ImGuiUtils::DrawCheckbox("Play On Start", component.PlayOnStart);
