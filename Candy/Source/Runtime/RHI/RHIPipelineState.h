@@ -40,6 +40,9 @@ namespace Candy {
 	{
 		CullMode Cull                = CullMode::Back;
 		FillMode Fill                = FillMode::Solid;
+		/// True = counter-clockwise triangles are front-facing (glTF/OpenGL
+		/// convention). False = clockwise front-facing (D3D12/Vulkan default).
+		bool     FrontCounterClockwise = false;
 		bool     DepthClipEnable     = true;
 		int32_t  DepthBias           = 0;
 		float    DepthBiasSlopeFactor = 0.0f;

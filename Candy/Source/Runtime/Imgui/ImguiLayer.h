@@ -54,6 +54,11 @@ namespace Candy {
 		bool m_BlockEvents = true;
 		float m_Time = 0.0f;
 
+		// Disk path backing io.IniFilename ("VFS://Engine/Saved/imgui.ini" resolved
+		// via FileSystem). ImGui keeps the const char* pointer, so it must outlive
+		// the context.
+		std::string m_IniPath;
+
 		ImGuiContext* m_EditorContext = nullptr;
 		ImGuiContext* m_GameUIContext = nullptr;
 

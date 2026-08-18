@@ -38,8 +38,12 @@ namespace Candy {
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
-		std::filesystem::create_directories("Saved");
-		io.IniFilename = "Saved/imgui.ini";
+		// User layout state lives under the engine mount (UE-style), so it
+		// resolves regardless of the process cwd. ImGui writes the file itself
+		// via io.IniFilename, which needs a disk path with a stable lifetime.
+		auto iniPath = FileSystem::Get().ToDiskPath("VFS://Engine/Saved/imgui.ini");
+		m_IniPath = iniPath.value_or(std::filesystem::path("Saved/imgui.ini")).string();
+		io.IniFilename = m_IniPath.c_str();
 
 		LoadFontsFromVfs(io);
 

@@ -218,7 +218,7 @@ namespace Candy {
 		LOAD_DEV(fnCreateFence); LOAD_DEV(fnDestroyFence);
 		LOAD_DEV(fnWaitForFences); LOAD_DEV(fnResetFences);
 
-		// Additional functions for Texture/Sampler/Descriptor/Renderer2D
+		// Additional functions for Texture/Sampler/Descriptor
 		LOAD_DEV(fnCreateImage);               LOAD_DEV(fnDestroyImage);
 		LOAD_DEV(fnGetImageMemoryRequirements); LOAD_DEV(fnBindImageMemory);
 		LOAD_DEV(fnCreateSampler);             LOAD_DEV(fnDestroySampler);
@@ -367,7 +367,7 @@ namespace Candy {
 		const Ref<RHIShaderModule>& vs,
 		const Ref<RHIShaderModule>& fs)
 	{
-		if (auto cached = GetPipelineCache().Find(desc))
+		if (auto cached = GetPipelineCache().Find(desc, vs, fs))
 			return cached;
 
 		// Shader stages
@@ -440,7 +440,7 @@ namespace Candy {
 		rs.cullMode    = (desc.Rasterizer.Cull == CullMode::None) ? VK_CULL_MODE_NONE
 		               : (desc.Rasterizer.Cull == CullMode::Front) ? VK_CULL_MODE_FRONT_BIT
 		                                                           : VK_CULL_MODE_BACK_BIT;
-		rs.frontFace   = VK_FRONT_FACE_CLOCKWISE;
+		rs.frontFace   = desc.Rasterizer.FrontCounterClockwise ? VK_FRONT_FACE_COUNTER_CLOCKWISE : VK_FRONT_FACE_CLOCKWISE;
 		rs.lineWidth   = 1.0f;
 
 		VkPipelineMultisampleStateCreateInfo ms = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
@@ -480,7 +480,7 @@ namespace Candy {
 
 		auto vkp = CreateRef<VulkanGraphicsPipeline>(desc);
 		vkp->SetVkPipeline(pipeline, layout);
-		GetPipelineCache().Insert(desc, vkp);
+		GetPipelineCache().Insert(desc, vs, fs, vkp);
 		return vkp;
 	}
 

@@ -394,7 +394,7 @@ namespace Candy {
 		ID3D12DescriptorHeap* heaps[] = { m_SRVHeap };
 		guiCmd->SetDescriptorHeaps(1, heaps);
 
-		// Render into the framebuffer's color attachment 0. Renderer2D's EndRenderPass
+		// Render into the framebuffer's color attachment 0. The command buffer's EndRenderPass
 		// leaves the attachment in PIXEL_SHADER_RESOURCE (so the editor can display it),
 		// so we must explicitly transition it back to RENDER_TARGET first — otherwise
 		// D3D12 renders into a texture in the wrong state and the GPU faults/hangs.

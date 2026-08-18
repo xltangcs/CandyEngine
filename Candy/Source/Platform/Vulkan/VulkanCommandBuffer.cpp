@@ -126,14 +126,16 @@ namespace Candy {
 		}
 	}
 
-	void VulkanCommandBuffer::SetConstantBuffer(uint32_t slot, uint32_t binding, const Ref<RHIBuffer>&)
+	void VulkanCommandBuffer::SetConstantBuffer(uint32_t slot, uint32_t binding, const Ref<RHIBuffer>&, uint64_t offset)
 	{
+		(void)offset;
 		CANDY_CORE_WARN("TODO: Vulkan SetConstantBuffer ¡ª descriptor set binding must be done at submit time");
 	}
 
-	void VulkanCommandBuffer::SetTexture(uint32_t slot, uint32_t binding, const Ref<RHITexture>&)
+	void VulkanCommandBuffer::SetTextures(uint32_t slot, uint32_t count, const Ref<RHITexture>* textures)
 	{
-		CANDY_CORE_WARN("TODO: Vulkan SetTexture");
+		(void)slot; (void)count; (void)textures;
+		CANDY_CORE_WARN("TODO: Vulkan SetTextures");
 	}
 
 	void VulkanCommandBuffer::SetSampler(uint32_t slot, uint32_t binding, const Ref<RHISampler>&)

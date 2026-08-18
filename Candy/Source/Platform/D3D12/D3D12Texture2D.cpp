@@ -13,7 +13,7 @@
 namespace Candy {
 
 	// =========================================================================
-	// Constructor: empty texture (e.g. white 1x1 pixel for Renderer2D)
+	// Constructor: empty texture (e.g. white 1x1 pixel fallback)
 	// =========================================================================
 
 	D3D12Texture2D::D3D12Texture2D(D3D12Device* device, uint32_t width, uint32_t height)
@@ -142,14 +142,14 @@ namespace Candy {
 	}
 
 	// =========================================================================
-	// Bind ！ set texture on a slot (for Renderer2D batch)
+	// Bind ！ set texture on a slot (legacy immediate-mode API)
 	// =========================================================================
 
 	void D3D12Texture2D::Bind(uint32_t slot) const
 	{
 		// In D3D12, texture binding happens via descriptor tables set in
-		// the command buffer (SetTexture).  This is a no-op at the engine
-		// level ！ the actual binding is done in Renderer2D::Flush().
+		// the command buffer (SetTextures).  This is a no-op at the engine
+		// level ！ the actual binding is done by the renderer.
 	}
 
 	Ref<RHITexture> D3D12Texture2D::GetRHITexture()

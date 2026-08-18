@@ -10,7 +10,7 @@ namespace Candy {
 	// This used to be a virtual interface (Init/SetViewport/Clear/Draw...) with
 	// per-backend implementations, accessed through RenderCommand. That dual
 	// abstraction leaked responsibilities (e.g. D3D12 Clear() was a no-op for
-	// framebuffers, forcing clear semantics into Renderer2D's render passes).
+	// framebuffers, forcing clear semantics into the renderer's render passes).
 	// It is now retired: rendering goes through the RHI layer, and this class
 	// only keeps the process-wide "which backend is active" selector used by
 	// the legacy factories (Buffer/Texture/Shader/VertexArray/Framebuffer/

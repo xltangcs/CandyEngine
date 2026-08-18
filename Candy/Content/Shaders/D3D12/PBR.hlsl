@@ -1,0 +1,180 @@
+// CandyEngine built-in PBR surface shader (D3D12).
+//
+// The //@param declarations drive material parameter reflection in the
+// inspector (Godot-style): MeshImporter fills the conventional keys
+// (u_BaseColor, ...) when importing glTF materials. SceneRenderer packs the
+// reflected values into MaterialCB (b1) at runtime.
+//
+// Layout conventions (SceneRenderer MaterialUniforms matches byte-for-byte):
+//   CameraCB   (b0): u_ViewProjection, u_CameraPosition
+//   MaterialCB (b1): u_World, surface params, u_TextureFlags, u_EntityID
+//   Textures (t0-t3): base color / metallic-roughness / normal / emissive
+
+cbuffer CameraCB : register(b0)
+{
+	float4x4 u_ViewProjection;
+	float3    u_CameraPosition;
+};
+
+cbuffer MaterialCB : register(b1)
+{
+	float4x4 u_World;            // model -> world (column-major, matches GLM)
+	float4 u_BaseColor;          // @param color "Base Color" = (1.0, 1.0, 1.0, 1.0)
+	float  u_Metallic;           // @param range(0.0, 1.0, 0.01) "Metallic" = 0.0
+	float  u_Roughness;          // @param range(0.0, 1.0, 0.01) "Roughness" = 0.5
+	float  u_BlendMode;          // @param enum(Opaque, Masked, Transparent) "Blend Mode" = Opaque
+	float  u_ShadingModel;       // @param enum(Lit, Unlit) "Shading Model" = Lit
+	float3 u_Emissive;           // @param "Emissive Color" = (0.0, 0.0, 0.0)
+	float  u_EmissiveIntensity;  // @param range(0.0, 10.0, 0.1) "Emissive Intensity" = 0.0
+	float2 u_UVTiling;           // @param "UV Tiling" = (1.0, 1.0)
+	float2 u_UVOffset;           // @param "UV Offset" = (0.0, 0.0)
+	uint   u_TextureFlags;       // bit0 base color, bit1 metallic-roughness, bit2 normal, bit3 emissive
+	int    u_EntityID;
+};
+
+Texture2D    u_BaseColorMap;         // @param texture "Base Color Map"
+Texture2D    u_MetallicRoughnessMap; // @param texture "Metallic-Roughness Map" (G = roughness, B = metallic)
+Texture2D    u_NormalMap;            // @param texture "Normal Map"
+Texture2D    u_EmissiveMap;          // @param texture "Emissive Map"
+SamplerState u_Sampler : register(s0);
+
+// =============================================================================
+// PBR lighting — simplified Cook-Torrance, single directional light
+// =============================================================================
+
+static const float3 kLightDir     = normalize(float3(0.4, 1.0, 0.3)); // towards light
+static const float3 kLightColor   = float3(1.0, 0.95, 0.88);
+static const float  kAmbient      = 0.03;
+static const float  kMaskCutoff   = 0.5;
+
+float3 F_Schlick(float3 f0, float VdotH)
+{
+	return f0 + (1.0 - f0) * pow(1.0 - VdotH, 5.0);
+}
+
+float D_GGX(float NdotH, float roughness)
+{
+	float a  = roughness * roughness;
+	float a2 = a * a;
+	float d  = NdotH * NdotH * (a2 - 1.0) + 1.0;
+	return a2 / max(3.14159265 * d * d, 1e-6);
+}
+
+float V_SmithGGXCorrelated(float NdotV, float NdotL, float roughness)
+{
+	float a2 = roughness * roughness * roughness * roughness;
+	float ggxV = NdotL * sqrt(NdotV * NdotV * (1.0 - a2) + a2);
+	float ggxL = NdotV * sqrt(NdotL * NdotL * (1.0 - a2) + a2);
+	return 0.5 / max(ggxV + ggxL, 1e-6);
+}
+
+// =============================================================================
+// Vertex shader
+// =============================================================================
+
+struct VSInput
+{
+	float3 Position : TEXCOORD0;
+	float3 Normal   : TEXCOORD1;
+	float4 Tangent  : TEXCOORD2;
+	float2 TexCoord : TEXCOORD3;
+};
+
+struct VSOutput
+{
+	float4 Position        : SV_POSITION;
+	float3 WorldPosition   : TEXCOORD0;
+	float3 WorldNormal     : TEXCOORD1;
+	float3 WorldTangent    : TEXCOORD2;
+	float3 WorldBitangent  : TEXCOORD3;
+	float2 TexCoord        : TEXCOORD4;
+};
+
+VSOutput VSMain(VSInput input)
+{
+	VSOutput output;
+	float4 worldPos = mul(u_World, float4(input.Position, 1.0));
+	output.Position       = mul(u_ViewProjection, worldPos);
+	output.WorldPosition  = worldPos.xyz;
+	output.WorldNormal    = normalize(mul((float3x3)u_World, input.Normal));
+	output.WorldTangent   = normalize(mul((float3x3)u_World, input.Tangent.xyz));
+	output.WorldBitangent = cross(output.WorldNormal, output.WorldTangent) * input.Tangent.w;
+	output.TexCoord       = input.TexCoord * u_UVTiling + u_UVOffset;
+	return output;
+}
+
+// =============================================================================
+// Pixel shader
+// =============================================================================
+
+struct PSOutput
+{
+	float4 Color    : SV_TARGET0;
+	int    EntityID : SV_TARGET1;
+};
+
+PSOutput PSMain(VSOutput input)
+{
+	// --- Surface data -----------------------------------------------------
+	float4 baseColor = u_BaseColor;
+	if (u_TextureFlags & 1)
+		baseColor *= u_BaseColorMap.Sample(u_Sampler, input.TexCoord);
+
+	if (u_BlendMode >= 0.5 && u_BlendMode < 1.5) // Masked
+		clip(baseColor.a - kMaskCutoff);
+
+	float metallic  = u_Metallic;
+	float roughness = u_Roughness;
+	if (u_TextureFlags & 2)
+	{
+		float4 mr = u_MetallicRoughnessMap.Sample(u_Sampler, input.TexCoord);
+		roughness *= mr.g; // glTF: G = roughness
+		metallic  *= mr.b; // glTF: B = metallic
+	}
+
+	float3 N = normalize(input.WorldNormal);
+	if (u_TextureFlags & 4)
+	{
+		float3 tn = u_NormalMap.Sample(u_Sampler, input.TexCoord).xyz * 2.0 - 1.0;
+		N = normalize(tn.x * input.WorldTangent + tn.y * input.WorldBitangent + tn.z * N);
+	}
+
+	// --- Unlit ------------------------------------------------------------
+	float3 color;
+	if (u_ShadingModel >= 0.5) // Unlit
+	{
+		color = baseColor.rgb;
+	}
+	else
+	{
+		// --- Lighting (simplified Cook-Torrance, single directional light) ---
+		float3 V = normalize(u_CameraPosition - input.WorldPosition);
+		float3 L = normalize(kLightDir);
+		float3 H = normalize(V + L);
+
+		float NdotL = saturate(dot(N, L));
+		float NdotV = max(dot(N, V), 1e-4);
+		float NdotH = saturate(dot(N, H));
+		float VdotH = saturate(dot(V, H));
+
+		float3 f0      = lerp(float3(0.04, 0.04, 0.04), baseColor.rgb, metallic);
+		float3 diffuse = (1.0 - f0) * (1.0 - metallic) * baseColor.rgb;
+
+		float D   = D_GGX(NdotH, roughness);
+		float Vis = V_SmithGGXCorrelated(NdotV, NdotL, roughness);
+		float3 spec = F_Schlick(f0, VdotH) * D * Vis;
+
+		color = (diffuse + spec) * kLightColor * NdotL + kAmbient * baseColor.rgb;
+	}
+
+	// --- Emissive -----------------------------------------------------------
+	float3 emissive = u_Emissive * u_EmissiveIntensity;
+	if (u_TextureFlags & 8)
+		emissive *= u_EmissiveMap.Sample(u_Sampler, input.TexCoord).rgb;
+	color += emissive;
+
+	PSOutput output;
+	output.Color    = float4(color, baseColor.a);
+	output.EntityID = u_EntityID;
+	return output;
+}

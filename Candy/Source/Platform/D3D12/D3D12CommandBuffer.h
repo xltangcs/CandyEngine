@@ -23,7 +23,8 @@ namespace Candy {
 		                  ID3D12Device* device,
 		                  ID3D12DescriptorHeap* cbvSrvUavHeap,
 		                  ID3D12DescriptorHeap* samplerHeap,
-		                  uint32_t textureTableBase);
+		                  uint32_t dynamicSRVBase,
+		                  uint32_t dynamicSRVCapacity);
 		virtual ~D3D12CommandBuffer();
 
 		// ---- Lifetime ------------------------------------------------------
@@ -50,8 +51,8 @@ namespace Candy {
 		void SetVertexBuffer(const Candy::Ref<RHIBuffer>& buffer, uint32_t slot = 0, uint64_t offset = 0) override;
 		void SetIndexBuffer(const Candy::Ref<RHIBuffer>& buffer, IndexFormat format = IndexFormat::UInt32, uint64_t offset = 0) override;
 
-		void SetConstantBuffer(uint32_t slot, uint32_t binding, const Candy::Ref<RHIBuffer>& buffer) override;
-		void SetTexture(uint32_t slot, uint32_t binding, const Candy::Ref<RHITexture>& texture) override;
+		void SetConstantBuffer(uint32_t slot, uint32_t binding, const Candy::Ref<RHIBuffer>& buffer, uint64_t offset = 0) override;
+		void SetTextures(uint32_t slot, uint32_t count, const Candy::Ref<RHITexture>* textures) override;
 		void SetSampler(uint32_t slot, uint32_t binding, const Candy::Ref<RHISampler>& sampler) override;
 
 		// ---- Draw calls ----------------------------------------------------
@@ -77,7 +78,7 @@ namespace Candy {
 
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> m_CommandList;
 		// Each command buffer owns its own allocator so multiple command buffers
-		// (Renderer2D scene + overlay Flush) never share one and reset it while
+		// (scene + overlay passes) never share one and reset it while
 		// another is still recording ("allocator cannot be reset while a command
 		// list is recording" â†?GPU hang).
 		Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_Allocator;
@@ -87,9 +88,13 @@ namespace Candy {
 		ID3D12DescriptorHeap* m_CBVSRVUAVHeap = nullptr;
 		ID3D12DescriptorHeap* m_SamplerHeap   = nullptr;
 		uint32_t              m_CBVSRVDescriptorSize = 0;
-		// Base slot of the Renderer2D texture table in the shared heap
-		// (allocated once by D3D12Device from the IR descriptor range allocator).
-		uint32_t              m_TextureTableBase = 0;
+		// Per-command-buffer dynamic SRV region (device-allocated). SetTextures
+		// bumps linearly within [m_DynamicSRVBase, +m_DynamicSRVCapacity); the
+		// bump resets at Begin(), and each command buffer lives one frame, so
+		// per-draw descriptor tables never alias across frames or draws.
+		uint32_t              m_DynamicSRVBase = 0;
+		uint32_t              m_DynamicSRVCapacity = 0;
+		uint32_t              m_NextDynamicSRVSlot = 0;
 
 		// Current render target
 		D3D12SwapChain*   m_CurrentSwapChain   = nullptr;

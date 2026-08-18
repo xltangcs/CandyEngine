@@ -28,7 +28,7 @@ namespace Candy {
 		static void SetSwapChain(RHISwapChain* swapChain);
 		static void SetCurrentCommandBuffer(RHICommandBuffer* cmd);
 
-		// ---- Reader API (called by Renderer2D / Editor / etc.) ------------
+		// ---- Reader API (called by the renderer / Editor / etc.) ------------
 		[[nodiscard]] static RHIDevice*        GetDevice();
 		[[nodiscard]] static RHISwapChain*     GetSwapChain();
 		[[nodiscard]] static RHICommandBuffer* GetCurrentCommandBuffer();

@@ -20,13 +20,15 @@ namespace Candy {
 	                                     ID3D12Device* device,
 	                                     ID3D12DescriptorHeap* cbvSrvUavHeap,
 	                                     ID3D12DescriptorHeap* samplerHeap,
-	                                     uint32_t textureTableBase)
+	                                     uint32_t dynamicSRVBase,
+	                                     uint32_t dynamicSRVCapacity)
 		: m_CommandList(std::move(cmdList))
 		, m_Allocator(std::move(allocator))
 		, m_Device(device)
 		, m_CBVSRVUAVHeap(cbvSrvUavHeap)
 		, m_SamplerHeap(samplerHeap)
-		, m_TextureTableBase(textureTableBase)
+		, m_DynamicSRVBase(dynamicSRVBase)
+		, m_DynamicSRVCapacity(dynamicSRVCapacity)
 	{
 		if (cbvSrvUavHeap)
 		{
@@ -73,6 +75,9 @@ namespace Candy {
 		// Reset linear descriptor allocator
 		if (m_CBVSRVUAVHeap)
 			m_NextCBVSRVHandle = m_CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart();
+
+		// Reset the per-frame dynamic SRV bump allocator
+		m_NextDynamicSRVSlot = 0;
 	}
 
 	void D3D12CommandBuffer::End()
@@ -303,49 +308,62 @@ namespace Candy {
 		}
 	}
 
-	void D3D12CommandBuffer::SetConstantBuffer(uint32_t slot, uint32_t binding, const Ref<RHIBuffer>& buffer)
+	void D3D12CommandBuffer::SetConstantBuffer(uint32_t slot, uint32_t binding, const Ref<RHIBuffer>& buffer, uint64_t offset)
 	{
 		auto* d3d12buffer = dynamic_cast<D3D12Buffer*>(buffer.get());
 		if (!d3d12buffer || !m_CommandList)
 			return;
 
 		// Root descriptor model: bind the buffer's GPU virtual address
-		// directly to a root CBV parameter.  No descriptor heap allocation
-		// is required and the binding persists on this slot until the next
-		// call to SetConstantBuffer with the same slot or End().
+		// directly to a root CBV parameter.  `offset` selects a 256B-aligned
+		// per-draw slice (root CBV addresses must be 256B aligned), so a single
+		// frame-scoped buffer can hold per-draw data without aliasing.  The
+		// binding persists on this slot until the next call to
+		// SetConstantBuffer with the same slot or End().
 		(void)binding; // D3D12 root CBV does not use a descriptor table index
-		m_CommandList->SetGraphicsRootConstantBufferView(slot, d3d12buffer->GetGPUVirtualAddress());
+		m_CommandList->SetGraphicsRootConstantBufferView(slot, d3d12buffer->GetGPUVirtualAddress() + offset);
 	}
 
-	void D3D12CommandBuffer::SetTexture(uint32_t slot, uint32_t binding, const Ref<RHITexture>& texture)
+	void D3D12CommandBuffer::SetTextures(uint32_t slot, uint32_t count, const Ref<RHITexture>* textures)
 	{
-		auto* d3d12tex = dynamic_cast<D3D12Texture*>(texture.get());
-		if (!d3d12tex || !d3d12tex->GetResource())
-		{
-			CANDY_CORE_WARN("D3D12CommandBuffer::SetTexture: not a D3D12Texture or resource is null");
-			return;
-		}
 		if (!m_CBVSRVUAVHeap || !m_CommandList)
 			return;
 
-		// Write an SRV for this texture at offset `binding` from the texture
-		// table base (m_TextureTableBase, allocated by the device from the IR
-		// descriptor range allocator).  Multiple textures in the same batch
-		// occupy consecutive binding slots [0, N); the descriptor table bound
-		// to root parameter `slot` covers them all in one
-		// SetGraphicsRootDescriptorTable call.
-		d3d12tex->CreateSRV(m_CBVSRVUAVHeap, m_TextureTableBase + binding, m_CBVSRVDescriptorSize);
+		// Allocate a fresh contiguous range from the per-frame dynamic region.
+		// Recording multiple draws then submitting the list once is only safe
+		// when each draw owns its own descriptors — a fixed shared table would
+		// alias across draws (every draw would read the last one's bindings at
+		// GPU execution time).
+		// D3D12 requires descriptor-table GPU addresses to be 256B aligned.
+		// With a 32B descriptor increment, every draw's range must therefore
+		// start on an 8-descriptor boundary — a naive per-draw bump of `count`
+		// slots would misalign the second draw (e.g. slot 4 -> 128B offset),
+		// which crashes the GPU driver. Bump by the 8-aligned size instead.
+		const uint32_t alignedCount = (count + 7u) & ~7u;
+		if (m_NextDynamicSRVSlot + alignedCount > m_DynamicSRVCapacity)
+		{
+			CANDY_CORE_ERROR("D3D12CommandBuffer::SetTextures: dynamic SRV region exhausted ({} needed, {} used/{})",
+			                 alignedCount, m_NextDynamicSRVSlot, m_DynamicSRVCapacity);
+			return;
+		}
 
-		// Bind the table starting at the texture table base to root parameter
-		// `slot`.  Re-binding the whole table is cheap; it remains valid until End().
+		const uint32_t base = m_DynamicSRVBase + m_NextDynamicSRVSlot;
+		for (uint32_t i = 0; i < count; ++i)
+		{
+			auto* d3d12tex = dynamic_cast<D3D12Texture*>(textures[i].get());
+			if (d3d12tex && d3d12tex->GetResource())
+				d3d12tex->CreateSRV(m_CBVSRVUAVHeap, base + i, m_CBVSRVDescriptorSize);
+		}
+		m_NextDynamicSRVSlot += alignedCount;
+
 		D3D12_GPU_DESCRIPTOR_HANDLE gpuBase = m_CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart();
-		gpuBase.ptr += static_cast<SIZE_T>(m_TextureTableBase) * m_CBVSRVDescriptorSize;
+		gpuBase.ptr += static_cast<SIZE_T>(base) * m_CBVSRVDescriptorSize;
 		m_CommandList->SetGraphicsRootDescriptorTable(slot, gpuBase);
 	}
 
 	void D3D12CommandBuffer::SetSampler(uint32_t slot, uint32_t binding, const Ref<RHISampler>& sampler)
 	{
-		// Renderer2D's textured root signature (see
+		// The textured root signature (see
 		// D3D12Device::CreateTexturedRootSignature) bakes a single linear
 		// static sampler at s0 with linear/min-mag-mip filter.  Non-static
 		// sampler heap binding is not yet wired through the RHI abstraction.

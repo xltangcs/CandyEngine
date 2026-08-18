@@ -34,8 +34,8 @@ namespace Candy {
 		void SetVertexBuffer(const Ref<RHIBuffer>& buffer, uint32_t slot = 0, uint64_t offset = 0) override;
 		void SetIndexBuffer(const Ref<RHIBuffer>& buffer, IndexFormat format = IndexFormat::UInt32, uint64_t offset = 0) override;
 
-		void SetConstantBuffer(uint32_t slot, uint32_t binding, const Ref<RHIBuffer>& buffer) override;
-		void SetTexture(uint32_t slot, uint32_t binding, const Ref<RHITexture>& texture) override;
+		void SetConstantBuffer(uint32_t slot, uint32_t binding, const Ref<RHIBuffer>& buffer, uint64_t offset = 0) override;
+		void SetTextures(uint32_t slot, uint32_t count, const Ref<RHITexture>* textures) override;
 		void SetSampler(uint32_t slot, uint32_t binding, const Ref<RHISampler>& sampler) override;
 
 		void Draw(uint32_t vertexCount,

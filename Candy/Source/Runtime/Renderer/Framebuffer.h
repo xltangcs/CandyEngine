@@ -10,7 +10,7 @@ namespace Candy {
 	//
 	// Single-inherits RHIFramebuffer: runtime/editor code holding a
 	// Ref<Framebuffer> can pass it anywhere a Ref<RHIFramebuffer> is expected
-	// (Renderer2D::SetActiveRenderTarget, RHICommandBuffer::BeginRenderPass)
+	// (SceneRenderer::SetActiveRenderTarget, RHICommandBuffer::BeginRenderPass)
 	// without dynamic_pointer_cast bridges.
 	//
 	// FramebufferDesc (RHI side) is the single source of truth for the

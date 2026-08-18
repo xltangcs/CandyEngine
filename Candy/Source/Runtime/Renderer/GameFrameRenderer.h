@@ -38,7 +38,7 @@ namespace Candy {
 	public:
 		/// Render one full editor frame: scene pass → overlay pass → camera
 		/// preview PIP → game UI composite. All clear/viewport semantics are
-		/// owned by Renderer2D's render passes (LoadOp).
+		/// owned by SceneRenderer's render passes (LoadOp).
 		static void RenderEditorFrame(const EditorRenderContext& ctx);
 
 		static void RenderSceneTo(Framebuffer& target, Scene& scene, EditorCamera* editorCamera);

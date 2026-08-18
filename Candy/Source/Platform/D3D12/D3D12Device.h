@@ -69,10 +69,6 @@ namespace Candy {
 		/// (backed by RHIDescriptorSetManager's linear range allocator).
 		uint32_t AllocateSRVRange(uint32_t count);
 
-		/// Base slot of the 32-wide texture table used by Renderer2D batch
-		/// rendering (allocated once at device init).
-		[[nodiscard]] uint32_t GetTextureTableBase() const { return m_TextureTableBase; }
-
 		// ---- Synchronization -----------------------------------------------
 
 		uint64_t SignalFence();
@@ -129,9 +125,8 @@ namespace Candy {
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_CBVSRVUAVHeap;
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_SamplerHeap;
 
-		// Base slot of the Renderer2D texture table within the shared heap
-		// (allocated from the IR descriptor range allocator at init).
-		uint32_t m_TextureTableBase = 0;
+		// Base slot of the per-frame dynamic SRV region (SetTextures).
+		uint32_t m_DynamicSRVBase = 0;
 		uint32_t m_CBVSRVUAVDescriptorSize = 0;
 		uint32_t m_SamplerDescriptorSize   = 0;
 

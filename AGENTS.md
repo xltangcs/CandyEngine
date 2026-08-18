@@ -12,6 +12,7 @@ msbuild CandyEngine.sln /p:Configuration=Debug
 
 > 第三方依赖已通过 **git subtree** 合并进主仓库，克隆后无需 submodule 拉取。
 
+- **运行 exe 时工作目录指定为 `Candy/`**（与 IDE 调试工作目录一致；codemaker 用 bash 的 `workdir` 参数指定，例如 `workdir="E:\CandyEngine\Candy"`）
 - `premake5.lua` 是唯一真实构建来源，**不要手动编辑生成的 .sln/.vcxproj**
 - 配置: `Debug`/`Release`/`Dist` → `CANDY_DEBUG`/`CANDY_RELEASE`/`CANDY_DIST`
 - Sandbox 默认注释在根 `premake5.lua:40`

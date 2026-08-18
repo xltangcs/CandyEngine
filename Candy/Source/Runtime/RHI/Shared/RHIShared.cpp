@@ -2,6 +2,7 @@
 #include "Runtime/RHI/Shared/RHIShared.h"
 
 #include "Runtime/Core/Log.h"
+#include "Runtime/RHI/RHIShader.h"
 
 #include <algorithm>
 #include <cstring>
@@ -83,27 +84,51 @@ bool RHIResourceManager::IsRegistered(Candy::RHIHandle handle) const
 
 RHIPipelineCache::~RHIPipelineCache() = default;
 
-Candy::Ref<Candy::RHIGraphicsPipeline>
-RHIPipelineCache::Find(const Candy::GraphicsPipelineDesc& desc) const
+// FNV-1a over the shader bytecode; stable per content (identical sources
+// compiled by the same backend produce identical bytecode -> same key).
+static size_t HashShaderBytecode(const Candy::Ref<Candy::RHIShaderModule>& shader)
 {
-	size_t h = HashDesc(desc);
+	if (!shader || !shader->GetBytecode())
+		return 0;
+
+	size_t h = 1469598103934665603ULL;
+	const auto* p = reinterpret_cast<const uint8_t*>(shader->GetBytecode());
+	const uint32_t bytes = shader->GetBytecodeSize();
+	for (uint32_t i = 0; i < bytes; ++i)
+	{
+		h ^= p[i];
+		h *= 1099511628211ULL;
+	}
+	return h;
+}
+
+Candy::Ref<Candy::RHIGraphicsPipeline>
+RHIPipelineCache::Find(const Candy::GraphicsPipelineDesc& desc,
+                       const Candy::Ref<Candy::RHIShaderModule>& vs,
+                       const Candy::Ref<Candy::RHIShaderModule>& fs) const
+{
+	size_t h = HashDesc(desc, vs, fs);
 	auto it = m_Cache.find(h);
 	return it != m_Cache.end() ? it->second : nullptr;
 }
 
 bool RHIPipelineCache::Insert(const Candy::GraphicsPipelineDesc& desc,
-                             const Candy::Ref<Candy::RHIGraphicsPipeline>& pipeline)
+                              const Candy::Ref<Candy::RHIShaderModule>& vs,
+                              const Candy::Ref<Candy::RHIShaderModule>& fs,
+                              const Candy::Ref<Candy::RHIGraphicsPipeline>& pipeline)
 {
-	size_t h = HashDesc(desc);
+	size_t h = HashDesc(desc, vs, fs);
 	if (m_Cache.find(h) != m_Cache.end())
 		return false;
 	m_Cache[h] = pipeline;
 	return true;
 }
 
-void RHIPipelineCache::Erase(const Candy::GraphicsPipelineDesc& desc)
+void RHIPipelineCache::Erase(const Candy::GraphicsPipelineDesc& desc,
+                             const Candy::Ref<Candy::RHIShaderModule>& vs,
+                             const Candy::Ref<Candy::RHIShaderModule>& fs)
 {
-	m_Cache.erase(HashDesc(desc));
+	m_Cache.erase(HashDesc(desc, vs, fs));
 }
 
 void RHIPipelineCache::Clear()
@@ -118,7 +143,9 @@ static void HashCombine(size_t& seed, size_t value)
 	seed ^= value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
 }
 
-size_t RHIPipelineCache::HashDesc(const Candy::GraphicsPipelineDesc& desc)
+size_t RHIPipelineCache::HashDesc(const Candy::GraphicsPipelineDesc& desc,
+                                  const Candy::Ref<Candy::RHIShaderModule>& vs,
+                                  const Candy::Ref<Candy::RHIShaderModule>& fs)
 {
 	size_t seed = 0;
 
@@ -140,6 +167,7 @@ size_t RHIPipelineCache::HashDesc(const Candy::GraphicsPipelineDesc& desc)
 	// Rasterizer
 	HashCombine(seed, std::hash<uint32_t>{}(static_cast<uint32_t>(desc.Rasterizer.Cull)));
 	HashCombine(seed, std::hash<uint32_t>{}(static_cast<uint32_t>(desc.Rasterizer.Fill)));
+	HashCombine(seed, std::hash<bool>{}(desc.Rasterizer.FrontCounterClockwise));
 	HashCombine(seed, std::hash<bool>{}(desc.Rasterizer.DepthClipEnable));
 	HashCombine(seed, std::hash<int32_t>{}(desc.Rasterizer.DepthBias));
 	HashCombine(seed, std::hash<float>{}(desc.Rasterizer.DepthBiasSlopeFactor));
@@ -166,6 +194,10 @@ size_t RHIPipelineCache::HashDesc(const Candy::GraphicsPipelineDesc& desc)
 		HashCombine(seed, std::hash<uint32_t>{}(static_cast<uint32_t>(fmt)));
 	HashCombine(seed, std::hash<uint32_t>{}(static_cast<uint32_t>(desc.DepthStencilFormat)));
 	HashCombine(seed, std::hash<uint32_t>{}(desc.SampleCount));
+
+	// Shaders — the same desc with different shaders must NOT share a PSO.
+	HashCombine(seed, HashShaderBytecode(vs));
+	HashCombine(seed, HashShaderBytecode(fs));
 
 	return seed;
 }

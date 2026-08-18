@@ -50,8 +50,15 @@ namespace Candy {
 		virtual void SetVertexBuffer(const Ref<RHIBuffer>& buffer, uint32_t slot = 0, uint64_t offset = 0) = 0;
 		virtual void SetIndexBuffer(const Ref<RHIBuffer>& buffer, IndexFormat format = IndexFormat::UInt32, uint64_t offset = 0) = 0;
 
-		virtual void SetConstantBuffer(uint32_t slot, uint32_t binding, const Ref<RHIBuffer>& buffer) = 0;
-		virtual void SetTexture(uint32_t slot, uint32_t binding, const Ref<RHITexture>& texture) = 0;
+		/// Binds a constant buffer (or a 256B-aligned slice at `offset` within it)
+		/// to root parameter `slot`. Per-draw slices let a single frame-scoped
+		/// buffer hold per-draw data without GPU-side aliasing between draws.
+		virtual void SetConstantBuffer(uint32_t slot, uint32_t binding, const Ref<RHIBuffer>& buffer, uint64_t offset = 0) = 0;
+		/// Binds `count` textures as one contiguous SRV descriptor table rooted at
+		/// root parameter `slot` (bindings 0..count-1). The backend allocates a
+		/// fresh descriptor range per call, so consecutive draws never alias each
+		/// other's texture bindings within a command list.
+		virtual void SetTextures(uint32_t slot, uint32_t count, const Ref<RHITexture>* textures) = 0;
 		virtual void SetSampler(uint32_t slot, uint32_t binding, const Ref<RHISampler>& sampler) = 0;
 
 		// ---- Draw calls ----------------------------------------------------

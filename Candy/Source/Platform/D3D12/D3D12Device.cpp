@@ -1,4 +1,4 @@
-#include "CandyPCH.h"
+ï»¿#include "CandyPCH.h"
 #include <Windows.h>
 #include <d3d12.h>
 #include <d3d12sdklayers.h>
@@ -19,6 +19,10 @@
 using Microsoft::WRL::ComPtr;
 
 namespace Candy {
+
+	// Per-frame dynamic SRV descriptors for per-draw texture tables
+	// (SetTextures). 1024 descriptors = 256 draws of 4 slots per frame.
+	static constexpr uint32_t kDynamicSRVCapacity = 1024;
 
 	// Dumps any stored D3D12 debug-layer messages and clears the queue so the
 	// next call starts fresh.  Called at PSO creation failure sites.
@@ -103,10 +107,12 @@ float4 main(PSInput input) : SV_TARGET
 		D3D12CommandQueue(ID3D12Device* device, ComPtr<ID3D12CommandQueue> queue,
 		                 ID3D12DescriptorHeap* cbvSrvUavHeap,
 		                 ID3D12DescriptorHeap* samplerHeap,
-		                 uint32_t textureTableBase)
+		                 uint32_t dynamicSRVBase,
+		                 uint32_t dynamicSRVCapacity)
 			: m_Device(device), m_Queue(std::move(queue))
 			, m_CBVSRVUAVHeap(cbvSrvUavHeap), m_SamplerHeap(samplerHeap)
-			, m_TextureTableBase(textureTableBase)
+			, m_DynamicSRVBase(dynamicSRVBase)
+			, m_DynamicSRVCapacity(dynamicSRVCapacity)
 		{
 			HRESULT hr = device->CreateCommandAllocator(
 				D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_CommandAllocator));
@@ -117,10 +123,10 @@ float4 main(PSInput input) : SV_TARGET
 		Scope<RHICommandBuffer> CreateCommandBuffer() override
 		{
 			// Each command buffer gets its OWN allocator. A shared allocator is unsafe
-			// when multiple command buffers exist (e.g. Renderer2D scene + overlay
-			// Flush): resetting it while another list is still recording makes the
-			// GPU hang ("command allocator cannot be reset because a command list is
-			// currently being recorded").
+			// when multiple command buffers exist (scene + overlay passes): resetting
+			// it while another list is still recording makes the GPU hang ("command
+			// allocator cannot be reset because a command list is currently being
+			// recorded").
 			ComPtr<ID3D12CommandAllocator> allocator;
 			HRESULT hr = m_Device->CreateCommandAllocator(
 				D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator));
@@ -146,7 +152,8 @@ float4 main(PSInput input) : SV_TARGET
 
 			return Candy::CreateScope<D3D12CommandBuffer>(
 				std::move(cmdList), std::move(allocator), m_Device,
-				m_CBVSRVUAVHeap, m_SamplerHeap, m_TextureTableBase);
+				m_CBVSRVUAVHeap, m_SamplerHeap,
+				m_DynamicSRVBase, m_DynamicSRVCapacity);
 		}
 
 		void Submit(const std::vector<RHICommandBuffer*>& commandBuffers) override
@@ -184,7 +191,7 @@ float4 main(PSInput input) : SV_TARGET
 
 		void WaitIdle() override
 		{
-			CANDY_CORE_WARN("TODO: D3D12CommandQueue::WaitIdle ¡ª use D3D12Device::WaitIdle");
+			CANDY_CORE_WARN("TODO: D3D12CommandQueue::WaitIdle ---- use D3D12Device::WaitIdle");
 		}
 
 		[[nodiscard]] ID3D12CommandQueue*   GetNativeQueue()   const { return m_Queue.Get(); }
@@ -201,13 +208,13 @@ float4 main(PSInput input) : SV_TARGET
 		ComPtr<ID3D12CommandAllocator> m_CommandAllocator;
 		ID3D12DescriptorHeap*          m_CBVSRVUAVHeap = nullptr;
 		ID3D12DescriptorHeap*          m_SamplerHeap   = nullptr;
-		// Base slot of the Renderer2D texture table in the shared heap
-		// (owned by D3D12Device, handed out at construction).
-		uint32_t                       m_TextureTableBase = 0;
+		// Per-frame dynamic SRV region for per-draw descriptor tables.
+		uint32_t                       m_DynamicSRVBase = 0;
+		uint32_t                       m_DynamicSRVCapacity = 0;
 	};
 
 	// =========================================================================
-	// D3D12Device ¡ª Constructor
+	// D3D12Device ---- Constructor
 	// =========================================================================
 
 	D3D12Device::D3D12Device()
@@ -287,7 +294,7 @@ float4 main(PSInput input) : SV_TARGET
 #if defined(CANDY_DEBUG)
 		// GPU-based validation catches resource-state violations / OOB descriptor
 		// reads at the GPU level, which the debug layer alone can miss (they hang
-		// the GPU ¡ú TDR ¡ú device removed).
+		// the GPU ---- TDR ---- device removed).
 #ifndef D3D12_DEBUG_FEATURE_GPU_BASED_VALIDATION
 #define D3D12_DEBUG_FEATURE_GPU_BASED_VALIDATION 0x00000002
 #endif
@@ -305,7 +312,7 @@ float4 main(PSInput input) : SV_TARGET
 		{
 			D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
 			cbvHeapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-			cbvHeapDesc.NumDescriptors = 256;
+			cbvHeapDesc.NumDescriptors = 2048;
 			cbvHeapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 			cbvHeapDesc.NodeMask       = 0;
 
@@ -333,14 +340,15 @@ float4 main(PSInput input) : SV_TARGET
 		}
 
 		// SRV range allocator over the shared CBV_SRV_UAV heap. All regions
-		// (Renderer2D texture table, ImGui editor/game UI, framebuffer SRVs,
-		// engine textures) are handed out by RHIDescriptorSetManager instead of
+		// (ImGui editor/game UI, framebuffer SRVs, engine textures, per-draw
+		// dynamic tables) are handed out by RHIDescriptorSetManager instead of
 		// hard-coded slot constants.
-		GetDescriptorSetManager().InitRangeAllocator(256);
+		GetDescriptorSetManager().InitRangeAllocator(2048);
 
-		// Renderer2D's 32-wide texture table region (t0-t31) ¡ª allocated once
-		// here; command buffers write batch textures relative to this base.
-		m_TextureTableBase = AllocateSRVRange(32);
+		// Per-frame dynamic SRV region for per-draw descriptor tables
+		// (SetTextures). Command buffers bump linearly inside it and reset at
+		// Begin(); each buffer lives one frame, so no cross-frame aliasing.
+		m_DynamicSRVBase = AllocateSRVRange(kDynamicSRVCapacity);
 
 		// Command queue
 		D3D12_COMMAND_QUEUE_DESC queueDesc = {};
@@ -359,7 +367,7 @@ float4 main(PSInput input) : SV_TARGET
 		m_CommandQueue = CreateScope<D3D12CommandQueue>(
 			m_NativeDevice.Get(), std::move(commandQueue),
 			m_CBVSRVUAVHeap.Get(), m_SamplerHeap.Get(),
-			m_TextureTableBase);
+			m_DynamicSRVBase, kDynamicSRVCapacity);
 
 		// Fence
 		hr = m_NativeDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_Fence));
@@ -511,7 +519,7 @@ float4 main(PSInput input) : SV_TARGET
 			return nullptr;
 		}
 
-		CANDY_CORE_INFO("D3D12Device: compiled '{}' ({}) ¡ª {} bytes",
+		CANDY_CORE_INFO("D3D12Device: compiled '{}' ({}) ---- {} bytes",
 		                debugName, target, bytecode->GetBufferSize());
 		return bytecode;
 	}
@@ -564,7 +572,7 @@ float4 main(PSInput input) : SV_TARGET
 
 	ComPtr<ID3D12RootSignature> D3D12Device::CreateMinimalRootSignature()
 	{
-		// Root parameter 0: CBV (b0) ¡ª transform / per-draw constants
+		// Root parameter 0: CBV (b0) ---- transform / per-draw constants
 		D3D12_ROOT_PARAMETER rootParams[2] = {};
 
 		// Parameter 0: CBV
@@ -640,9 +648,14 @@ float4 main(PSInput input) : SV_TARGET
 
 	ComPtr<ID3D12RootSignature> D3D12Device::CreateTexturedRootSignature()
 	{
-		// Parameter 0: CBV (b0)
-		// Parameter 1: descriptor table with 32 SRVs (t0-t31)
-		D3D12_ROOT_PARAMETER rootParams[2] = {};
+		// Parameter 0: CBV (b0)  ---- per-frame view data (SceneRenderer view)
+		// Parameter 1: CBV (b1)  ---- per-draw material data (SceneRenderer)
+		// Parameter 2: descriptor table with 4 SRVs (t0-t3) â€” the engine binds
+		// per-draw texture sets (base color / MR / normal / emissive). The old
+		// 32-wide table came from Renderer2D batch rendering; a wider table
+		// than the bound descriptors makes the GPU read uninitialized heap
+		// slots (undefined behavior, driver crash).
+		D3D12_ROOT_PARAMETER rootParams[3] = {};
 
 		rootParams[0].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_CBV;
 		rootParams[0].Descriptor       = {};
@@ -650,19 +663,27 @@ float4 main(PSInput input) : SV_TARGET
 		rootParams[0].Descriptor.RegisterSpace  = 0;
 		rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
+		rootParams[1].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		rootParams[1].Descriptor       = {};
+		rootParams[1].Descriptor.ShaderRegister = 1;
+		rootParams[1].Descriptor.RegisterSpace  = 0;
+		// ALL: SceneRenderer's material CB holds u_World which the vertex shader
+		// also reads (model->world transform), not just pixel-shader params.
+		rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
 		D3D12_DESCRIPTOR_RANGE srvRange = {};
 		srvRange.RangeType          = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-		srvRange.NumDescriptors     = 32;
+		srvRange.NumDescriptors     = 4;
 		srvRange.BaseShaderRegister = 0;
 		srvRange.RegisterSpace      = 0;
 		srvRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-		rootParams[1].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		rootParams[1].DescriptorTable.NumDescriptorRanges = 1;
-		rootParams[1].DescriptorTable.pDescriptorRanges   = &srvRange;
-		rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		rootParams[2].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParams[2].DescriptorTable.NumDescriptorRanges = 1;
+		rootParams[2].DescriptorTable.pDescriptorRanges   = &srvRange;
+		rootParams[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-		// Static sampler (s0) ¡ª linear wrap
+		// Static sampler (s0) ---- linear wrap
 		D3D12_STATIC_SAMPLER_DESC staticSampler = {};
 		staticSampler.Filter           = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
 		staticSampler.AddressU         = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -678,7 +699,7 @@ float4 main(PSInput input) : SV_TARGET
 		staticSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
 		D3D12_ROOT_SIGNATURE_DESC rootSigDesc = {};
-		rootSigDesc.NumParameters     = 2;
+		rootSigDesc.NumParameters     = 3;
 		rootSigDesc.pParameters       = rootParams;
 		rootSigDesc.NumStaticSamplers = 1;
 		rootSigDesc.pStaticSamplers   = &staticSampler;
@@ -738,7 +759,7 @@ float4 main(PSInput input) : SV_TARGET
 
 	Ref<RHIShaderModule> D3D12Device::CreateShaderModule(const void* bytecode, uint32_t byteSize, const std::string& debugName)
 	{
-		// Store the bytecode for pipeline creation ¡ª the actual shader module
+		// Store the bytecode for pipeline creation ---- the actual shader module
 		// is not a D3D12 runtime object; D3D12 pipelines consume bytecode directly.
 		// We wrap it in a simple blob holder.
 		struct D3D12ShaderModule : public RHIShaderModule
@@ -780,15 +801,15 @@ float4 main(PSInput input) : SV_TARGET
 		const Ref<RHIShaderModule>& vs,
 		const Ref<RHIShaderModule>& fs)
 	{
-		// Cache lookup
-		if (auto cached = GetPipelineCache().Find(desc))
+		// Cache lookup (keyed by desc + shader contents)
+		if (auto cached = GetPipelineCache().Find(desc, vs, fs))
 			return cached;
 
 		// ---- Vertex input layout --------------------------------------------
 
 		std::vector<D3D12_INPUT_ELEMENT_DESC> inputElements;
 
-		// Map RHIFormat ¡ú DXGI_FORMAT for common vertex attribute formats
+		// Map RHIFormat ---- DXGI_FORMAT for common vertex attribute formats
 		static const auto MapFormat = [](RHIFormat fmt) -> DXGI_FORMAT
 		{
 			switch (fmt)
@@ -824,9 +845,9 @@ float4 main(PSInput input) : SV_TARGET
 
 		// ---- Root signature ------------------------------------------------
 
-		// All Renderer2D pipelines share the textured root signature (CBV b0 +
+		// All pipelines share the textured root signature (CBV b0 +
 		// 32-SRV descriptor table t0-t31 + static sampler s0). Shaders that
-		// don't sample textures (circle/line) are still compatible ¡ª a root
+		// don't sample textures (debug lines) are still compatible ---- a root
 		// signature may legally declare more than the shader consumes.
 		auto rootSig = CreateTexturedRootSignature();
 		if (!rootSig)
@@ -844,7 +865,7 @@ float4 main(PSInput input) : SV_TARGET
 		rasterizer.CullMode              = (desc.Rasterizer.Cull == CullMode::None)  ? D3D12_CULL_MODE_NONE
 		                                 : (desc.Rasterizer.Cull == CullMode::Front) ? D3D12_CULL_MODE_FRONT
 		                                                                              : D3D12_CULL_MODE_BACK;
-		rasterizer.FrontCounterClockwise = FALSE;
+		rasterizer.FrontCounterClockwise = desc.Rasterizer.FrontCounterClockwise ? TRUE : FALSE;
 		rasterizer.DepthBias             = desc.Rasterizer.DepthBias;
 		rasterizer.DepthBiasClamp        = desc.Rasterizer.DepthBiasClamp;
 		rasterizer.SlopeScaledDepthBias  = desc.Rasterizer.DepthBiasSlopeFactor;
@@ -858,7 +879,7 @@ float4 main(PSInput input) : SV_TARGET
 		depthStencil.DepthWriteMask   = desc.DepthStencil.DepthWriteEnable
 		                                ? D3D12_DEPTH_WRITE_MASK_ALL
 		                                : D3D12_DEPTH_WRITE_MASK_ZERO;
-		// Map CompareOp ¡ú D3D12_COMPARISON_FUNC
+		// Map CompareOp ---- D3D12_COMPARISON_FUNC
 		static const D3D12_COMPARISON_FUNC compMap[] = {
 			D3D12_COMPARISON_FUNC_NEVER,        // Never
 			D3D12_COMPARISON_FUNC_LESS,          // Less
@@ -875,7 +896,7 @@ float4 main(PSInput input) : SV_TARGET
 
 		D3D12_BLEND_DESC blend = {};
 		// Per-RT blend allowed: RT0 (color) blends alpha, RT1 (R32_SINT
-		// entity-id) must NOT blend under any circumstances ¡ª D3D12 otherwise
+		// entity-id) must NOT blend under any circumstances ---- D3D12 otherwise
 		// rejects PSO creation ("R32_SINT does not support blending").
 		blend.IndependentBlendEnable   = TRUE;
 		blend.RenderTarget[0].BlendEnable   = desc.Blend.BlendEnable;
@@ -915,7 +936,7 @@ float4 main(PSInput input) : SV_TARGET
 		                                 ? 1u
 		                                 : static_cast<UINT>(desc.RenderTargetFormats.size());
 
-		// Map RHIFormats ¡ú RTVFormats[i] (driver requires one entry per RT
+		// Map RHIFormats ---- RTVFormats[i] (driver requires one entry per RT
 		// declared on the PS output signature; falling short triggers PSO
 		// creation failure on pipelines that write SV_TARGET1, etc.).
 		static const auto MapRenderTargetFormat = [](RHIFormat fmt) -> DXGI_FORMAT
@@ -970,7 +991,7 @@ float4 main(PSInput input) : SV_TARGET
 		auto pipeline = CreateRef<D3D12GraphicsPipeline>(desc);
 		pipeline->SetNativePipeline(std::move(pso), std::move(rootSig));
 
-		GetPipelineCache().Insert(desc, pipeline);
+		GetPipelineCache().Insert(desc, vs, fs, pipeline);
 		pipeline->SetRHITracking(&GetResourceManager(),
 			GetResourceManager().Register(ResourceType::GraphicsPipeline, pipeline.get(), "GraphicsPipeline"));
 
@@ -1033,7 +1054,7 @@ float4 main(PSInput input) : SV_TARGET
 
 		D3D12_BLEND_DESC blend = {};
 		// Per-RT blend allowed: RT0 (color) blends alpha, RT1 (R32_SINT
-		// entity-id) must NOT blend under any circumstances ¡ª D3D12 otherwise
+		// entity-id) must NOT blend under any circumstances ---- D3D12 otherwise
 		// rejects PSO creation ("R32_SINT does not support blending").
 		blend.IndependentBlendEnable   = TRUE;
 		blend.RenderTarget[0].BlendEnable   = desc.Blend.BlendEnable;
@@ -1139,9 +1160,9 @@ float4 main(PSInput input) : SV_TARGET
 	{
 		// Single triangle: 3 vertices, each Position(3 floats) + Color(4 floats)
 		VertexPosColor vertices[] = {
-			{ {  0.0f,  0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } }, // top    ¡ª red
-			{ { -0.5f, -0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } }, // left   ¡ª green
-			{ {  0.5f, -0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }, // right  ¡ª blue
+			{ {  0.0f,  0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } }, // top    ---- red
+			{ { -0.5f, -0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } }, // left   ---- green
+			{ {  0.5f, -0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }, // right  ---- blue
 		};
 
 		return CreateGPUBufferWithData(vertices, sizeof(vertices),
@@ -1201,7 +1222,7 @@ float4 main(PSInput input) : SV_TARGET
 			return nullptr;
 		}
 
-		// 3. Use a temporary command list to copy upload ¡ú GPU
+		// 3. Use a temporary command list to copy upload ---- GPU
 		ComPtr<ID3D12CommandAllocator> tempAllocator;
 		HRESULT hr = m_NativeDevice->CreateCommandAllocator(
 			D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&tempAllocator));

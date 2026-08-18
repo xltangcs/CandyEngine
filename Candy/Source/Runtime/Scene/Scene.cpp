@@ -7,7 +7,7 @@
 #include "Runtime/Scene/PhysicsContactListener.h"
 #include "Runtime/Scripting/ScriptSystem.h"
 
-#include "Runtime/Renderer/Renderer2D.h"
+#include "Runtime/Renderer/SceneRenderer.h"
 
 #include <glm/glm.hpp>
 
@@ -90,6 +90,7 @@ namespace Candy {
 		// Copy components (except IDComponent and TagComponent)
 		CopyComponent<TransformComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<SpriteRendererComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<StaticMeshComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<CircleRendererComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<CameraComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<NativeScriptComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
@@ -202,6 +203,7 @@ namespace Candy {
 	{
 		OnUpdateRuntimeLogic(ts);
 		RenderRuntimeScene();
+		SceneRenderer::EndFrame();
 	}
 
 	void Scene::OnUpdateRuntimeLogic(Timestep ts)
@@ -256,9 +258,96 @@ namespace Candy {
 		}
 	}
 
+	// ---- Sprite/circle shared rendering resources ---------------------------
+
+	const Ref<StaticMeshResource>& Scene::GetSpriteQuad()
+	{
+		if (!m_QuadMesh)
+			m_QuadMesh = StaticMeshResource::CreateQuad();
+		return m_QuadMesh;
+	}
+
+	const Ref<Material>& Scene::GetSpriteMaterial()
+	{
+		if (!m_SpriteMaterial)
+		{
+			m_SpriteMaterial = CreateRef<Material>();
+			m_SpriteMaterial->Name = "Builtin/Sprite";
+			m_SpriteMaterial->ShaderPath = "VFS://Engine/Content/Shaders/D3D12/Sprite.hlsl";
+			m_SpriteMaterial->ShaderParams["u_BlendMode"] = 2.0f; // Transparent
+		}
+		return m_SpriteMaterial;
+	}
+
+	const Ref<Material>& Scene::GetCircleMaterial()
+	{
+		if (!m_CircleMaterial)
+		{
+			m_CircleMaterial = CreateRef<Material>();
+			m_CircleMaterial->Name = "Builtin/Circle";
+			m_CircleMaterial->ShaderPath = "VFS://Engine/Content/Shaders/D3D12/Sprite.hlsl";
+			m_CircleMaterial->ShaderParams["u_BlendMode"]  = 2.0f; // Transparent
+			m_CircleMaterial->ShaderParams["u_CircleMode"] = 1.0f; // SDF circle
+		}
+		return m_CircleMaterial;
+	}
+
+	void Scene::SubmitSpriteAndCircleDraws()
+	{
+		const auto& quad = GetSpriteQuad();
+
+		// Sprites
+		{
+			auto group = m_Registry.group<TransformComponent>(entt::get<SpriteRendererComponent>);
+			for (auto entity : group)
+			{
+				auto [tc, sprite] = group.get<TransformComponent, SpriteRendererComponent>(entity);
+				const glm::mat4 transform = tc.GetTransform();
+
+				MeshDrawCommand draw;
+				draw.Transform    = transform;
+				draw.Mesh         = quad;
+				draw.Material     = GetSpriteMaterial();
+				draw.EntityID     = static_cast<int>(entity);
+				draw.SortKey      = transform[3].z; // 2D z-order (smaller = further back)
+				draw.HasOverrides = true;
+				draw.Overrides.BaseColor = sprite.Color;
+				draw.Overrides.UVTiling  = glm::vec2(sprite.TilingFactor);
+				if (sprite.Texture)
+					draw.Overrides.BaseColorTexture = sprite.Texture;
+				else if (!sprite.TexturePath.empty())
+					draw.Overrides.BaseColorMap = sprite.TexturePath;
+				SceneRenderer::Submit(draw);
+			}
+		}
+
+		// Circles
+		{
+			auto view = m_Registry.view<TransformComponent, CircleRendererComponent>();
+			for (auto entity : view)
+			{
+				auto [tc, circle] = view.get<TransformComponent, CircleRendererComponent>(entity);
+				const glm::mat4 transform = tc.GetTransform();
+
+				MeshDrawCommand draw;
+				draw.Transform    = transform;
+				draw.Mesh         = quad;
+				draw.Material     = GetCircleMaterial();
+				draw.EntityID     = static_cast<int>(entity);
+				draw.SortKey      = transform[3].z;
+				draw.HasOverrides = true;
+				draw.Overrides.BaseColor  = circle.Color;
+				draw.Overrides.CircleMode = 1.0f;
+				draw.Overrides.Thickness  = circle.Thickness;
+				draw.Overrides.Fade       = circle.Fade;
+				SceneRenderer::Submit(draw);
+			}
+		}
+	}
+
 	void Scene::RenderRuntimeScene()
 	{
-		// Render 2D
+		// Render 2D (sprites/circles) via the unified scene renderer.
 		Camera* mainCamera = nullptr;
 		glm::mat4 cameraTransform;
 		{
@@ -281,29 +370,8 @@ namespace Candy {
 		}
 
 		{
-			Renderer2D::BeginScene(*mainCamera, cameraTransform);
-			// Draw sprites
-			{
-				auto group = m_Registry.group<TransformComponent>(entt::get<SpriteRendererComponent>);
-				for (auto entity : group)
-				{
-					auto [transform, sprite] = group.get<TransformComponent, SpriteRendererComponent>(entity);
-
-					Renderer2D::DrawSprite(transform.GetTransform(), sprite, (int)entity);
-				}
-			}
-
-			// Draw circles
-			{
-				auto view = m_Registry.view<TransformComponent, CircleRendererComponent>();
-				for (auto entity : view)
-				{
-					auto [transform, circle] = view.get<TransformComponent, CircleRendererComponent>(entity);
-
-					Renderer2D::DrawCircle(transform.GetTransform(), circle.Color, circle.Thickness, circle.Fade, (int)entity);
-				}
-			}
-			Renderer2D::EndScene();
+			SceneRenderer::BeginFrame(*mainCamera, cameraTransform);
+			SubmitSpriteAndCircleDraws();
 		}
 	}
 
@@ -340,12 +408,14 @@ namespace Candy {
 
 		// Render
 		RenderScene(camera);
+		SceneRenderer::EndFrame();
 	}
 
 	void Scene::OnUpdateEditor(Timestep ts, EditorCamera& camera)
 	{
 		// Render
 		RenderScene(camera);
+		SceneRenderer::EndFrame();
 	}
 
 	void Scene::OnViewportResize(uint32_t width, uint32_t height)
@@ -373,6 +443,7 @@ namespace Candy {
 
 		CopyComponentIfExists<TransformComponent>(newEntity, entity);
 		CopyComponentIfExists<SpriteRendererComponent>(newEntity, entity);
+		CopyComponentIfExists<StaticMeshComponent>(newEntity, entity);
 		CopyComponentIfExists<CircleRendererComponent>(newEntity, entity);
 		CopyComponentIfExists<CameraComponent>(newEntity, entity);
 		CopyComponentIfExists<NativeScriptComponent>(newEntity, entity);
@@ -539,60 +610,58 @@ namespace Candy {
 
 	void Scene::RenderScene(EditorCamera& camera)
 	{
-		Renderer2D::BeginScene(camera);
+		// Render 3D (static meshes) + 2D (sprites/circles) in one pipeline.
+		SceneRenderer::BeginFrame(camera);
 
-		// Draw sprites
+		auto view = m_Registry.view<TransformComponent, StaticMeshComponent>();
+		for (auto entity : view)
 		{
-			auto group = m_Registry.group<TransformComponent>(entt::get<SpriteRendererComponent>);
-			for (auto entity : group)
-			{
-				auto [transform, sprite] = group.get<TransformComponent, SpriteRendererComponent>(entity);
+			auto [tc, smc] = view.get<TransformComponent, StaticMeshComponent>(entity);
+			if (!smc.Mesh || smc.Mesh->Submeshes.empty())
+				continue;
 
-				Renderer2D::DrawSprite(transform.GetTransform(), sprite, (int)entity);
+			const glm::mat4 transform = tc.GetTransform();
+			for (size_t i = 0; i < smc.Mesh->Submeshes.size(); ++i)
+			{
+				MeshDrawCommand draw;
+				draw.Transform     = transform;
+				draw.Mesh          = smc.Mesh;
+				draw.Material      = (i < smc.Materials.size()) ? smc.Materials[i] : nullptr;
+				draw.SubmeshIndex  = static_cast<uint32_t>(i);
+				draw.EntityID      = static_cast<int>(entity);
+				SceneRenderer::Submit(draw);
 			}
 		}
 
-		// Draw circles
-		{
-			auto view = m_Registry.view<TransformComponent, CircleRendererComponent>();
-			for (auto entity : view)
-			{
-				auto [transform, circle] = view.get<TransformComponent, CircleRendererComponent>(entity);
-
-				Renderer2D::DrawCircle(transform.GetTransform(), circle.Color, circle.Thickness, circle.Fade, (int)entity);
-			}
-		}
-
-		Renderer2D::EndScene();
+		SubmitSpriteAndCircleDraws();
 	}
 
 	void Scene::RenderSceneFromCamera(const CameraComponent& cameraComp, const glm::mat4& cameraTransform)
 	{
-		Renderer2D::BeginScene(cameraComp.Camera, cameraTransform);
+		// Render 3D (static meshes) + 2D (sprites/circles) in one pipeline.
+		SceneRenderer::BeginFrame(cameraComp.Camera, cameraTransform);
 
-		// Draw sprites
+		auto view = m_Registry.view<TransformComponent, StaticMeshComponent>();
+		for (auto entity : view)
 		{
-			auto group = m_Registry.group<TransformComponent>(entt::get<SpriteRendererComponent>);
-			for (auto entity : group)
-			{
-				auto [transform, sprite] = group.get<TransformComponent, SpriteRendererComponent>(entity);
+			auto [tc, smc] = view.get<TransformComponent, StaticMeshComponent>(entity);
+			if (!smc.Mesh || smc.Mesh->Submeshes.empty())
+				continue;
 
-				Renderer2D::DrawSprite(transform.GetTransform(), sprite, (int)entity);
+			const glm::mat4 transform = tc.GetTransform();
+			for (size_t i = 0; i < smc.Mesh->Submeshes.size(); ++i)
+			{
+				MeshDrawCommand draw;
+				draw.Transform     = transform;
+				draw.Mesh          = smc.Mesh;
+				draw.Material      = (i < smc.Materials.size()) ? smc.Materials[i] : nullptr;
+				draw.SubmeshIndex  = static_cast<uint32_t>(i);
+				draw.EntityID      = static_cast<int>(entity);
+				SceneRenderer::Submit(draw);
 			}
 		}
 
-		// Draw circles
-		{
-			auto view = m_Registry.view<TransformComponent, CircleRendererComponent>();
-			for (auto entity : view)
-			{
-				auto [transform, circle] = view.get<TransformComponent, CircleRendererComponent>(entity);
-
-				Renderer2D::DrawCircle(transform.GetTransform(), circle.Color, circle.Thickness, circle.Fade, (int)entity);
-			}
-		}
-
-		Renderer2D::EndScene();
+		SubmitSpriteAndCircleDraws();
 	}
 
 	template<typename T>

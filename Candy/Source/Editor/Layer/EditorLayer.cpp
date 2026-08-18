@@ -135,7 +135,7 @@ namespace Candy {
 			m_CameraController.OnUpdate(ts);
 		m_EditorCamera.OnUpdate(ts);
 
-		Candy::Renderer2D::ResetStats();
+		Candy::SceneRenderer::ResetStats();
 
 		// NOTE: Entity picking (ReadPixel) is intentionally NOT done every frame.
 		// It runs on mouse-click inside OnMouseButtonPressed — ReadPixel copies the
@@ -427,8 +427,11 @@ namespace Candy {
 		}
 		// ImGui::PopStyleVar();
 		
-		m_SceneHierarchyPanel.OnImGuiRender();
+		// Content Browser first so that a single click publishes its selection
+		// before the Scene Hierarchy's Properties window renders in the same frame,
+		// avoiding a one-frame delay when inspecting an asset.
 		m_ContentBrowserPanel.OnImGuiRender();
+		m_SceneHierarchyPanel.OnImGuiRender();
 
 		ImGui::Begin("Stats");
 
@@ -442,12 +445,10 @@ namespace Candy {
 		}
 		ImGui::Text("Hovered Entity: %s", name.c_str());
 
-		auto stats = Renderer2D::GetStats();
-		ImGui::Text("Renderer2D Stats:");
+		auto stats = Candy::SceneRenderer::GetStats();
+		ImGui::Text("SceneRenderer Stats:");
 		ImGui::Text("Draw Calls: %d", stats.DrawCalls);
-		ImGui::Text("Quads: %d", stats.QuadCount);
-		ImGui::Text("Vertices: %d", stats.GetTotalVertexCount());
-		ImGui::Text("Indices: %d", stats.GetTotalIndexCount());
+		ImGui::Text("Submitted: %d", stats.Submitted);
 
 		ImGui::End();
 		

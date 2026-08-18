@@ -150,27 +150,30 @@ namespace Candy {
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_IBID);
 	}
 
-	void OpenGLRHICommandBuffer::SetConstantBuffer(uint32_t slot, uint32_t binding, const Ref<RHIBuffer>& buffer)
+	void OpenGLRHICommandBuffer::SetConstantBuffer(uint32_t slot, uint32_t binding, const Ref<RHIBuffer>& buffer, uint64_t offset)
 	{
 		(void)slot; // D3D12 root param; not needed in OpenGL
+		(void)offset;
 		auto* gl = dynamic_cast<OpenGLRHIBuffer*>(buffer.get());
 		glBindBufferBase(GL_UNIFORM_BUFFER, binding, gl ? gl->GetID() : 0);
 	}
 
-	void OpenGLRHICommandBuffer::SetTexture(uint32_t slot, uint32_t binding, const Ref<RHITexture>& texture)
+	void OpenGLRHICommandBuffer::SetTextures(uint32_t slot, uint32_t count, const Ref<RHITexture>* textures)
 	{
 		(void)slot;
-		// Accept both RHI-device-created textures (OpenGLRHITexture2D) and the
-		// engine-level OpenGLTexture2D (which is-a RHITexture) â€?previously only
-		// the former was handled, silently binding texture 0 for engine textures.
-		GLuint id = 0;
-		if (auto* rhiTex = dynamic_cast<OpenGLRHITexture2D*>(texture.get()))
-			id = rhiTex->GetID();
-		else if (auto* engineTex = dynamic_cast<OpenGLTexture2D*>(texture.get()))
-			id = engineTex->GetRendererID();
-		GLenum unit = static_cast<GLenum>(GL_TEXTURE0 + binding);
-		glActiveTexture(unit);
-		glBindTexture(GL_TEXTURE_2D, id);
+		for (uint32_t i = 0; i < count; ++i)
+		{
+			// Accept both RHI-device-created textures (OpenGLRHITexture2D) and the
+			// engine-level OpenGLTexture2D (which is-a RHITexture).
+			GLuint id = 0;
+			if (auto* rhiTex = dynamic_cast<OpenGLRHITexture2D*>(textures[i].get()))
+				id = rhiTex->GetID();
+			else if (auto* engineTex = dynamic_cast<OpenGLTexture2D*>(textures[i].get()))
+				id = engineTex->GetRendererID();
+			GLenum unit = static_cast<GLenum>(GL_TEXTURE0 + i);
+			glActiveTexture(unit);
+			glBindTexture(GL_TEXTURE_2D, id);
+		}
 	}
 
 	void OpenGLRHICommandBuffer::SetSampler(uint32_t slot, uint32_t binding, const Ref<RHISampler>& sampler)

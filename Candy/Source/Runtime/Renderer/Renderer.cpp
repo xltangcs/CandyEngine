@@ -1,17 +1,17 @@
 #include "CandyPCH.h"
 
 #include "Runtime/Renderer/Renderer.h"
-#include "Runtime/Renderer/Renderer2D.h"
+#include "Runtime/Renderer/SceneRenderer.h"
 
 namespace Candy {
 
 	void Renderer::Init()
 	{
-		Renderer2D::Init();
+		SceneRenderer::Init();
 	}
 
 	void Renderer::Shutdown()
 	{
-		Renderer2D::Shutdown();
+		SceneRenderer::Shutdown();
 	}
 }

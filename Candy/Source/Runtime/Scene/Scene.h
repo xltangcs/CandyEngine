@@ -9,6 +9,8 @@
 #include "Runtime/Renderer/EditorCamera.h"
 #include "Runtime/Scene/SceneCamera.h"
 #include "Runtime/Audio/AudioSystem.h"
+#include "Runtime/Asset/StaticMeshResource.h"
+#include "Runtime/Asset/Material.h"
 
 
 class b2World;
@@ -42,11 +44,19 @@ namespace Candy {
 
 		void OnUpdateRuntime(Timestep ts);
 		void OnUpdateRuntimeLogic(Timestep ts);
+		/// Begins a SceneRenderer frame and submits all draw commands (meshes,
+		/// sprites, circles). The caller owns SceneRenderer::EndFrame() — the
+		/// frame orchestrator (GameFrameRenderer) ends the frame once, after
+		/// the debug-line overlay has also submitted.
 		void RenderRuntimeScene();
 		void OnUpdateSimulation(Timestep ts, EditorCamera& camera);
 		void OnUpdateSimulationLogic(Timestep ts);
 		void OnUpdateEditor(Timestep ts, EditorCamera& camera);
+		/// Begins a SceneRenderer frame and submits all draw commands (see
+		/// RenderRuntimeScene — caller owns EndFrame()).
 		void RenderScene(EditorCamera& camera);
+		/// Begins a SceneRenderer frame and submits all draw commands (see
+		/// RenderRuntimeScene — caller owns EndFrame()).
 		void RenderSceneFromCamera(const struct CameraComponent& cameraComp, const glm::mat4& cameraTransform);
 
 		void OnViewportResize(uint32_t width, uint32_t height);
@@ -73,6 +83,14 @@ namespace Candy {
 
 		void OnPhysics2DStart();
 		void OnPhysics2DStop();
+
+		// ---- Sprite/circle rendering (shared quad mesh + built-in materials) --
+		const Ref<StaticMeshResource>& GetSpriteQuad();
+		const Ref<Material>& GetSpriteMaterial();
+		const Ref<Material>& GetCircleMaterial();
+		/// Submits all sprite/circle entities as SceneRenderer mesh draws
+		/// (transparent pass, z-ordered by SortKey = world z).
+		void SubmitSpriteAndCircleDraws();
 	private:
 		entt::registry m_Registry;
 		uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
@@ -82,6 +100,11 @@ namespace Candy {
 		SceneCamera m_FallbackCamera;
 
 		std::set<entt::entity> m_PendingDeletions;
+
+		// Lazily-created shared rendering resources (sprite/circle migration)
+		Ref<StaticMeshResource> m_QuadMesh;
+		Ref<Material> m_SpriteMaterial;
+		Ref<Material> m_CircleMaterial;
 
 		friend class Entity;
 		friend class SceneSerializer;

@@ -106,7 +106,7 @@ namespace Candy {
 		PFN_vkWaitForFences  fnWaitForFences  = nullptr;
 		PFN_vkResetFences    fnResetFences    = nullptr;
 
-		// ---- Missing functions needed for Texture/Sampler/Descriptor/Renderer2D ---
+		// ---- Missing functions needed for Texture/Sampler/Descriptor ---
 		PFN_vkCreateImage               fnCreateImage               = nullptr;
 		PFN_vkDestroyImage              fnDestroyImage              = nullptr;
 		PFN_vkGetImageMemoryRequirements fnGetImageMemoryRequirements = nullptr;

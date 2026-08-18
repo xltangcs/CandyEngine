@@ -239,6 +239,7 @@ namespace Candy {
 	void OpenGLRHIGraphicsPipeline::ApplyState() const
 	{
 		// Rasterizer
+		glFrontFace(m_Desc.Rasterizer.FrontCounterClockwise ? GL_CCW : GL_CW);
 		switch (m_Desc.Rasterizer.Cull)
 		{
 		case CullMode::None:  glDisable(GL_CULL_FACE); break;
