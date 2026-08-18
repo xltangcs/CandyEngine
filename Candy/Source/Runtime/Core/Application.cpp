@@ -55,32 +55,11 @@ namespace Candy {
 	{
 		if (m_IsEditor)
 		{
-			// Editor: mount the engine root directory (hot-reload friendly).
-			// Engine resources live under the `Content/` subdirectory, so their
-			// VFS paths are `VFS://Engine/Content/...`. Try several candidate
-			// relative paths so the editor works whether the process cwd is the
-			// workspace root (`Candy`) or under bin/.
-			std::array<const char*, 5> candidates = {
-				"Candy",                  // cwd == workspace root (e.g. `E:\CandyEngine`)
-				"../Candy",               // cwd == bin/Debug-windows-x86_64/CandyEditor
-				"../../Candy",
-				"../../../Candy",
-				"..",                     // last-resort fallback beside the exe
-			};
-			std::filesystem::path engineDir;
-			for (const char* c : candidates)
-			{
-				std::filesystem::path p(c);
-				if (std::filesystem::exists(p))
-				{
-					engineDir = p;
-					break;
-				}
-			}
-			if (!engineDir.empty())
-				FileSystem::Get().Mount("Engine", engineDir);
-			else
-				CANDY_CORE_WARN("Engine directory not found in any candidate path");
+			// The "Engine" mount (engine root dir, absolute) is bootstrapped in
+			// main() by FileSystem::BootstrapMount() so VFS://Engine/Saved +
+			// VFS://Engine/Config user data resolve before app construction.
+			// Calling it again here is an idempotent no-op.
+			FileSystem::Get().BootstrapMount();
 		}
 		else
 		{

@@ -1,8 +1,18 @@
 #include "CandyPCH.h"
 #include "Runtime/Core/FileSystem.h"
 #include "Runtime/Core/PakFile.h"
+#include "Utils/PlatformUtils.h"
 
 namespace Candy {
+
+	// Mount roots are native paths (backslashes on Windows) while VFS relative
+	// parts come from "VFS://Game/..." strings (forward slashes); path::operator/
+	// keeps both, producing mixed separators. Always normalize to the preferred
+	// platform separator.
+	static std::filesystem::path JoinMountPath(const std::filesystem::path& root, const std::string& relPath)
+	{
+		return (root / relPath).lexically_normal();
+	}
 
 	FileSystem& FileSystem::Get()
 	{
@@ -82,6 +92,54 @@ namespace Candy {
 		return nullptr;
 	}
 
+	std::filesystem::path FileSystem::DetectEngineDir()
+	{
+		// Engine resources live under the `Content/` subdirectory, so their VFS
+		// paths are `VFS://Engine/Content/...`. Try several candidate relative
+		// paths so the editor works whether the process cwd is the workspace
+		// root (`Candy`) or under bin/. A candidate only counts as the engine
+		// root if it actually contains a `Content/` dir — otherwise sibling
+		// build-output dirs (e.g. bin/.../Candy holding Candy.lib) would win.
+		static const char* candidates[] = {
+			"Candy",                  // cwd == workspace root (e.g. `E:\CandyEngine`)
+			"../Candy",               // cwd == bin/Debug-windows-x86_64/CandyEditor
+			"../../Candy",
+			"../../../Candy",
+			"..",                     // last-resort fallback beside the exe
+		};
+		for (const char* c : candidates)
+		{
+			std::filesystem::path p(c);
+			if (std::filesystem::exists(p / "Content"))
+				return std::filesystem::absolute(p);
+		}
+		return {};
+	}
+
+	void FileSystem::BootstrapMount()
+	{
+		if (m_Bootstrapped)
+			return;
+		m_Bootstrapped = true;
+
+		// Editor mode: mount the engine root (absolute so it stays valid
+		// regardless of the process cwd). Packaged builds have no engine dir on
+		// disk next to the cwd; fall back to the executable's directory so
+		// VFS://Engine/Saved... still resolves to something writable.
+		auto engineDir = DetectEngineDir();
+		std::filesystem::path root = engineDir.empty()
+			? GetExecutablePath().parent_path()
+			: engineDir;
+
+		Mount("Engine", root);
+
+		// User data lives under the engine mount point (UE-style): Saved/ for
+		// editor state & layouts, Config/ for editor settings.
+		std::filesystem::create_directories(root / "Saved");
+		std::filesystem::create_directories(root / "Config");
+		CANDY_CORE_INFO("FileSystem: bootstrapped Engine mount at '{0}'", root.string());
+	}
+
 	std::optional<std::vector<uint8_t>> FileSystem::Read(const std::string& virtualPath)
 	{
 		std::string relPath;
@@ -95,7 +153,7 @@ namespace Candy {
 		}
 		else
 		{
-			std::filesystem::path fullPath = mp->path / relPath;
+			std::filesystem::path fullPath = JoinMountPath(mp->path, relPath);
 			if (!std::filesystem::exists(fullPath))
 				return std::nullopt;
 
@@ -134,7 +192,7 @@ namespace Candy {
 		}
 		else
 		{
-			return std::filesystem::exists(mp->path / relPath);
+			return std::filesystem::exists(JoinMountPath(mp->path, relPath));
 		}
 	}
 
@@ -145,7 +203,7 @@ namespace Candy {
 		if (!mp || mp->isPak)
 			return false;
 
-		std::filesystem::path fullPath = mp->path / relPath;
+		std::filesystem::path fullPath = JoinMountPath(mp->path, relPath);
 		std::filesystem::create_directories(fullPath.parent_path());
 
 		std::ofstream file(fullPath, std::ios::binary);
@@ -168,7 +226,7 @@ namespace Candy {
 		if (!mp || mp->isPak)
 			return std::nullopt;
 
-		std::filesystem::path fullPath = mp->path / relPath;
+		std::filesystem::path fullPath = JoinMountPath(mp->path, relPath);
 		return fullPath;
 	}
 
@@ -197,7 +255,7 @@ namespace Candy {
 		if (!vp.IsValid())
 			return std::nullopt;
 
-		auto tempPath = std::filesystem::temp_directory_path() / "CandyGame" / vp.DomainLabel() / vp.relativePath;
+		auto tempPath = (std::filesystem::temp_directory_path() / "CandyGame" / vp.DomainLabel() / vp.relativePath).lexically_normal();
 		std::filesystem::create_directories(tempPath.parent_path());
 		{
 			std::ofstream out(tempPath, std::ios::binary);
@@ -265,7 +323,7 @@ namespace Candy {
 		}
 		else
 		{
-			std::filesystem::path diskDir = mp->path / relPath;
+			std::filesystem::path diskDir = JoinMountPath(mp->path, relPath);
 			if (!std::filesystem::exists(diskDir))
 				return result;
 

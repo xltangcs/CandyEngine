@@ -80,10 +80,24 @@ namespace Candy {
 		// mount point root, with pakSubDir prepended for pak mounts).
 		const MountPoint* Resolve(const std::string& virtualPath, std::string& outRelativePath);
 
+		// Detect the engine root directory (the "Candy" dir containing Content/).
+		// Editor mode: probes candidate relative paths so it works regardless of
+		// the process cwd (workspace root, bin/, ...). Returns an absolute path,
+		// or an empty path if no candidate exists (packaged builds).
+		static std::filesystem::path DetectEngineDir();
+
+		// Bootstrap the "Engine" mount as early as possible (called from main()
+		// before any VFS://Engine path is used, e.g. EditorSettings/EditorState
+		// load). Editor mode mounts the engine root dir (absolute, cwd-independent);
+		// packaged builds fall back to the executable's directory. Creates the
+		// Saved/ and Config/ user-data subdirectories. Idempotent.
+		void BootstrapMount();
+
 	private:
 		FileSystem() = default;
 
 		std::vector<MountPoint> m_Mounts;
+		bool m_Bootstrapped = false;
 	};
 
 }
