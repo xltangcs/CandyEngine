@@ -3,6 +3,8 @@
 #include "Runtime/Scene/SceneCamera.h"
 #include "Runtime/Core/UUID.h"
 #include "Runtime/Renderer/Texture.h"
+#include "Runtime/Asset/StaticMeshResource.h"
+#include "Runtime/Asset/Material.h"
 
 
 #include <glm/glm.hpp>
@@ -12,6 +14,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include <unordered_map>
+#include <vector>
 
 #include "Runtime/Scripting/ScriptBindingsMacros.h"
 
@@ -76,6 +79,31 @@ namespace Candy {
 		SpriteRendererComponent(const SpriteRendererComponent&) = default;
 		SpriteRendererComponent(const glm::vec4& color)
 			: Color(color) {}
+	};
+
+	CANDY_CLASS()
+	struct StaticMeshComponent
+	{
+		// VFS:// path to the source glTF asset (serialized for save/load).
+		CANDY_PROPERTY()
+		std::string MeshPath;
+
+		// One .mat VFS path per Submesh (indexed by Submesh::MaterialIndex).
+		// Serialized for save/load; each entry points at a shared material asset.
+		// May be empty (meaning "use the mesh's imported default material").
+		CANDY_PROPERTY()
+		std::vector<std::string> MaterialPaths;
+
+		// Runtime imported data (not serialized). Populated from MeshPath via
+		// MeshImporter when the scene is loaded / the path changes, then refined
+		// by MaterialCache so each MaterialPaths[i] resolves to a shared material.
+		Ref<StaticMeshResource> Mesh;
+		// One material per Submesh (indexed by Submesh::MaterialIndex).
+		// Shared via MaterialCache when MaterialPaths[i] is set.
+		std::vector<Ref<Material>> Materials;
+
+		StaticMeshComponent() = default;
+		StaticMeshComponent(const StaticMeshComponent&) = default;
 	};
 
 	struct CircleRendererComponent
