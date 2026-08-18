@@ -371,6 +371,7 @@ namespace Candy {
 
 		{
 			SceneRenderer::BeginFrame(*mainCamera, cameraTransform);
+			SubmitStaticMeshDraws();
 			SubmitSpriteAndCircleDraws();
 		}
 	}
@@ -613,26 +614,7 @@ namespace Candy {
 		// Render 3D (static meshes) + 2D (sprites/circles) in one pipeline.
 		SceneRenderer::BeginFrame(camera);
 
-		auto view = m_Registry.view<TransformComponent, StaticMeshComponent>();
-		for (auto entity : view)
-		{
-			auto [tc, smc] = view.get<TransformComponent, StaticMeshComponent>(entity);
-			if (!smc.Mesh || smc.Mesh->Submeshes.empty())
-				continue;
-
-			const glm::mat4 transform = tc.GetTransform();
-			for (size_t i = 0; i < smc.Mesh->Submeshes.size(); ++i)
-			{
-				MeshDrawCommand draw;
-				draw.Transform     = transform;
-				draw.Mesh          = smc.Mesh;
-				draw.Material      = (i < smc.Materials.size()) ? smc.Materials[i] : nullptr;
-				draw.SubmeshIndex  = static_cast<uint32_t>(i);
-				draw.EntityID      = static_cast<int>(entity);
-				SceneRenderer::Submit(draw);
-			}
-		}
-
+		SubmitStaticMeshDraws();
 		SubmitSpriteAndCircleDraws();
 	}
 
@@ -641,6 +623,12 @@ namespace Candy {
 		// Render 3D (static meshes) + 2D (sprites/circles) in one pipeline.
 		SceneRenderer::BeginFrame(cameraComp.Camera, cameraTransform);
 
+		SubmitStaticMeshDraws();
+		SubmitSpriteAndCircleDraws();
+	}
+
+	void Scene::SubmitStaticMeshDraws()
+	{
 		auto view = m_Registry.view<TransformComponent, StaticMeshComponent>();
 		for (auto entity : view)
 		{
@@ -660,8 +648,6 @@ namespace Candy {
 				SceneRenderer::Submit(draw);
 			}
 		}
-
-		SubmitSpriteAndCircleDraws();
 	}
 
 	template<typename T>

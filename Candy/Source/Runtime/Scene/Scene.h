@@ -91,6 +91,9 @@ namespace Candy {
 		/// Submits all sprite/circle entities as SceneRenderer mesh draws
 		/// (transparent pass, z-ordered by SortKey = world z).
 		void SubmitSpriteAndCircleDraws();
+		/// Submits all StaticMeshComponent entities as SceneRenderer mesh draws
+		/// (one draw per submesh, opaque/masked/transparent by material).
+		void SubmitStaticMeshDraws();
 	private:
 		entt::registry m_Registry;
 		uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
