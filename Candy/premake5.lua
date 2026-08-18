@@ -52,6 +52,7 @@ project "Candy"
 		"%{IncludeDir.pybind11}",
 		"%{IncludeDir.Python3}",
 		"%{IncludeDir.Vulkan}",
+		"%{IncludeDir.cgltf}",
 		"ThirdParty/miniaudio"
 	}
 
@@ -84,6 +85,11 @@ project "Candy"
 	flags { "NoPCH" }
 
 	filter "files:ThirdParty/miniaudio/**.cpp"
+	flags { "NoPCH" }
+
+	-- cgltf is a bundled single-header C parser; its implementation TU must not
+	-- use the engine PCH (pure C translation unit).
+	filter "files:Source/Runtime/Asset/CgltfImpl.cpp"
 	flags { "NoPCH" }
 
 	-- D3D12/Vulkan files use CandyPCH.h which includes <Windows.h> with NOMINMAX.

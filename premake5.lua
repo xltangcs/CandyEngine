@@ -29,6 +29,7 @@ IncludeDir["yaml_cpp"]  = "%{wks.location}/Candy/ThirdParty/yaml-cpp/include"
 IncludeDir["ImGuizmo"]  = "%{wks.location}/Candy/ThirdParty/ImGuizmo/src"
 IncludeDir["box2d"]  	= "%{wks.location}/Candy/ThirdParty/box2d/include"
 IncludeDir["pybind11"] 	= "%{wks.location}/Candy/ThirdParty/pybind11/include"
+IncludeDir["cgltf"]  	= "%{wks.location}/Candy/ThirdParty/cgltf"
 
 -- Python3: 使用 ThirdParty/Python3 (embedded)
 IncludeDir["Python3"] = "%{wks.location}/Candy/ThirdParty/Python3/include"
