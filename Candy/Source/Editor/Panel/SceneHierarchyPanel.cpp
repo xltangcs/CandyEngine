@@ -470,6 +470,9 @@ namespace
 			EditorSelection::Get().SelectEntity(entity);
 		}
 
+		if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && m_OnEntityDoubleClicked)
+			m_OnEntityDoubleClicked(entity);
+
 		bool entityDeleted = false;
 		if (ImGui::BeginPopupContextItem())
 		{

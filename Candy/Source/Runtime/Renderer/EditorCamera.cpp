@@ -4,6 +4,7 @@
 #include "Runtime/Core/Input.h"
 #include "Runtime/Core/KeyCodes.h"
 #include "Runtime/Core/MouseCodes.h"
+#include "Runtime/Core/Application.h"
 
 #include <glfw/glfw3.h>
 
@@ -34,6 +35,24 @@ namespace Candy {
 		m_ViewMatrix = glm::inverse(m_ViewMatrix);
 	}
 
+	void EditorCamera::Focus(const glm::vec3& center, float radius)
+	{
+		// UE FocusViewportOnBounds style: keep the current yaw/pitch (view
+		// direction) and derive the distance from the bounding-sphere radius
+		// so the object is fully framed, with some padding.
+		float halfExtent = std::max(radius, 0.5f);
+
+		float halfFovV = glm::radians(m_FOV) * 0.5f;
+		float halfFovH = std::atan(std::tan(halfFovV) * m_AspectRatio);
+
+		float dist = halfExtent / std::sin(halfFovV);
+		dist = std::max(dist, halfExtent / std::sin(halfFovH));
+
+		m_Distance = glm::clamp(dist * 1.15f, 1.0f, m_FarClip * 0.9f);
+		m_FocalPoint = center;
+		UpdateView();
+	}
+
 	std::pair<float, float> EditorCamera::PanSpeed() const
 	{
 		float x = std::min(m_ViewportWidth / 1000.0f, 2.4f); // max = 2.4f
@@ -61,18 +80,32 @@ namespace Candy {
 
 	void EditorCamera::OnUpdate(Timestep ts)
 	{
+		const glm::vec2& mouse{ Input::GetMouseX(), Input::GetMouseY() };
+		glm::vec2 delta = (mouse - m_InitialMousePosition) * 0.003f;
+		m_InitialMousePosition = mouse;
+
 		if (Input::IsKeyPressed(Key::LeftAlt))
 		{
-			const glm::vec2& mouse{ Input::GetMouseX(), Input::GetMouseY() };
-			glm::vec2 delta = (mouse - m_InitialMousePosition) * 0.003f;
-			m_InitialMousePosition = mouse;
-
 			if (Input::IsMouseButtonPressed(Mouse::ButtonMiddle))
 				MousePan(delta);
 			else if (Input::IsMouseButtonPressed(Mouse::ButtonLeft))
 				MouseRotate(delta);
 			else if (Input::IsMouseButtonPressed(Mouse::ButtonRight))
 				MouseZoom(delta.y);
+		}
+		else if (Input::IsMouseButtonPressed(Mouse::ButtonMiddle))
+		{
+			MousePan(delta);
+		}
+		else if (Input::IsMouseButtonPressed(Mouse::ButtonRight))
+		{
+			if (!m_IsFlying)
+				EnterFlyMode();
+			MouseFly(delta, ts);
+		}
+		else if (m_IsFlying)
+		{
+			ExitFlyMode();
 		}
 
 		UpdateView();
@@ -104,16 +137,62 @@ namespace Candy {
 		float yawSign = GetUpDirection().y < 0 ? -1.0f : 1.0f;
 		m_Yaw += yawSign * delta.x * RotationSpeed();
 		m_Pitch += delta.y * RotationSpeed();
+		m_Pitch = glm::clamp(m_Pitch, -89.9f, 89.9f);
 	}
 
 	void EditorCamera::MouseZoom(float delta)
 	{
-		m_Distance -= delta * ZoomSpeed();
-		if (m_Distance < 1.0f)
+		float newDistance = m_Distance - delta * ZoomSpeed();
+		newDistance = std::max(newDistance, 1.0f);
+
+		// Keep the world point under the cursor stationary while zooming
+		// (UE-style zoom-to-cursor): move the camera along the cursor ray so
+		// that the point under the mouse stays under the mouse after the zoom.
+		glm::vec3 mouseWorld = GetMouseWorldPoint();
+		glm::vec3 rayDir = glm::normalize(mouseWorld - m_Position);
+		m_Position += rayDir * (m_Distance - newDistance);
+		m_FocalPoint = m_Position + GetForwardDirection() * newDistance;
+		m_Distance = newDistance;
+	}
+
+	void EditorCamera::MouseFly(const glm::vec2& delta, Timestep ts)
+	{
+		float yawSign = GetUpDirection().y < 0 ? -1.0f : 1.0f;
+		m_Yaw += yawSign * delta.x * RotationSpeed();
+		m_Pitch += delta.y * RotationSpeed();
+		m_Pitch = glm::clamp(m_Pitch, -89.9f, 89.9f);
+
+		float speed = m_FlySpeed * (m_Distance / 10.0f);
+		if (Input::IsKeyPressed(Key::LeftShift) || Input::IsKeyPressed(Key::RightShift))
+			speed *= 3.0f;
+
+		glm::vec3 move(0.0f);
+		if (Input::IsKeyPressed(Key::W)) move += GetForwardDirection();
+		if (Input::IsKeyPressed(Key::S)) move -= GetForwardDirection();
+		if (Input::IsKeyPressed(Key::A)) move -= GetRightDirection();
+		if (Input::IsKeyPressed(Key::D)) move += GetRightDirection();
+		if (Input::IsKeyPressed(Key::E)) move += GetUpDirection();
+		if (Input::IsKeyPressed(Key::Q)) move -= GetUpDirection();
+
+		if (glm::length(move) > 0.0f)
 		{
-			m_FocalPoint += GetForwardDirection();
-			m_Distance = 1.0f;
+			m_FocalPoint += glm::normalize(move) * speed * ts.GetSeconds();
+			m_Position = CalculatePosition();
 		}
+	}
+
+	void EditorCamera::EnterFlyMode()
+	{
+		m_IsFlying = true;
+		GLFWwindow* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow());
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	}
+
+	void EditorCamera::ExitFlyMode()
+	{
+		m_IsFlying = false;
+		GLFWwindow* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow());
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	}
 
 	glm::vec3 EditorCamera::GetUpDirection() const
@@ -134,6 +213,24 @@ namespace Candy {
 	glm::vec3 EditorCamera::CalculatePosition() const
 	{
 		return m_FocalPoint - GetForwardDirection() * m_Distance;
+	}
+
+	glm::vec3 EditorCamera::GetMouseWorldPoint() const
+	{
+		float viewportW = std::max(m_ViewportWidth, 1.0f);
+		float viewportH = std::max(m_ViewportHeight, 1.0f);
+		float ndcX = (m_ViewportMousePos.x / viewportW) * 2.0f - 1.0f;
+		float ndcY = 1.0f - (m_ViewportMousePos.y / viewportH) * 2.0f;
+
+		glm::vec4 rayClip(ndcX, ndcY, -1.0f, 1.0f);
+		glm::vec4 rayEye = glm::inverse(m_Projection) * rayClip;
+		rayEye.z = -1.0f;
+		rayEye.w = 0.0f;
+
+		glm::vec4 rayWorld4 = glm::inverse(m_ViewMatrix) * rayEye;
+		glm::vec3 rayWorld = glm::normalize(glm::vec3(rayWorld4));
+
+		return m_Position + rayWorld * m_Distance;
 	}
 
 	glm::quat EditorCamera::GetOrientation() const

@@ -18,10 +18,17 @@ namespace Candy {
 		void OnUpdate(Timestep ts);
 		void OnEvent(Event& e);
 
+		// UE-style fit-bounds focus: keeps the current view direction and
+		// moves the camera so the sphere (center, radius) is fully in view.
+		void Focus(const glm::vec3& center, float radius);
+
 		inline float GetDistance() const { return m_Distance; }
 		inline void SetDistance(float distance) { m_Distance = distance; }
 
 		inline void SetViewportSize(float width, float height) { m_ViewportWidth = width; m_ViewportHeight = height; UpdateProjection(); }
+		inline void SetViewportMousePosition(float x, float y) { m_ViewportMousePos = { x, y }; }
+		inline void SetFocalPoint(const glm::vec3& focalPoint) { m_FocalPoint = focalPoint; }
+		inline bool IsFlying() const { return m_IsFlying; }
 
 		const glm::mat4& GetViewMatrix() const { return m_ViewMatrix; }
 		glm::mat4 GetViewProjection() const { return m_Projection * m_ViewMatrix; }
@@ -43,8 +50,13 @@ namespace Candy {
 		void MousePan(const glm::vec2& delta);
 		void MouseRotate(const glm::vec2& delta);
 		void MouseZoom(float delta);
+		void MouseFly(const glm::vec2& delta, Timestep ts);
+
+		void EnterFlyMode();
+		void ExitFlyMode();
 
 		glm::vec3 CalculatePosition() const;
+		glm::vec3 GetMouseWorldPoint() const;
 
 		std::pair<float, float> PanSpeed() const;
 		float RotationSpeed() const;
@@ -62,6 +74,10 @@ namespace Candy {
 		float m_Pitch = 0.0f, m_Yaw = 0.0f;
 
 		float m_ViewportWidth = 1280, m_ViewportHeight = 720;
+		glm::vec2 m_ViewportMousePos = { 0.0f, 0.0f };
+
+		bool m_IsFlying = false;
+		float m_FlySpeed = 10.0f;
 	};
 
 }

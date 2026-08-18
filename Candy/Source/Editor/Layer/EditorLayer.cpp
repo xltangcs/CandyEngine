@@ -87,6 +87,13 @@ namespace Candy {
 
 		m_SceneHierarchyPanel.SetContext(m_ActiveScene);
 
+		// Double-clicking an entity in the Scene Hierarchy focuses the camera
+		// on it (UE-style frame selection).
+		m_SceneHierarchyPanel.SetEntityDoubleClickedCallback([this](Entity entity)
+		{
+			FocusEntity(entity);
+		});
+
 		// Apply persisted window size
 		GLFWwindow* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow());
 		if (editorState.WindowMaximized)
@@ -604,8 +611,28 @@ namespace Candy {
 
 	void EditorLayer::OnEvent(Event& e)
 	{
-		m_CameraController.OnEvent(e);
-		m_EditorCamera.OnEvent(e);
+		// Mouse events are only forwarded to the camera controllers while the
+		// viewport is hovered/focused. Otherwise wheel-scrolling (or dragging)
+		// over the Hierarchy, Content Browser, etc. would accidentally zoom,
+		// orbit or pan the editor camera. Non-mouse events (e.g. resize) are
+		// always forwarded.
+		if (e.IsInCategory(EventCategoryMouse))
+		{
+			if (m_ViewportHovered || m_ViewportFocused)
+			{
+				auto [mx, my] = ImGui::GetMousePos();
+				m_EditorCamera.SetViewportMousePosition(mx - m_ViewportBounds[0].x, my - m_ViewportBounds[0].y);
+
+				m_CameraController.OnEvent(e);
+				m_EditorCamera.OnEvent(e);
+			}
+		}
+		else
+		{
+			m_CameraController.OnEvent(e);
+			m_EditorCamera.OnEvent(e);
+		}
+
 		EventDispatcher dispatcher(e);
 		dispatcher.Dispatch<KeyPressedEvent>(CANDY_BIND_EVENT_FN(EditorLayer::OnKeyPressed));
 		dispatcher.Dispatch<MouseButtonPressedEvent>(CANDY_BIND_EVENT_FN(EditorLayer::OnMouseButtonPressed));
@@ -662,6 +689,11 @@ namespace Candy {
 			}
 
 			// Gizmos
+			case Key::F:
+			{
+				FocusEntity(m_SceneHierarchyPanel.GetSelectedEntity());
+				break;
+			}
 			case Key::Q:
 			{
 				if (!ImGuizmo::IsUsing())
@@ -687,6 +719,7 @@ namespace Candy {
 				break;
 			}
 		}
+		return false;
 	}
 
 	bool EditorLayer::OnMouseButtonPressed(MouseButtonPressedEvent& e)
@@ -849,6 +882,39 @@ namespace Candy {
 		Entity selectedEntity = m_SceneHierarchyPanel.GetSelectedEntity();
 		if (selectedEntity)
 			m_EditorScene->DuplicateEntity(selectedEntity);
+	}
+
+	float EditorLayer::CalculateEntityHalfExtent(Entity entity) const
+	{
+		const auto& tc = entity.GetComponent<TransformComponent>();
+		float maxScale = std::max(std::max(std::abs(tc.Scale.x), std::abs(tc.Scale.y)), std::abs(tc.Scale.z));
+		maxScale = std::max(maxScale, 0.01f);
+
+		// Fallback: a 1x1 quad (sprites have no size field) scaled by the transform.
+		float halfExtent = 0.5f * maxScale;
+
+		if (entity.HasComponent<BoxCollider2DComponent>())
+			halfExtent = std::max(halfExtent, glm::length(entity.GetComponent<BoxCollider2DComponent>().Size) * maxScale);
+
+		if (entity.HasComponent<CircleCollider2DComponent>())
+			halfExtent = std::max(halfExtent, entity.GetComponent<CircleCollider2DComponent>().Radius * maxScale);
+
+		if (entity.HasComponent<StaticMeshComponent>())
+		{
+			auto& mesh = entity.GetComponent<StaticMeshComponent>();
+			if (mesh.Mesh)
+				halfExtent = std::max(halfExtent, glm::length(mesh.Mesh->Bounds.GetExtent()) * maxScale);
+		}
+
+		return halfExtent;
+	}
+
+	void EditorLayer::FocusEntity(Entity entity)
+	{
+		if (!entity || !entity.HasComponent<TransformComponent>())
+			return;
+
+		m_EditorCamera.Focus(entity.GetComponent<TransformComponent>().Translation, CalculateEntityHalfExtent(entity));
 	}
 
 	void EditorLayer::OpenRecent(const std::filesystem::path& path)

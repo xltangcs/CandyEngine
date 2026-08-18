@@ -4,6 +4,8 @@
 #include "Runtime/Scene/Scene.h"
 #include "Runtime/Scene/Entity.h"
 
+#include <functional>
+
 namespace Candy {
 
 	class SceneHierarchyPanel
@@ -13,6 +15,8 @@ namespace Candy {
 		SceneHierarchyPanel(const Ref<Scene>& scene);
 
 		void SetContext(const Ref<Scene>& scene);
+
+		void SetEntityDoubleClickedCallback(const std::function<void(Entity)>& callback) { m_OnEntityDoubleClicked = callback; }
 
 		void OnImGuiRender();
 		Entity GetSelectedEntity() const { return m_SelectionContext; }
@@ -24,6 +28,7 @@ namespace Candy {
 	private:
 		Ref<Scene> m_Context;
 		Entity m_SelectionContext;
+		std::function<void(Entity)> m_OnEntityDoubleClicked;
 	};
 
 }

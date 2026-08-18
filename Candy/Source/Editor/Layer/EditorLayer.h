@@ -43,6 +43,9 @@ namespace Candy {
 
 		void OnDuplicateEntity();
 
+		void FocusEntity(Entity entity);
+		float CalculateEntityHalfExtent(Entity entity) const;
+
 		// Project
 		void OpenRecent(const std::filesystem::path& path);
 		void UI_BuildDialog();
