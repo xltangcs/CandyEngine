@@ -271,6 +271,7 @@ namespace Candy {
 		float Friction = 0.5f;
 		CANDY_PROPERTY()
 		float Restitution = 0.0f;
+		CANDY_PROPERTY()
 		float RestitutionThreshold = 0.5f;
 
 		// Storage for runtime
@@ -294,6 +295,7 @@ namespace Candy {
 		float Friction = 0.5f;
 		CANDY_PROPERTY()
 		float Restitution = 0.0f;
+		CANDY_PROPERTY()
 		float RestitutionThreshold = 0.5f;
 
 		// Storage for runtime

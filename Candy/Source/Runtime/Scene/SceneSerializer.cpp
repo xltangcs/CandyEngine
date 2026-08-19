@@ -9,6 +9,8 @@
 #include "Runtime/Asset/MeshImporter.h"
 #include "Runtime/Asset/MaterialCache.h"
 
+#include "Runtime/Scene/SceneSerialization.generated.inl"
+
 #include <fstream>
 #include <yaml-cpp/yaml.h>
 
@@ -187,10 +189,7 @@ namespace Candy {
 			out << YAML::Key << "TransformComponent";
 			out << YAML::BeginMap; // TransformComponent
 
-			auto& tc = entity.GetComponent<TransformComponent>();
-			out << YAML::Key << "Translation" << YAML::Value << tc.Translation;
-			out << YAML::Key << "Rotation" << YAML::Value << tc.Rotation;
-			out << YAML::Key << "Scale" << YAML::Value << tc.Scale;
+			GeneratedSerialization::SerializeTransformComponent(out, entity.GetComponent<TransformComponent>());
 
 			out << YAML::EndMap; // TransformComponent
 		}
@@ -241,11 +240,7 @@ namespace Candy {
 			out << YAML::Key << "SkyboxComponent";
 			out << YAML::BeginMap; // SkyboxComponent
 
-			auto& sb = entity.GetComponent<SkyboxComponent>();
-			if (!sb.CubemapPath.empty())
-				out << YAML::Key << "CubemapPath" << YAML::Value << sb.CubemapPath;
-			out << YAML::Key << "Intensity" << YAML::Value << sb.Intensity;
-			out << YAML::Key << "Exposure" << YAML::Value << sb.Exposure;
+			GeneratedSerialization::SerializeSkyboxComponent(out, entity.GetComponent<SkyboxComponent>());
 
 			out << YAML::EndMap; // SkyboxComponent
 		}
@@ -255,10 +250,7 @@ namespace Candy {
 			out << YAML::Key << "SpriteRendererComponent";
 			out << YAML::BeginMap; // SpriteRendererComponent
 
-			auto& spriteRendererComponent = entity.GetComponent<SpriteRendererComponent>();
-			out << YAML::Key << "Color" << YAML::Value << spriteRendererComponent.Color;
-			if (!spriteRendererComponent.TexturePath.empty())
-				out << YAML::Key << "TexturePath" << YAML::Value << spriteRendererComponent.TexturePath;
+			GeneratedSerialization::SerializeSpriteRendererComponent(out, entity.GetComponent<SpriteRendererComponent>());
 
 			out << YAML::EndMap; // SpriteRendererComponent
 		}
@@ -268,20 +260,7 @@ namespace Candy {
 			out << YAML::Key << "StaticMeshComponent";
 			out << YAML::BeginMap; // StaticMeshComponent
 
-			auto& staticMeshComponent = entity.GetComponent<StaticMeshComponent>();
-			if (!staticMeshComponent.MeshPath.empty())
-				out << YAML::Key << "MeshPath" << YAML::Value << staticMeshComponent.MeshPath;
-
-			// Material overrides: one .mat VFS path per submesh slot. Only
-			// serialized when the component has any (avoids bloating every mesh).
-			if (!staticMeshComponent.MaterialPaths.empty())
-			{
-				out << YAML::Key << "MaterialPaths" << YAML::Value;
-				out << YAML::BeginSeq;
-				for (const auto& p : staticMeshComponent.MaterialPaths)
-					out << YAML::Value << p;
-				out << YAML::EndSeq;
-			}
+			GeneratedSerialization::SerializeStaticMeshComponent(out, entity.GetComponent<StaticMeshComponent>());
 
 			out << YAML::EndMap; // StaticMeshComponent
 		}
@@ -291,23 +270,7 @@ namespace Candy {
 			out << YAML::Key << "SkeletalMeshComponent";
 			out << YAML::BeginMap; // SkeletalMeshComponent
 
-			auto& skmc = entity.GetComponent<SkeletalMeshComponent>();
-			if (!skmc.MeshPath.empty())
-				out << YAML::Key << "MeshPath" << YAML::Value << skmc.MeshPath;
-
-			if (!skmc.MaterialPaths.empty())
-			{
-				out << YAML::Key << "MaterialPaths" << YAML::Value;
-				out << YAML::BeginSeq;
-				for (const auto& p : skmc.MaterialPaths)
-					out << YAML::Value << p;
-				out << YAML::EndSeq;
-			}
-
-			out << YAML::Key << "ClipName" << YAML::Value << skmc.ClipName;
-			out << YAML::Key << "Speed" << YAML::Value << skmc.Speed;
-			out << YAML::Key << "Play" << YAML::Value << skmc.Play;
-			out << YAML::Key << "Loop" << YAML::Value << skmc.Loop;
+			GeneratedSerialization::SerializeSkeletalMeshComponent(out, entity.GetComponent<SkeletalMeshComponent>());
 
 			out << YAML::EndMap; // SkeletalMeshComponent
 		}
@@ -342,13 +305,7 @@ namespace Candy {
 			out << YAML::Key << "BoxCollider2DComponent";
 			out << YAML::BeginMap; // BoxCollider2DComponent
 
-			auto& bc2dComponent = entity.GetComponent<BoxCollider2DComponent>();
-			out << YAML::Key << "Offset" << YAML::Value << bc2dComponent.Offset;
-			out << YAML::Key << "Size" << YAML::Value << bc2dComponent.Size;
-			out << YAML::Key << "Density" << YAML::Value << bc2dComponent.Density;
-			out << YAML::Key << "Friction" << YAML::Value << bc2dComponent.Friction;
-			out << YAML::Key << "Restitution" << YAML::Value << bc2dComponent.Restitution;
-			out << YAML::Key << "RestitutionThreshold" << YAML::Value << bc2dComponent.RestitutionThreshold;
+			GeneratedSerialization::SerializeBoxCollider2DComponent(out, entity.GetComponent<BoxCollider2DComponent>());
 
 			out << YAML::EndMap; // BoxCollider2DComponent
 		}
@@ -358,13 +315,7 @@ namespace Candy {
 			out << YAML::Key << "CircleCollider2DComponent";
 			out << YAML::BeginMap; // CircleCollider2DComponent
 
-			auto& cc2dComponent = entity.GetComponent<CircleCollider2DComponent>();
-			out << YAML::Key << "Offset" << YAML::Value << cc2dComponent.Offset;
-			out << YAML::Key << "Radius" << YAML::Value << cc2dComponent.Radius;
-			out << YAML::Key << "Density" << YAML::Value << cc2dComponent.Density;
-			out << YAML::Key << "Friction" << YAML::Value << cc2dComponent.Friction;
-			out << YAML::Key << "Restitution" << YAML::Value << cc2dComponent.Restitution;
-			out << YAML::Key << "RestitutionThreshold" << YAML::Value << cc2dComponent.RestitutionThreshold;
+			GeneratedSerialization::SerializeCircleCollider2DComponent(out, entity.GetComponent<CircleCollider2DComponent>());
 
 			out << YAML::EndMap; // CircleCollider2DComponent
 		}
@@ -374,9 +325,7 @@ namespace Candy {
 			out << YAML::Key << "ScriptComponent";
 			out << YAML::BeginMap; // ScriptComponent
 
-			auto& sc = entity.GetComponent<ScriptComponent>();
-			out << YAML::Key << "ScriptPath" << YAML::Value << sc.ScriptPath;
-			out << YAML::Key << "ClassName" << YAML::Value << sc.ClassName;
+			GeneratedSerialization::SerializeScriptComponent(out, entity.GetComponent<ScriptComponent>());
 
 			out << YAML::EndMap; // ScriptComponent
 		}
@@ -386,11 +335,7 @@ namespace Candy {
 			out << YAML::Key << "AudioSourceComponent";
 			out << YAML::BeginMap; // AudioSourceComponent
 
-			auto& asc = entity.GetComponent<AudioSourceComponent>();
-			out << YAML::Key << "SoundPath" << YAML::Value << asc.SoundPath;
-			out << YAML::Key << "Volume" << YAML::Value << asc.Volume;
-			out << YAML::Key << "Looping" << YAML::Value << asc.Looping;
-			out << YAML::Key << "PlayOnStart" << YAML::Value << asc.PlayOnStart;
+			GeneratedSerialization::SerializeAudioSourceComponent(out, entity.GetComponent<AudioSourceComponent>());
 
 			out << YAML::EndMap; // AudioSourceComponent
 		}
@@ -547,9 +492,7 @@ namespace Candy {
 				if (transformComponent)
 				{
 					auto& tc = deserializedEntity.GetComponent<TransformComponent>();
-					tc.Translation = transformComponent["Translation"].as<glm::vec3>();
-					tc.Rotation = transformComponent["Rotation"].as<glm::vec3>();
-					tc.Scale = transformComponent["Scale"].as<glm::vec3>();
+					GeneratedSerialization::DeserializeTransformComponent(transformComponent, tc);
 				}
 
 				auto cameraComponent = entity["CameraComponent"];
@@ -588,40 +531,27 @@ namespace Candy {
 				if (skyboxComponent)
 				{
 					auto& sb = deserializedEntity.AddComponent<SkyboxComponent>();
-					if (auto cp = skyboxComponent["CubemapPath"])
+					GeneratedSerialization::DeserializeSkyboxComponent(skyboxComponent, sb);
+					if (!sb.CubemapPath.empty())
 					{
-						std::string raw = cp.as<std::string>();
-						if (!raw.empty())
-						{
-							sb.CubemapPath = raw;
-							sb.Cubemap = TextureCubemap::CreateFromEquirect(sb.CubemapPath);
-							if (!sb.Cubemap)
-								CANDY_CORE_WARN("SceneSerializer: failed to load cubemap {0}", sb.CubemapPath);
-						}
+						sb.Cubemap = TextureCubemap::CreateFromEquirect(sb.CubemapPath);
+						if (!sb.Cubemap)
+							CANDY_CORE_WARN("SceneSerializer: failed to load cubemap {0}", sb.CubemapPath);
 					}
-					if (auto in = skyboxComponent["Intensity"])
-						sb.Intensity = in.as<float>();
-					if (auto ex = skyboxComponent["Exposure"])
-						sb.Exposure = ex.as<float>();
 				}
 
 				auto spriteRendererComponent = entity["SpriteRendererComponent"];
 				if (spriteRendererComponent)
 				{
 					auto& src = deserializedEntity.AddComponent<SpriteRendererComponent>();
-					src.Color = spriteRendererComponent["Color"].as<glm::vec4>();
-					if (auto tp = spriteRendererComponent["TexturePath"])
+					GeneratedSerialization::DeserializeSpriteRendererComponent(spriteRendererComponent, src);
+					if (!src.TexturePath.empty())
 					{
-						std::string raw = tp.as<std::string>();
-						if (!raw.empty())
-						{
-						src.TexturePath = raw;
 						auto tex = Texture2D::Create(src.TexturePath); // sprite maps are color maps -> default sRGB
 						if (tex && tex->IsLoaded())
 							src.Texture = tex;
-							else
-								CANDY_CORE_WARN("SceneSerializer: failed to load texture {0}", src.TexturePath);
-						}
+						else
+							CANDY_CORE_WARN("SceneSerializer: failed to load texture {0}", src.TexturePath);
 					}
 				}
 
@@ -629,30 +559,21 @@ namespace Candy {
 				if (staticMeshComponent)
 				{
 					auto& smc = deserializedEntity.AddComponent<StaticMeshComponent>();
-					if (auto mp = staticMeshComponent["MeshPath"])
+					GeneratedSerialization::DeserializeStaticMeshComponent(staticMeshComponent, smc);
+					if (!smc.MeshPath.empty())
 					{
-						std::string raw = mp.as<std::string>();
-						if (!raw.empty())
+						auto imported = MeshImporter::ImportStaticMesh(smc.MeshPath);
+						if (imported && imported->Mesh)
 						{
-							smc.MeshPath = raw;
-							auto imported = MeshImporter::ImportStaticMesh(smc.MeshPath);
-							if (imported && imported->Mesh)
-							{
-								smc.Mesh = imported->Mesh;
-								smc.Materials = imported->Materials;
-							}
-							else
-								CANDY_CORE_WARN("SceneSerializer: failed to import mesh {0}", smc.MeshPath);
+							smc.Mesh = imported->Mesh;
+							smc.Materials = imported->Materials;
 						}
+						else
+							CANDY_CORE_WARN("SceneSerializer: failed to import mesh {0}", smc.MeshPath);
 					}
 
 					// Material overrides: resolve each .mat path through the cache
 					// so a mesh that referenced a shared .mat stays shared after load.
-					if (auto mpNode = staticMeshComponent["MaterialPaths"])
-					{
-						for (const auto& p : mpNode)
-							smc.MaterialPaths.push_back(p.as<std::string>());
-					}
 					if (!smc.MaterialPaths.empty())
 					{
 						// Ensure the materials list has at least as many slots as
@@ -672,30 +593,21 @@ namespace Candy {
 				if (skeletalMeshComponent)
 				{
 					auto& skmc = deserializedEntity.AddComponent<SkeletalMeshComponent>();
-					if (auto mp = skeletalMeshComponent["MeshPath"])
+					GeneratedSerialization::DeserializeSkeletalMeshComponent(skeletalMeshComponent, skmc);
+					if (!skmc.MeshPath.empty())
 					{
-						std::string raw = mp.as<std::string>();
-						if (!raw.empty())
+						auto imported = MeshImporter::ImportSkeletalMesh(skmc.MeshPath);
+						if (imported && imported->Mesh)
 						{
-							skmc.MeshPath = raw;
-							auto imported = MeshImporter::ImportSkeletalMesh(skmc.MeshPath);
-							if (imported && imported->Mesh)
-							{
-								skmc.Mesh = imported->Mesh;
-								skmc.Materials = imported->Materials;
-								if (skmc.ClipName.empty() && !imported->Mesh->Clips.empty())
-									skmc.ClipName = imported->Mesh->Clips[0].Name;
-							}
-							else
-								CANDY_CORE_WARN("SceneSerializer: failed to import skeletal mesh {0}", skmc.MeshPath);
+							skmc.Mesh = imported->Mesh;
+							skmc.Materials = imported->Materials;
+							if (skmc.ClipName.empty() && !imported->Mesh->Clips.empty())
+								skmc.ClipName = imported->Mesh->Clips[0].Name;
 						}
+						else
+							CANDY_CORE_WARN("SceneSerializer: failed to import skeletal mesh {0}", skmc.MeshPath);
 					}
 
-					if (auto mpNode = skeletalMeshComponent["MaterialPaths"])
-					{
-						for (const auto& p : mpNode)
-							skmc.MaterialPaths.push_back(p.as<std::string>());
-					}
 					if (!skmc.MaterialPaths.empty())
 					{
 						if (skmc.Materials.size() < skmc.MaterialPaths.size())
@@ -707,15 +619,6 @@ namespace Candy {
 								skmc.Materials[i] = mat;
 						}
 					}
-
-					if (auto cn = skeletalMeshComponent["ClipName"])
-						skmc.ClipName = cn.as<std::string>();
-					if (auto sp = skeletalMeshComponent["Speed"])
-						skmc.Speed = sp.as<float>();
-					if (auto pl = skeletalMeshComponent["Play"])
-						skmc.Play = pl.as<bool>();
-					if (auto lp = skeletalMeshComponent["Loop"])
-						skmc.Loop = lp.as<bool>();
 				}
 
 				auto circleRendererComponent = entity["CircleRendererComponent"];
@@ -739,44 +642,28 @@ namespace Candy {
 				if (boxCollider2DComponent)
 				{
 					auto& bc2d = deserializedEntity.AddComponent<BoxCollider2DComponent>();
-					bc2d.Offset = boxCollider2DComponent["Offset"].as<glm::vec2>();
-					bc2d.Size = boxCollider2DComponent["Size"].as<glm::vec2>();
-					bc2d.Density = boxCollider2DComponent["Density"].as<float>();
-					bc2d.Friction = boxCollider2DComponent["Friction"].as<float>();
-					bc2d.Restitution = boxCollider2DComponent["Restitution"].as<float>();
-					bc2d.RestitutionThreshold = boxCollider2DComponent["RestitutionThreshold"].as<float>();
+					GeneratedSerialization::DeserializeBoxCollider2DComponent(boxCollider2DComponent, bc2d);
 				}
 
 				auto circleCollider2DComponent = entity["CircleCollider2DComponent"];
 				if (circleCollider2DComponent)
 				{
 					auto& cc2d = deserializedEntity.AddComponent<CircleCollider2DComponent>();
-					cc2d.Offset = circleCollider2DComponent["Offset"].as<glm::vec2>();
-					cc2d.Radius = circleCollider2DComponent["Radius"].as<float>();
-					cc2d.Density = circleCollider2DComponent["Density"].as<float>();
-					cc2d.Friction = circleCollider2DComponent["Friction"].as<float>();
-					cc2d.Restitution = circleCollider2DComponent["Restitution"].as<float>();
-					cc2d.RestitutionThreshold = circleCollider2DComponent["RestitutionThreshold"].as<float>();
+					GeneratedSerialization::DeserializeCircleCollider2DComponent(circleCollider2DComponent, cc2d);
 				}
 
 				auto scriptComponent = entity["ScriptComponent"];
 				if (scriptComponent)
 				{
 					auto& sc = deserializedEntity.AddComponent<ScriptComponent>();
-					std::string rawScript = scriptComponent["ScriptPath"].as<std::string>();
-					sc.ScriptPath = rawScript;
-					sc.ClassName = scriptComponent["ClassName"].as<std::string>();
+					GeneratedSerialization::DeserializeScriptComponent(scriptComponent, sc);
 				}
 
 				auto audioSourceComponent = entity["AudioSourceComponent"];
 				if (audioSourceComponent)
 				{
 					auto& asc = deserializedEntity.AddComponent<AudioSourceComponent>();
-					std::string rawSound = audioSourceComponent["SoundPath"].as<std::string>();
-					asc.SoundPath = rawSound;
-					asc.Volume = audioSourceComponent["Volume"].as<float>();
-					asc.Looping = audioSourceComponent["Looping"].as<bool>();
-					asc.PlayOnStart = audioSourceComponent["PlayOnStart"].as<bool>();
+					GeneratedSerialization::DeserializeAudioSourceComponent(audioSourceComponent, asc);
 				}
 
 				auto uiTextBlockComponent = entity["UITextBlockComponent"];

@@ -42,6 +42,8 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 DEFAULT_SOURCE_DIR = PROJECT_ROOT / "Candy" / "Source"
 # Default output for .inl file
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "Candy" / "Source" / "Runtime" / "Scripting"
+# Default output for the scene-serialization .inl file
+DEFAULT_SERIALIZATION_OUTPUT = PROJECT_ROOT / "Candy" / "Source" / "Runtime" / "Scene" / "SceneSerialization.generated.inl"
 # Default output for .pyi file (package-style stub under stubPath)
 DEFAULT_PYI_DIR = PROJECT_ROOT / "stubs" / "candy"
 
@@ -139,6 +141,22 @@ UNBINDABLE_TYPE_PREFIXES = (
     "std::set", "std::shared_ptr", "std::unique_ptr", "std::function",
 )
 
+# C++ types that the scene-serialization codegen can write to/read from YAML.
+SERIALIZABLE_TYPES = {
+    "float", "double", "int", "int32_t", "uint32_t", "int64_t", "uint64_t",
+    "size_t", "bool", "std::string", "glm::vec2", "glm::vec3", "glm::vec4",
+    "std::vector<std::string>",
+}
+
+# Components whose (de)serialization stays hand-written (special load logic,
+# nested/enum fields, or ownership handled elsewhere).
+SERIALIZATION_EXCLUDED_COMPONENTS = {
+    "TagComponent",          # created via CreateEntityWithUUID
+    "LightComponent",        # enum-typed Type field (string round-trip)
+    "TextBlockUIData",       # nested UI data structure (UI kept hand-written)
+    "ButtonUIData",          # nested UI data structure (UI kept hand-written)
+}
+
 # Matches a named type declaration: struct Foo, class Foo, enum class Foo, enum Foo
 RE_TYPE_DECL = re.compile(r'\b(struct|class|enum(?:\s+class|\s+struct)?)\s+(\w+)')
 RE_CANDY_CLASS = re.compile(r'CANDY_CLASS\s*\(')
@@ -158,11 +176,13 @@ def _next_meaningful_index(lines: list[str], start: int) -> int | None:
     return None
 
 
-def _parse_member_decl(line: str):
+def _parse_member_decl(line: str, bindable_only: bool = True):
     """
     Parse a C++ member declaration line into (cpp_type, name).
-    Returns None if the line is not a bindable member (constructor, method,
-    comment, unbindable type, ...).
+    Returns None if the line is not a member declaration (constructor, method,
+    comment, ...). When `bindable_only` is True, types that cannot be bound via
+    py::class_::def_readwrite are also skipped (with a warning); the flag is
+    disabled by the scene-serialization pass, which has its own type table.
     """
     s = line.strip()
     s = re.sub(r'//.*', '', s)              # strip trailing comments
@@ -189,7 +209,8 @@ def _parse_member_decl(line: str):
     if name in {'if', 'for', 'while', 'return', 'switch', 'do', 'else',
                 'struct', 'class', 'enum', 'using', 'typedef'}:
         return None
-    if type_str in UNBINDABLE_TYPES or type_str.startswith(UNBINDABLE_TYPE_PREFIXES):
+    if bindable_only and (type_str in UNBINDABLE_TYPES
+                          or type_str.startswith(UNBINDABLE_TYPE_PREFIXES)):
         print(f"  Warning: skipping CANDY_PROPERTY '{name}' - type '{type_str}' "
               f"cannot be bound via def_readwrite")
         return None
@@ -300,7 +321,7 @@ def parse_header(filepath: Path) -> tuple[list[StructInfo], list[EnumInfo]]:
         elif collecting is not None and RE_CANDY_PROPERTY.search(code_s):
             j = _next_meaningful_index(lines, i + 1)
             if j is not None:
-                mem = _parse_member_decl(lines[j])
+                mem = _parse_member_decl(lines[j], bindable_only=False)
                 if mem is not None:
                     collecting.members.append(mem)
         elif RE_CANDY_ENUM.search(code_s):
@@ -436,6 +457,8 @@ def generate_inl(structs: list[StructInfo], enums: list[EnumInfo], output_path: 
         lines.append(f"    .def(py::init<>())")
 
         for member_type, member_name in s.members:
+            if member_type in UNBINDABLE_TYPES or member_type.startswith(UNBINDABLE_TYPE_PREFIXES):
+                continue
             lines.append(f"    .def_readwrite(\"{member_name}\", &{cpp_type}::{member_name})")
 
         lines.append("    ;")
@@ -462,6 +485,90 @@ def generate_inl(structs: list[StructInfo], enums: list[EnumInfo], output_path: 
         lines.append("")
 
     # Write file (write_text with default newline='' translates \n to os.linesep on Windows)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    text = "\n".join(lines)
+    output_path.write_text(text, encoding="utf-8")
+    print(f"Generated: {output_path}")
+
+
+def generate_scene_serialization(structs: list[StructInfo], output_path: Path):
+    """Generate SceneSerialization.generated.inl — per-component YAML
+    (de)serialization helpers driven by CANDY_PROPERTY metadata.
+
+    Components with unsupported member types are skipped (they keep their
+    hand-written serialization in SceneSerializer.cpp). String/vector members
+    whose value is empty are omitted on write (matches the hand-written
+    format); missing nodes are tolerated on read (defaults stay intact).
+    Resource loading (mesh import, texture/cubemap bake, material cache) is
+    deliberately NOT generated — SceneSerializer handles it after the plain
+    fields have been applied.
+    """
+    lines = []
+    lines.append("// Auto-generated by generate_bindings.py - DO NOT EDIT")
+    lines.append(f"// Generated: {__import__('datetime').datetime.now().isoformat()}")
+    lines.append("")
+    lines.append("#pragma once")
+    lines.append("")
+    lines.append("namespace YAML { class Emitter; class Node; }")
+    lines.append("")
+    lines.append("namespace Candy {")
+    lines.append("namespace GeneratedSerialization {")
+    lines.append("")
+
+    for s in structs:
+        if s.name in SERIALIZATION_EXCLUDED_COMPONENTS:
+            continue
+        if not s.members:
+            continue
+        if any(mtype not in SERIALIZABLE_TYPES for mtype, _ in s.members):
+            print(f"  Warning: skipping serialization codegen for {s.name} "
+                  f"(unsupported member type)")
+            continue
+
+        cpp_type = s.cpp_type
+        if not cpp_type.startswith("Candy::"):
+            cpp_type = f"Candy::{cpp_type}"
+
+        lines.append(f"// ---- {s.name} ------------------------------------------------")
+        lines.append(f"inline void Serialize{s.name}(YAML::Emitter& out, const {cpp_type}& c)")
+        lines.append("{")
+        for mtype, mname in s.members:
+            if mtype == "std::string":
+                lines.append(f"\tif (!c.{mname}.empty())")
+                lines.append(f"\t\tout << YAML::Key << \"{mname}\" << YAML::Value << c.{mname};")
+            elif mtype == "std::vector<std::string>":
+                lines.append(f"\tif (!c.{mname}.empty())")
+                lines.append("\t{")
+                lines.append(f"\t\tout << YAML::Key << \"{mname}\" << YAML::Value;")
+                lines.append(f"\t\tout << YAML::BeginSeq;")
+                lines.append(f"\t\tfor (const auto& v : c.{mname})")
+                lines.append(f"\t\t\tout << YAML::Value << v;")
+                lines.append(f"\t\tout << YAML::EndSeq;")
+                lines.append("\t}")
+            else:
+                lines.append(f"\tout << YAML::Key << \"{mname}\" << YAML::Value << c.{mname};")
+        lines.append("}")
+        lines.append("")
+        lines.append(f"inline void Deserialize{s.name}(const YAML::Node& node, {cpp_type}& c)")
+        lines.append("{")
+        for mtype, mname in s.members:
+            if mtype == "std::vector<std::string>":
+                lines.append(f"\tif (auto n = node[\"{mname}\"])")
+                lines.append("\t{")
+                lines.append(f"\t\tc.{mname}.clear();")
+                lines.append(f"\t\tfor (const auto& v : n)")
+                lines.append(f"\t\t\tc.{mname}.push_back(v.as<std::string>());")
+                lines.append("\t}")
+            else:
+                lines.append(f"\tif (auto n = node[\"{mname}\"])")
+                lines.append(f"\t\tc.{mname} = n.as<{mtype}>();")
+        lines.append("}")
+        lines.append("")
+
+    lines.append("} // namespace GeneratedSerialization")
+    lines.append("} // namespace Candy")
+    lines.append("")
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     text = "\n".join(lines)
     output_path.write_text(text, encoding="utf-8")
@@ -499,6 +606,8 @@ def generate_pyi(structs: list[StructInfo], enums: list[EnumInfo], output_path: 
     for s in structs:
         lines.append(f"class {s.name}:")
         for member_type, member_name in s.members:
+            if member_type in UNBINDABLE_TYPES or member_type.startswith(UNBINDABLE_TYPE_PREFIXES):
+                continue
             py_type = cpp_to_py_type(member_type)
             lines.append(f"\t{member_name}: {py_type}")
         lines.append(f"\tdef __init__(self) -> None: ...")
@@ -650,6 +759,8 @@ def main():
                         help="Source directory to scan for annotated C++ headers")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT_DIR),
                         help="Output directory for ScriptBindings.generated.inl")
+    parser.add_argument("--serialization-output", default=str(DEFAULT_SERIALIZATION_OUTPUT),
+                        help="Output path for SceneSerialization.generated.inl")
     parser.add_argument("-p", "--pyi-dir", default=str(DEFAULT_PYI_DIR),
                         help="Output directory for candy.pyi and pyrightconfig.json "
                              "(default: <root>/JumpGame/Content/Scripts)")
@@ -658,6 +769,7 @@ def main():
     source_dir = Path(args.source)
     output_dir = Path(args.output)
     pyi_dir = Path(args.pyi_dir)
+    serialization_path = Path(args.serialization_output)
 
     if not source_dir.exists():
         print(f"Error: Source directory not found: {source_dir}")
@@ -680,6 +792,9 @@ def main():
     # Generate .inl
     inl_path = output_dir / "ScriptBindings.generated.inl"
     generate_inl(structs, enums, inl_path)
+
+    # Generate scene-serialization helpers (CANDY_PROPERTY driven)
+    generate_scene_serialization(structs, serialization_path)
 
     # Generate .pyi as a package-style stub (candy/__init__.pyi)
     pyi_path = pyi_dir / "__init__.pyi"
