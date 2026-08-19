@@ -104,7 +104,7 @@ namespace Candy {
 	}
 
 	// =========================================================================
-	// SRV allocation ¡ª write SRV descriptor into device CBV_SRV_UAV heap
+	// SRV allocation â€” write SRV descriptor into device CBV_SRV_UAV heap
 	// =========================================================================
 
 	void D3D12Texture2D::AllocateSRV()
@@ -128,7 +128,7 @@ namespace Candy {
 	}
 
 	// =========================================================================
-	// SetData ¡ª update texture data
+	// SetData â€” update texture data
 	// =========================================================================
 
 	void D3D12Texture2D::SetData(void* data, uint32_t size)
@@ -142,14 +142,14 @@ namespace Candy {
 	}
 
 	// =========================================================================
-	// Bind ¡ª set texture on a slot (legacy immediate-mode API)
+	// Bind â€” set texture on a slot (legacy immediate-mode API)
 	// =========================================================================
 
 	void D3D12Texture2D::Bind(uint32_t slot) const
 	{
 		// In D3D12, texture binding happens via descriptor tables set in
 		// the command buffer (SetTextures).  This is a no-op at the engine
-		// level ¡ª the actual binding is done by the renderer.
+		// level â€” the actual binding is done by the renderer.
 	}
 
 	Ref<RHITexture> D3D12Texture2D::GetRHITexture()

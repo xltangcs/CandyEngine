@@ -68,7 +68,9 @@ namespace Candy {
 		template<typename T, typename F>
 		bool Dispatch(const F& func)
 		{
-			if (m_Event.GetEventType() == T::GetStaticType())
+			// 已消费（Handled）的事件不再下发给后续处理者，与层间传播的
+			// `if (e.Handled) break;` 语义一致（Application::OnEvent）
+			if (!m_Event.Handled && m_Event.GetEventType() == T::GetStaticType())
 			{
 				m_Event.Handled |= func(static_cast<T&>(m_Event));
 				return true;

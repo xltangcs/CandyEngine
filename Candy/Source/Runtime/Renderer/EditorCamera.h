@@ -3,6 +3,7 @@
 #include "Camera.h"
 #include "Runtime/Core/Timestep.h"
 #include "Runtime/Events/Event.h"
+#include "Runtime/Events/KeyEvent.h"
 #include "Runtime/Events/MouseEvent.h"
 
 #include <glm/glm.hpp>
@@ -50,9 +51,9 @@ namespace Candy {
 		void UpdateView();
 
 		bool OnMouseScroll(MouseScrolledEvent& e);
+		bool OnKeyPressed(KeyPressedEvent& e);
 
 		void MousePan(const glm::vec2& delta);
-		void MouseRotate(const glm::vec2& delta);
 		void MouseZoom(float delta);
 		void MouseFly(const glm::vec2& delta, Timestep ts);
 

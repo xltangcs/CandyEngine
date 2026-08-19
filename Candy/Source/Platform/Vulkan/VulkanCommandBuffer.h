@@ -50,7 +50,7 @@ namespace Candy {
 		VkExtent2D       m_ActiveExtent      = {};
 		float            m_ClearColor[4]     = { 0,0,0,1 };
 
-		// Debug-time recording-state validator (per command buffer ¡ª never shared).
+		// Debug-time recording-state validator (per command buffer â€” never shared).
 		RHICommandValidator m_Validator;
 	};
 

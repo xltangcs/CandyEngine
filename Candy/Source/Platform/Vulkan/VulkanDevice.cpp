@@ -491,7 +491,7 @@ namespace Candy {
 
 	Ref<RHIFramebuffer> VulkanDevice::CreateFramebuffer(const FramebufferDesc& desc)
 	{
-		// [FROZEN] minimal implementation ¡ª kept compiling only.
+		// [FROZEN] minimal implementation â€” kept compiling only.
 		auto fb = CreateRef<VulkanFramebuffer>(desc, this);
 		fb->SetRHITracking(&GetResourceManager(),
 			GetResourceManager().Register(ResourceType::Framebuffer, fb.get(), "Framebuffer"));

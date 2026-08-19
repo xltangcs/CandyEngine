@@ -46,7 +46,7 @@ namespace Candy {
 	void VulkanCommandBuffer::BeginRenderPass(RHIFramebuffer* target, const RenderPassDesc& desc)
 	{
 		m_Validator.OnBeginRenderPass(desc);
-		// [EXPERIMENTAL ¡ª FROZEN] off-screen framebuffer targets are not wired;
+		// [EXPERIMENTAL â€” FROZEN] off-screen framebuffer targets are not wired;
 		// the pass uses whatever render pass/framebuffer SetRenderPassInfo set.
 		(void)target;
 		if (!m_ActiveRenderPass)
@@ -129,7 +129,7 @@ namespace Candy {
 	void VulkanCommandBuffer::SetConstantBuffer(uint32_t slot, uint32_t binding, const Ref<RHIBuffer>&, uint64_t offset)
 	{
 		(void)offset;
-		CANDY_CORE_WARN("TODO: Vulkan SetConstantBuffer ¡ª descriptor set binding must be done at submit time");
+		CANDY_CORE_WARN("TODO: Vulkan SetConstantBuffer â€” descriptor set binding must be done at submit time");
 	}
 
 	void VulkanCommandBuffer::SetTextures(uint32_t slot, uint32_t count, const Ref<RHITexture>* textures)

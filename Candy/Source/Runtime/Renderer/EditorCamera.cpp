@@ -57,7 +57,7 @@ namespace Candy {
 	void EditorCamera::RestoreView(const glm::vec3& focalPoint, float pitch, float yaw, float distance)
 	{
 		m_FocalPoint = focalPoint;
-		m_Pitch = glm::clamp(pitch, -89.9f, 89.9f);
+		m_Pitch = glm::clamp(pitch, -glm::radians(89.9f), glm::radians(89.9f));
 		m_Yaw = yaw;
 		m_Distance = glm::max(distance, 1.0f);
 		UpdateView();
@@ -91,19 +91,14 @@ namespace Candy {
 	void EditorCamera::OnUpdate(Timestep ts)
 	{
 		const glm::vec2& mouse{ Input::GetMouseX(), Input::GetMouseY() };
-		glm::vec2 delta = (mouse - m_InitialMousePosition) * 0.003f;
+		glm::vec2 deltaPx = mouse - m_InitialMousePosition;
 		m_InitialMousePosition = mouse;
+		constexpr float maxDeltaPx = 64.0f;
+		if (glm::length(deltaPx) > maxDeltaPx)
+			deltaPx = glm::normalize(deltaPx) * maxDeltaPx;
 
-		// if (Input::IsKeyPressed(Key::LeftAlt))
-		// {
-		// 	if (Input::IsMouseButtonPressed(Mouse::ButtonMiddle))
-		// 		MousePan(delta);
-		// 	else if (Input::IsMouseButtonPressed(Mouse::ButtonLeft))
-		// 		MouseRotate(delta);
-		// 	else if (Input::IsMouseButtonPressed(Mouse::ButtonRight))
-		// 		MouseZoom(delta.y);
-		// }
-		// else
+		glm::vec2 delta = deltaPx * 0.003f;
+
 		if (Input::IsMouseButtonPressed(Mouse::ButtonMiddle))
 		{
 			MousePan(delta);
@@ -126,10 +121,35 @@ namespace Candy {
 	{
 		EventDispatcher dispatcher(e);
 		dispatcher.Dispatch<MouseScrolledEvent>(CANDY_BIND_EVENT_FN(EditorCamera::OnMouseScroll));
+		dispatcher.Dispatch<KeyPressedEvent>(CANDY_BIND_EVENT_FN(EditorCamera::OnKeyPressed));
+	}
+
+	bool EditorCamera::OnKeyPressed(KeyPressedEvent& e)
+	{
+		// 飞行模式（RMB）下 WASD/QE 归相机移动：消费按键事件，阻止其
+		// 继续传播到编辑器快捷键（如 Q/W/E/R 切换 gizmo 模式）
+		if (!m_IsFlying)
+			return false;
+
+		switch (e.GetKeyCode())
+		{
+			case Key::W: case Key::A: case Key::S: case Key::D:
+			case Key::Q: case Key::E:
+				return true;
+			default:
+				return false;
+		}
 	}
 
 	bool EditorCamera::OnMouseScroll(MouseScrolledEvent& e)
 	{
+		if (m_IsFlying)
+		{
+			float& speed = EditorSettings::Get().m_CameraFlySpeed;
+			speed = glm::clamp(speed * (e.GetYOffset() > 0 ? 1.1f : 1.0f / 1.1f), 0.1f, 10.0f);
+			return false;
+		}
+
 		float delta = e.GetYOffset() * 0.1f;
 		MouseZoom(delta);
 		UpdateView();
@@ -141,14 +161,6 @@ namespace Candy {
 		auto [xSpeed, ySpeed] = PanSpeed();
 		m_FocalPoint += -GetRightDirection() * delta.x * xSpeed * m_Distance;
 		m_FocalPoint += GetUpDirection() * delta.y * ySpeed * m_Distance;
-	}
-
-	void EditorCamera::MouseRotate(const glm::vec2& delta)
-	{
-		float yawSign = GetUpDirection().y < 0 ? -1.0f : 1.0f;
-		m_Yaw += yawSign * delta.x * RotationSpeed();
-		m_Pitch += delta.y * RotationSpeed();
-		m_Pitch = glm::clamp(m_Pitch, -89.9f, 89.9f);
 	}
 
 	void EditorCamera::MouseZoom(float delta)
@@ -168,20 +180,20 @@ namespace Candy {
 
 	void EditorCamera::MouseFly(const glm::vec2& delta, Timestep ts)
 	{
-		float yawSign = GetUpDirection().y < 0 ? -1.0f : 1.0f;
-		m_Yaw += yawSign * delta.x * RotationSpeed();
+		m_Yaw += delta.x * RotationSpeed();
 		m_Pitch += delta.y * RotationSpeed();
-		m_Pitch = glm::clamp(m_Pitch, -89.9f, 89.9f);
+		m_Pitch = glm::clamp(m_Pitch, -glm::radians(89.9f), glm::radians(89.9f));
+		m_FocalPoint = m_Position + GetForwardDirection() * m_Distance;
 
-		float speed = m_FlySpeed * (m_Distance / 10.0f) * EditorSettings::Get().m_CameraFlySpeed;
+		float speed = m_FlySpeed * EditorSettings::Get().m_CameraFlySpeed;
 
 		glm::vec3 move(0.0f);
 		if (Input::IsKeyPressed(Key::W)) move += GetForwardDirection();
 		if (Input::IsKeyPressed(Key::S)) move -= GetForwardDirection();
 		if (Input::IsKeyPressed(Key::A)) move -= GetRightDirection();
 		if (Input::IsKeyPressed(Key::D)) move += GetRightDirection();
-		if (Input::IsKeyPressed(Key::E)) move += GetUpDirection();
-		if (Input::IsKeyPressed(Key::Q)) move -= GetUpDirection();
+		if (Input::IsKeyPressed(Key::E)) move += glm::vec3(0.0f, 1.0f, 0.0f);
+		if (Input::IsKeyPressed(Key::Q)) move -= glm::vec3(0.0f, 1.0f, 0.0f);
 
 		if (glm::length(move) > 0.0f)
 		{
@@ -193,6 +205,7 @@ namespace Candy {
 	void EditorCamera::EnterFlyMode()
 	{
 		m_IsFlying = true;
+		m_InitialMousePosition = { Input::GetMouseX(), Input::GetMouseY() };
 		GLFWwindow* window = static_cast<GLFWwindow*>(Application::Get().GetWindow().GetNativeWindow());
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	}
