@@ -3,6 +3,7 @@
 #include "Runtime/Scene/Scene.h"
 #include "Runtime/Scene/Entity.h"
 #include "Runtime/Scene/Components.h"
+#include "Runtime/Scene/ComponentLists.generated.inl"
 #include "Runtime/Scene/ScriptableEntity.h"
 #include "Runtime/Scene/PhysicsContactListener.h"
 #include "Runtime/Scene/SkeletalAnimationSystem.h"
@@ -87,23 +88,9 @@ namespace Candy {
 			enttMap[entity.GetUUID()] = (entt::entity)newEntity;
 		}
 
-		// Copy components (except IDComponent and TagComponent)
-		CopyComponent<TransformComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
-		CopyComponent<SpriteRendererComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
-		CopyComponent<StaticMeshComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
-		CopyComponent<SkeletalMeshComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
-		CopyComponent<CircleRendererComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
-		CopyComponent<CameraComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
-		CopyComponent<LightComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
-		CopyComponent<SkyboxComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
-		CopyComponent<NativeScriptComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
-		CopyComponent<Rigidbody2DComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
-		CopyComponent<BoxCollider2DComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
-		CopyComponent<CircleCollider2DComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
-		CopyComponent<ScriptComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
-		CopyComponent<AudioSourceComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
-		CopyComponent<UITextBlockComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
-		CopyComponent<UIButtonComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		// Copy components (except IDComponent and TagComponent) — the list is
+		// generated from CANDY_CLASS metadata (ComponentLists.generated.inl).
+		CANDY_COPY_COMPONENT_LIST(dstSceneRegistry, srcSceneRegistry, enttMap);
 
 		// Per-instance runtime resources must not be shared across scenes:
 		// reset the copied bone CBs so each instance lazily re-creates its own.
@@ -329,22 +316,7 @@ namespace Candy {
 		std::string name = entity.GetName();
 		Entity newEntity = CreateEntity(name);
 
-		CopyComponentIfExists<TransformComponent>(newEntity, entity);
-		CopyComponentIfExists<SpriteRendererComponent>(newEntity, entity);
-		CopyComponentIfExists<StaticMeshComponent>(newEntity, entity);
-		CopyComponentIfExists<SkeletalMeshComponent>(newEntity, entity);
-		CopyComponentIfExists<CircleRendererComponent>(newEntity, entity);
-		CopyComponentIfExists<CameraComponent>(newEntity, entity);
-		CopyComponentIfExists<LightComponent>(newEntity, entity);
-		CopyComponentIfExists<SkyboxComponent>(newEntity, entity);
-		CopyComponentIfExists<NativeScriptComponent>(newEntity, entity);
-		CopyComponentIfExists<Rigidbody2DComponent>(newEntity, entity);
-		CopyComponentIfExists<BoxCollider2DComponent>(newEntity, entity);
-		CopyComponentIfExists<CircleCollider2DComponent>(newEntity, entity);
-		CopyComponentIfExists<ScriptComponent>(newEntity, entity);
-		CopyComponentIfExists<AudioSourceComponent>(newEntity, entity);
-		CopyComponentIfExists<UITextBlockComponent>(newEntity, entity);
-		CopyComponentIfExists<UIButtonComponent>(newEntity, entity);
+		CANDY_DUPLICATE_COMPONENT_LIST(newEntity, entity);
 
 		// Per-instance runtime resources must not be shared: the duplicate
 		// lazily re-creates its own bone CB on the next animation tick.

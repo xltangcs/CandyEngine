@@ -23,6 +23,21 @@ if (-not (Test-Path $solution)) {
 	exit 1
 }
 
+# Regenerate CANDY_PROPERTY-derived code (Python bindings, scene serialization,
+# inspector defaults, component inventory) so the build can never drift from
+# the annotated headers.
+$python = Get-Command python -ErrorAction SilentlyContinue
+if ($python) {
+	Write-Host "Regenerating metadata-driven sources (generate_bindings.py)..." -ForegroundColor Cyan
+	& python (Join-Path $PSScriptRoot "generate_bindings.py") | Out-Host
+	if ($LASTEXITCODE -ne 0) {
+		Write-Error "generate_bindings.py failed (exit $LASTEXITCODE)"
+		exit $LASTEXITCODE
+	}
+} else {
+	Write-Warning "python not found on PATH - skipping metadata regeneration (generated files may be stale)"
+}
+
 Write-Host "Building $solution ($Config|$Platform) with $msbuild" -ForegroundColor Cyan
 & $msbuild $solution /p:Configuration=$Config /p:Platform=$Platform /m /v:minimal /nr:false
 exit $LASTEXITCODE

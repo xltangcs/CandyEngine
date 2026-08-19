@@ -52,8 +52,9 @@ msbuild CandyEngine.sln /p:Configuration=Debug
 
 | 目录 | 目标 | 类型 | 用途 |
 |---|---|---|---|
-| `Candy/Source/` | `Candy` | 静态库 | 引擎核心 |
-| `CandyEditor/Source/` | `CandyEditor` | ConsoleApp | 编辑器（链接 `Candy`） |
+| `Candy/Source/` | `Candy` | 静态库 | 引擎核心（含 `Candy/Source/Editor/` 编辑器代码与 `Candy/Source/Platform/` 后端） |
+| `CandyEditor/` | `CandyEditor` | ConsoleApp | 编辑器工程（premake 定义在 `Candy/premake5.lua`，仅入口 main） |
+| `CandyGame/` | `CandyGame` | ConsoleApp | 独立游戏示例（链接 `Candy`） |
 | `Sandbox/Source/` | `Sandbox` | ConsoleApp | 测试 demo（默认不构建） |
 
 ## Entry Point
@@ -89,8 +90,8 @@ Candy::Application* Candy::CreateApplication() {
 - **ECS**: 使用 EnTT，`Scene` 拥有 `entt::registry` + `b2World`。`Entity` = `entt::entity + Scene*`。组件位于 `Scene/Components.h`
 - **物理**: Box2D 集成（Rigidbody2D + Box/CircleCollider2D），运行时 body/fixture 存为 `void*`
 - **原生脚本**: `ScriptableEntity` 基类 + `NativeScriptComponent::Bind<T>()`
-- **Python 脚本**（计划中）：pybind11 已加入依赖但**引擎源码尚未使用**
-- **序列化**: yaml-cpp，`.candy` 文件。`SerializeRuntime()` 尚未实现
+- **Python 脚本**：pybind11 已接线——`ScriptSystem::InitPython()`（`Application::Init`）启动解释器；`ScriptComponent` 附加 .py 脚本（编辑器支持拖放）；组件绑定由 `Scripts/generate_bindings.py` 生成
+- **序列化**: yaml-cpp，`.candy` 文件。`SerializeRuntime()` 尚未实现。简单组件的序列化/反序列化由 `CANDY_PROPERTY` 元数据生成（`SceneSerialization.generated.inl`），资源加载逻辑（mesh 导入、材质缓存、纹理/IBL 烘焙）保留手写在 `SceneSerializer.cpp`
 - **虚拟文件系统 (VFS)**：所有资源路径统一使用 `VFS://Engine/...` 或 `VFS://Game/...` 格式
   - 读取资源一律通过 `FileSystem::Get().Read()` / `ReadText()` / `Exists()`，**不要直接用 `std::filesystem`**
   - 需要磁盘路径时用 `FileSystem::Get().ToDiskPath()` / `ResolveToDiskPath()`
@@ -108,6 +109,12 @@ Candy::Application* Candy::CreateApplication() {
 - 缩进使用 Tab，与现有 ~95% 文件保持一致
 - 行尾使用 CRLF（回车+换行），与现有大部分文件保持一致
 
-## Python 绑定现状
+## Python 绑定与代码生成
 
-pybind11 子模块已添加（`Candy/ThirdParty/pybind11`），`IncludeDir` 和 premake includedirs 已配置，但引擎源码中**无任何 pybind11 使用代码**。这是一个预留骨架，等待实现。
+- pybind11 位于 `Candy/ThirdParty/pybind11`，绑定已生成并接入运行时
+- `Scripts/generate_bindings.py` 扫描 `CANDY_CLASS()/CANDY_PROPERTY()/CANDY_ENUM()` 宏，生成 4 类产物（**Build.ps1 构建前自动重跑**，勿手动编辑）：
+  - `ScriptBindings.generated.inl` — pybind11 绑定（`PythonBindings.cpp` include）
+  - `SceneSerialization.generated.inl` — 组件 YAML 序列化（`SceneSerializer.cpp` include）
+  - `ComponentUI.generated.inl` — 组件 Inspector 默认绘制（`SceneHierarchyPanel.cpp` include，供新组件起步）
+  - `ComponentLists.generated.inl` — 组件清单宏（`Scene::Copy` / `DuplicateEntity` 使用）
+- **新增组件**：加 `CANDY_CLASS()` + 成员 `CANDY_PROPERTY()` 即可自动获得序列化/UI 默认/复制清单；`Rigidbody2DComponent`/`UITextBlockComponent`/`UIButtonComponent` 因手动绑定在 `PYTHON_MANUAL_BINDINGS` 黑名单（生成器不重复注册）

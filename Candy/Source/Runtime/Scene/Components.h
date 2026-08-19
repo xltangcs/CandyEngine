@@ -168,6 +168,7 @@ namespace Candy {
 		CircleRendererComponent(const CircleRendererComponent&) = default;
 	};
 
+	CANDY_CLASS()
 	struct CameraComponent
 	{
 		SceneCamera Camera;
@@ -229,6 +230,7 @@ namespace Candy {
 	// Forward declaration
 	class ScriptableEntity;
 
+	CANDY_CLASS()
 	struct NativeScriptComponent
 	{
 		ScriptableEntity* Instance = nullptr;
@@ -247,6 +249,7 @@ namespace Candy {
 	// Physics
 
 	// Rigidbody2DComponent bound manually in PythonBindings.cpp (custom physics methods)
+	CANDY_CLASS()
 	struct Rigidbody2DComponent
 	{
 		CANDY_ENUM()
@@ -359,6 +362,7 @@ namespace Candy {
 	};
 
 	// UITextBlockComponent bound manually in PythonBindings.cpp (custom set_text/set_text_visible methods)
+	CANDY_CLASS()
 	struct UITextBlockComponent
 	{
 		std::unordered_map<std::string, TextBlockUIData> TextBlockDatas;
@@ -386,6 +390,7 @@ namespace Candy {
 	};
 
 	// UIButtonComponent bound manually in PythonBindings.cpp (custom set_button_*/get_button_* methods)
+	CANDY_CLASS()
 	struct UIButtonComponent
 	{
 		std::unordered_map<std::string, ButtonUIData> ButtonDatas;
