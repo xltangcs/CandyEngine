@@ -65,3 +65,16 @@ Entities:
       CubemapPath: VFS://Game/Texture/autumn_field_puresky_1k.hdr
       Intensity: 1
       Exposure: 1
+  - Entity: 9876543210123456789
+    TagComponent:
+      Tag: Fox
+    TransformComponent:
+      Translation: [3, 0, -20]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SkeletalMeshComponent:
+      MeshPath: VFS://Game/Model/Fox/Fox.gltf
+      ClipName: Walk
+      Speed: 1
+      Play: true
+      Loop: true

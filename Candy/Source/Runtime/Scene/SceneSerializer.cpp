@@ -286,6 +286,32 @@ namespace Candy {
 			out << YAML::EndMap; // StaticMeshComponent
 		}
 
+		if (entity.HasComponent<SkeletalMeshComponent>())
+		{
+			out << YAML::Key << "SkeletalMeshComponent";
+			out << YAML::BeginMap; // SkeletalMeshComponent
+
+			auto& skmc = entity.GetComponent<SkeletalMeshComponent>();
+			if (!skmc.MeshPath.empty())
+				out << YAML::Key << "MeshPath" << YAML::Value << skmc.MeshPath;
+
+			if (!skmc.MaterialPaths.empty())
+			{
+				out << YAML::Key << "MaterialPaths" << YAML::Value;
+				out << YAML::BeginSeq;
+				for (const auto& p : skmc.MaterialPaths)
+					out << YAML::Value << p;
+				out << YAML::EndSeq;
+			}
+
+			out << YAML::Key << "ClipName" << YAML::Value << skmc.ClipName;
+			out << YAML::Key << "Speed" << YAML::Value << skmc.Speed;
+			out << YAML::Key << "Play" << YAML::Value << skmc.Play;
+			out << YAML::Key << "Loop" << YAML::Value << skmc.Loop;
+
+			out << YAML::EndMap; // SkeletalMeshComponent
+		}
+
 		if (entity.HasComponent<CircleRendererComponent>())
 		{
 			out << YAML::Key << "CircleRendererComponent";
@@ -640,6 +666,56 @@ namespace Candy {
 								smc.Materials[i] = mat;
 						}
 					}
+				}
+
+				auto skeletalMeshComponent = entity["SkeletalMeshComponent"];
+				if (skeletalMeshComponent)
+				{
+					auto& skmc = deserializedEntity.AddComponent<SkeletalMeshComponent>();
+					if (auto mp = skeletalMeshComponent["MeshPath"])
+					{
+						std::string raw = mp.as<std::string>();
+						if (!raw.empty())
+						{
+							skmc.MeshPath = raw;
+							auto imported = MeshImporter::ImportSkeletalMesh(skmc.MeshPath);
+							if (imported && imported->Mesh)
+							{
+								skmc.Mesh = imported->Mesh;
+								skmc.Materials = imported->Materials;
+								if (skmc.ClipName.empty() && !imported->Mesh->Clips.empty())
+									skmc.ClipName = imported->Mesh->Clips[0].Name;
+							}
+							else
+								CANDY_CORE_WARN("SceneSerializer: failed to import skeletal mesh {0}", skmc.MeshPath);
+						}
+					}
+
+					if (auto mpNode = skeletalMeshComponent["MaterialPaths"])
+					{
+						for (const auto& p : mpNode)
+							skmc.MaterialPaths.push_back(p.as<std::string>());
+					}
+					if (!skmc.MaterialPaths.empty())
+					{
+						if (skmc.Materials.size() < skmc.MaterialPaths.size())
+							skmc.Materials.resize(skmc.MaterialPaths.size());
+						for (size_t i = 0; i < skmc.MaterialPaths.size(); i++)
+						{
+							auto mat = MaterialCache::Get().Load(skmc.MaterialPaths[i]);
+							if (mat)
+								skmc.Materials[i] = mat;
+						}
+					}
+
+					if (auto cn = skeletalMeshComponent["ClipName"])
+						skmc.ClipName = cn.as<std::string>();
+					if (auto sp = skeletalMeshComponent["Speed"])
+						skmc.Speed = sp.as<float>();
+					if (auto pl = skeletalMeshComponent["Play"])
+						skmc.Play = pl.as<bool>();
+					if (auto lp = skeletalMeshComponent["Loop"])
+						skmc.Loop = lp.as<bool>();
 				}
 
 				auto circleRendererComponent = entity["CircleRendererComponent"];

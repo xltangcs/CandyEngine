@@ -97,6 +97,9 @@ namespace Candy {
 		/// Submits all StaticMeshComponent entities as SceneRenderer mesh draws
 		/// (one draw per submesh, opaque/masked/transparent by material).
 		void SubmitStaticMeshDraws();
+		/// Submits all SkeletalMeshComponent entities as skinned SceneRenderer
+		/// draws (SkinnedVSMain path; bone CB bound from SkeletalAnimationSystem).
+		void SubmitSkeletalMeshDraws();
 		/// Sets the scene's ambient light on the renderer and submits every
 		/// LightComponent entity as a SceneRenderer light.
 		void SubmitSceneLights();

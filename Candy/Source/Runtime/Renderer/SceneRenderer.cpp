@@ -214,6 +214,8 @@ namespace Candy {
 		Ref<RHIBuffer>           SkyboxCB;   // per-frame skybox params (Exposure/Intensity)
 		Ref<RHIGraphicsPipeline> OpaquePipeline;
 		Ref<RHIGraphicsPipeline> TransparentPipeline;
+		Ref<RHIGraphicsPipeline> SkinnedOpaquePipeline;      // SkinnedVSMain (PBR.hlsl)
+		Ref<RHIGraphicsPipeline> SkinnedTransparentPipeline; // SkinnedVSMain (PBR.hlsl)
 		Ref<RHIGraphicsPipeline> SpriteTransparentPipeline; // Sprite.hlsl (2D sprites/circles)
 		Ref<RHIGraphicsPipeline> LinePipeline;
 		Ref<RHIGraphicsPipeline> SkyboxPipeline; // fullscreen triangle, depth LessEqual
@@ -249,6 +251,7 @@ namespace Candy {
 			Ref<RHIBuffer> IB;
 		};
 		std::unordered_map<Ref<StaticMeshResource>, MeshGPU> MeshCache; // key holds Ref alive
+		std::unordered_map<Ref<SkeletalMeshResource>, MeshGPU> SkinnedMeshCache; // key holds Ref alive
 		std::unordered_map<std::string, Ref<Texture2D>>      TextureCache; // VFS path -> texture
 
 		SceneRenderer::Statistics Stats;
@@ -342,6 +345,39 @@ namespace Candy {
 			gpu.IB->Write(mesh->Indices.data(), mesh->Indices.size() * sizeof(uint32_t));
 
 		auto [entry, inserted] = s_Data.MeshCache.emplace(mesh, std::move(gpu));
+		(void)inserted;
+		return entry->second;
+	}
+
+	const SceneRendererData::MeshGPU& GetSkinnedMeshGPU(const Ref<SkeletalMeshResource>& mesh)
+	{
+		auto it = s_Data.SkinnedMeshCache.find(mesh);
+		if (it != s_Data.SkinnedMeshCache.end())
+			return it->second;
+
+		auto* dev = RHIContext::GetDevice();
+		SceneRendererData::MeshGPU gpu;
+
+		BufferDesc vb;
+		vb.Size          = mesh->Vertices.size() * sizeof(SkinnedMeshVertex);
+		vb.Usage         = ResourceUsage::VertexBuffer;
+		vb.CPUAccessible = true; // simple upload path (D3D12 upload heap)
+		vb.Stride        = sizeof(SkinnedMeshVertex);
+		vb.DebugName     = "SceneRenderer_SkinnedMeshVB";
+		gpu.VB = dev->CreateBuffer(vb);
+		if (gpu.VB && !mesh->Vertices.empty())
+			gpu.VB->Write(mesh->Vertices.data(), mesh->Vertices.size() * sizeof(SkinnedMeshVertex));
+
+		BufferDesc ib;
+		ib.Size          = mesh->Indices.size() * sizeof(uint32_t);
+		ib.Usage         = ResourceUsage::IndexBuffer;
+		ib.CPUAccessible = true;
+		ib.DebugName     = "SceneRenderer_SkinnedMeshIB";
+		gpu.IB = dev->CreateBuffer(ib);
+		if (gpu.IB && !mesh->Indices.empty())
+			gpu.IB->Write(mesh->Indices.data(), mesh->Indices.size() * sizeof(uint32_t));
+
+		auto [entry, inserted] = s_Data.SkinnedMeshCache.emplace(mesh, std::move(gpu));
 		(void)inserted;
 		return entry->second;
 	}
@@ -579,6 +615,56 @@ namespace Candy {
 			return;
 		}
 
+		// ---- Skinned pipelines (SkinnedVSMain, same PBR PS) -----------------
+		// Vertex layout extends the static one with JOINTS_0 (R8G8B8A8_UINT)
+		// and WEIGHTS_0 (R32G32B32A32_FLOAT); SkinnedMeshVertex layout must
+		// match byte-for-byte (static_assert in MeshData.h).
+		{
+			auto src = FileSystem::Get().ReadText("VFS://Engine/Content/Shaders/D3D12/PBR.hlsl");
+			if (!src)
+			{
+				CANDY_CORE_ERROR("SceneRenderer: failed to load PBR.hlsl for SkinnedVSMain");
+			}
+			else
+			{
+				auto skinnedVS = dev->CreateShaderModuleFromSource(src->c_str(),
+					ShaderStage::Vertex, "SkinnedVSMain", "PBR_SkinnedVS");
+				if (!skinnedVS)
+				{
+					CANDY_CORE_ERROR("SceneRenderer: failed to compile SkinnedVSMain");
+				}
+				else
+				{
+				GraphicsPipelineDesc skinned = base;
+				skinned.VertexInput.Bindings.clear();
+				skinned.VertexInput.Attributes.clear();
+				VertexInputLayout::VertexBinding binding;
+				binding.Binding = 0;
+				binding.Stride  = sizeof(SkinnedMeshVertex);
+				skinned.VertexInput.Bindings.push_back(binding);
+				skinned.VertexInput.Attributes.push_back({ 0, 0, RHIFormat::R32G32B32Float,    offsetof(SkinnedMeshVertex, Position) });
+				skinned.VertexInput.Attributes.push_back({ 1, 0, RHIFormat::R32G32B32Float,    offsetof(SkinnedMeshVertex, Normal) });
+				skinned.VertexInput.Attributes.push_back({ 2, 0, RHIFormat::R32G32B32A32Float, offsetof(SkinnedMeshVertex, Tangent) });
+				skinned.VertexInput.Attributes.push_back({ 3, 0, RHIFormat::R32G32Float,       offsetof(SkinnedMeshVertex, TexCoord) });
+				skinned.VertexInput.Attributes.push_back({ 4, 0, RHIFormat::R8G8B8A8Uint,      offsetof(SkinnedMeshVertex, BoneIndices) });
+				skinned.VertexInput.Attributes.push_back({ 5, 0, RHIFormat::R32G32B32A32Float, offsetof(SkinnedMeshVertex, BoneWeights) });
+
+				s_Data.SkinnedOpaquePipeline = dev->CreateGraphicsPipeline(skinned, skinnedVS, ps);
+				if (!s_Data.SkinnedOpaquePipeline)
+					CANDY_CORE_ERROR("SceneRenderer: failed to create skinned opaque pipeline");
+
+				GraphicsPipelineDesc skinnedTransparent = skinned;
+				skinnedTransparent.DepthStencil.DepthWriteEnable = false;
+				skinnedTransparent.Blend.BlendEnable = true;
+				skinnedTransparent.Blend.SrcColorBlendFactor = BlendState::BlendFactor::SrcAlpha;
+				skinnedTransparent.Blend.DstColorBlendFactor = BlendState::BlendFactor::OneMinusSrcAlpha;
+				s_Data.SkinnedTransparentPipeline = dev->CreateGraphicsPipeline(skinnedTransparent, skinnedVS, ps);
+				if (!s_Data.SkinnedTransparentPipeline)
+					CANDY_CORE_ERROR("SceneRenderer: failed to create skinned transparent pipeline");
+				}
+			}
+		}
+
 		// ---- Sprite pipeline (2D sprites/circles, Sprite.hlsl) -------------
 		// Same transparent desc as PBR, but a dedicated unlit shader: no
 		// lighting/TBN, and its own //@param reflection (clean material
@@ -711,6 +797,8 @@ namespace Candy {
 		s_Data.SkyboxCB.reset();
 		s_Data.OpaquePipeline.reset();
 		s_Data.TransparentPipeline.reset();
+		s_Data.SkinnedOpaquePipeline.reset();
+		s_Data.SkinnedTransparentPipeline.reset();
 		s_Data.SpriteTransparentPipeline.reset();
 		s_Data.LinePipeline.reset();
 		s_Data.SkyboxPipeline.reset();
@@ -722,6 +810,7 @@ namespace Candy {
 		s_Data.ActiveRenderTarget.reset();
 		s_Data.ActiveRenderTargetPendingClear = true;
 		s_Data.MeshCache.clear();
+		s_Data.SkinnedMeshCache.clear();
 		s_Data.TextureCache.clear();
 		s_Data.DrawCommands.clear();
 		s_Data.LineVertices.clear();
@@ -878,10 +967,21 @@ namespace Candy {
 
 		for (const auto& draw : s_Data.DrawCommands)
 		{
-			if (!draw.Mesh || draw.SubmeshIndex >= draw.Mesh->Submeshes.size())
-				continue;
-			if (!frustum.IntersectsAABB(draw.Mesh->Bounds, draw.Transform))
-				continue;
+			const bool skinned = (bool)draw.SkinnedMesh;
+			if (skinned)
+			{
+				if (draw.SubmeshIndex >= draw.SkinnedMesh->Submeshes.size())
+					continue;
+				if (!frustum.IntersectsAABB(draw.SkinnedMesh->Bounds, draw.Transform))
+					continue;
+			}
+			else
+			{
+				if (!draw.Mesh || draw.SubmeshIndex >= draw.Mesh->Submeshes.size())
+					continue;
+				if (!frustum.IntersectsAABB(draw.Mesh->Bounds, draw.Transform))
+					continue;
+			}
 
 			const float blendMode = GetMaterialState(draw.Material).BlendMode;
 			if (blendMode >= 1.5f)
@@ -914,7 +1014,8 @@ namespace Candy {
 					if (a2D != b2D)
 						return b2D; // 3D distance group draws before the 2D z-key group
 					auto center = [](const MeshDrawCommand& d) {
-						const glm::vec3 c = (d.Mesh->Bounds.Min + d.Mesh->Bounds.Max) * 0.5f;
+						const MeshAABB& b = d.SkinnedMesh ? d.SkinnedMesh->Bounds : d.Mesh->Bounds;
+						const glm::vec3 c = (b.Min + b.Max) * 0.5f;
 						return glm::vec3(d.Transform * glm::vec4(c, 1.0f));
 					};
 					const glm::vec3 diffA = center(a) - camPos;
@@ -1076,15 +1177,18 @@ namespace Candy {
 		for (const auto& draw : draws)
 		{
 			const MaterialState& state = GetMaterialState(draw.Material);
+			const bool skinned = (bool)draw.SkinnedMesh;
 
-			// Sprite.hlsl materials use the dedicated unlit 2D PSO; everything
-			// else uses the PBR pipelines. Re-set per draw (cheap, stable in
-			// practice). The built-in sprite/circle materials are always
-			// transparent; an opaque sprite material would render through the
-			// sprite transparent PSO too (alpha=1 blends to the same result).
-			Ref<RHIGraphicsPipeline> pipeline = state.IsSprite
-				? s_Data.SpriteTransparentPipeline
-				: (transparent ? s_Data.TransparentPipeline : s_Data.OpaquePipeline);
+			// Skinned draws use SkinnedVSMain (PBR.hlsl); Sprite.hlsl materials
+			// use the dedicated unlit 2D PSO; everything else uses the PBR
+			// pipelines. Re-set per draw (cheap, stable in practice).
+			Ref<RHIGraphicsPipeline> pipeline;
+			if (skinned)
+				pipeline = transparent ? s_Data.SkinnedTransparentPipeline : s_Data.SkinnedOpaquePipeline;
+			else if (state.IsSprite)
+				pipeline = s_Data.SpriteTransparentPipeline;
+			else
+				pipeline = transparent ? s_Data.TransparentPipeline : s_Data.OpaquePipeline;
 			if (!pipeline)
 				pipeline = transparent ? s_Data.TransparentPipeline : s_Data.OpaquePipeline;
 			cmd->SetPipeline(pipeline);
@@ -1097,6 +1201,11 @@ namespace Candy {
 			// register; the sprite/line root signatures simply ignore it.
 			if (!state.IsSprite && s_Data.LightCB)
 				cmd->SetConstantBuffer(3, 0, s_Data.LightCB);
+
+			// Skinned draws bind the per-skeleton bone CB (b3); the static
+			// PBR shaders never read it and the sprite root signature ignores it.
+			if (skinned && draw.BoneMatrices)
+				cmd->SetConstantBuffer(5, 0, draw.BoneMatrices);
 
 			// 2D sprite draws pack SpriteUniforms (120B), 3D draws pack
 			// MaterialUniforms (136B); each draw still owns a 256B-aligned slice.
@@ -1160,11 +1269,23 @@ namespace Candy {
 			cmd->SetConstantBuffer(1, 0, s_Data.MaterialCB, cbOffset);
 			cmd->SetTextures(2, 4, textures.data());
 
-			const auto& gpu = GetMeshGPU(draw.Mesh);
-			cmd->SetVertexBuffer(gpu.VB);
-			cmd->SetIndexBuffer(gpu.IB);
+			const auto& submesh = skinned
+				? draw.SkinnedMesh->Submeshes[draw.SubmeshIndex]
+				: draw.Mesh->Submeshes[draw.SubmeshIndex];
 
-			const auto& submesh = draw.Mesh->Submeshes[draw.SubmeshIndex];
+			if (skinned)
+			{
+				const auto& gpu = GetSkinnedMeshGPU(draw.SkinnedMesh);
+				cmd->SetVertexBuffer(gpu.VB);
+				cmd->SetIndexBuffer(gpu.IB);
+			}
+			else
+			{
+				const auto& gpu = GetMeshGPU(draw.Mesh);
+				cmd->SetVertexBuffer(gpu.VB);
+				cmd->SetIndexBuffer(gpu.IB);
+			}
+
 			cmd->DrawIndexed(submesh.IndexCount, 1, submesh.IndexOffset);
 			s_Data.Stats.DrawCalls++;
 		}

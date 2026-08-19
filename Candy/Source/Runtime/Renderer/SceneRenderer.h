@@ -6,6 +6,7 @@
 #include "Runtime/Renderer/TextureCubemap.h"
 #include "Runtime/RHI/RHI.h"
 #include "Runtime/Asset/StaticMeshResource.h"
+#include "Runtime/Asset/SkeletalMeshResource.h"
 #include "Runtime/Asset/Material.h"
 
 #include <glm/glm.hpp>
@@ -58,6 +59,15 @@ namespace Candy {
 		Ref<Material> Material;          // null = default material
 		uint32_t SubmeshIndex = 0;
 		int      EntityID = -1;          // picking ID (SV_TARGET1)
+
+		/// Non-null for skinned draws: renders with SkinnedVSMain + the
+		/// SkeletalMeshResource's vertex/index buffers.
+		Ref<SkeletalMeshResource> SkinnedMesh;
+
+		/// Bone matrix CB (b3) filled by SkeletalAnimationSystem, already
+		/// containing skin matrices (global pose × inverse bind). Ignored when
+		/// SkinnedMesh is null.
+		Ref<RHIBuffer> BoneMatrices;
 
 		/// 2D z-order key (transparent pass). FLT_MAX = 3D distance-sorted draw;
 		/// otherwise smaller key = drawn first = further back (camera looks -Z).

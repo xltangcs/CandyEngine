@@ -661,7 +661,10 @@ float4 main(PSInput input) : SV_TARGET
 		// Parameter 4: descriptor table with 3 SRVs (t4-t6) — IBL environment
 		// maps (irradiance cube / prefiltered cube / BRDF LUT). Bound once per
 		// pass; shaders that don't declare t4-t6 simply ignore the table.
-		D3D12_ROOT_PARAMETER rootParams[5] = {};
+		// Parameter 5: CBV (b3)  ---- skinned-mesh bone matrices (SkinnedVSMain).
+		// Declared vertex-side, so visibility must be ALL. Static pipelines
+		// never bind it (same root signature, no cost).
+		D3D12_ROOT_PARAMETER rootParams[6] = {};
 
 		rootParams[0].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_CBV;
 		rootParams[0].Descriptor       = {};
@@ -710,6 +713,14 @@ float4 main(PSInput input) : SV_TARGET
 		rootParams[4].DescriptorTable.pDescriptorRanges   = &iblRange;
 		rootParams[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
+		// Skinned-mesh bone matrices: vertex-shader-only (SkinnedVSMain reads
+		// b3); PBR PSMain never touches it.
+		rootParams[5].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		rootParams[5].Descriptor       = {};
+		rootParams[5].Descriptor.ShaderRegister = 3;
+		rootParams[5].Descriptor.RegisterSpace  = 0;
+		rootParams[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
 		// Static sampler (s0) ---- linear wrap
 		D3D12_STATIC_SAMPLER_DESC staticSampler = {};
 		staticSampler.Filter           = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -726,7 +737,7 @@ float4 main(PSInput input) : SV_TARGET
 		staticSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
 		D3D12_ROOT_SIGNATURE_DESC rootSigDesc = {};
-		rootSigDesc.NumParameters     = 5;
+		rootSigDesc.NumParameters     = 6;
 		rootSigDesc.pParameters       = rootParams;
 		rootSigDesc.NumStaticSamplers = 1;
 		rootSigDesc.pStaticSamplers   = &staticSampler;
@@ -967,6 +978,7 @@ float4 main(PSInput input) : SV_TARGET
 			case RHIFormat::R32G32B32Float:     return DXGI_FORMAT_R32G32B32_FLOAT;
 			case RHIFormat::R32G32B32A32Float:  return DXGI_FORMAT_R32G32B32A32_FLOAT;
 			case RHIFormat::R8G8B8A8Unorm:      return DXGI_FORMAT_R8G8B8A8_UNORM;
+			case RHIFormat::R8G8B8A8Uint:       return DXGI_FORMAT_R8G8B8A8_UINT;
 			case RHIFormat::R32Float:           return DXGI_FORMAT_R32_FLOAT;
 			case RHIFormat::R32Sint:            return DXGI_FORMAT_R32_SINT;
 			case RHIFormat::R32Uint:            return DXGI_FORMAT_R32_UINT;

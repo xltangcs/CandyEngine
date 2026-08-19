@@ -58,6 +58,14 @@ cbuffer LightCB : register(b2)
 	float     _IBLPad;
 };
 
+// Skinned-mesh bone matrices (SkinnedVSMain only; 512 x 64B = 32KB < 64KB
+// root CBV limit). The binding is per-skeleton, shared by every draw that
+// references the same SkeletalMeshResource.
+cbuffer SkinCB : register(b3)
+{
+	float4x4 u_Bones[512];
+};
+
 Texture2D    u_BaseColorMap;         // @param texture "Base Color Map" --- color map (sRGB-decoded per engine convention)
 Texture2D    u_MetallicRoughnessMap; // @param texture "Metallic-Roughness Map" (G = roughness, B = metallic)
 Texture2D    u_NormalMap;            // @param texture "Normal Map"
@@ -161,6 +169,50 @@ VSOutput VSMain(VSInput input)
 	output.WorldPosition  = worldPos.xyz;
 	output.WorldNormal    = normalize(mul((float3x3)u_World, input.Normal));
 	output.WorldTangent   = normalize(mul((float3x3)u_World, input.Tangent.xyz));
+	output.WorldBitangent = cross(output.WorldNormal, output.WorldTangent) * input.Tangent.w;
+	output.TexCoord       = input.TexCoord * u_UVTiling + u_UVOffset;
+	return output;
+}
+
+// =============================================================================
+// Skinned vertex shader — same VSOutput as VSMain, so the pixel shader is
+// shared. Per-vertex linear blend skinning (LBS): each bone matrix maps the
+// bind-pose position into animated mesh space; weights blend the results.
+// =============================================================================
+
+struct SkinVSInput
+{
+	float3 Position    : TEXCOORD0;
+	float3 Normal      : TEXCOORD1;
+	float4 Tangent     : TEXCOORD2;
+	float2 TexCoord    : TEXCOORD3;
+	uint4  BoneIndices : TEXCOORD4; // R8G8B8A8_UINT (JOINTS_0, uint8)
+	float4 BoneWeights : TEXCOORD5;
+};
+
+VSOutput SkinnedVSMain(SkinVSInput input)
+{
+	float3 p = 0.0;
+	float3 n = 0.0;
+	float3 t = 0.0;
+	[unroll]
+	for (int k = 0; k < 4; k++)
+	{
+		const float w = input.BoneWeights[k];
+		if (w <= 0.0)
+			continue;
+		const float4x4 bone = u_Bones[input.BoneIndices[k]];
+		p += w * mul(bone, float4(input.Position, 1.0)).xyz;
+		n += w * mul((float3x3)bone, input.Normal);
+		t += w * mul((float3x3)bone, input.Tangent.xyz);
+	}
+
+	VSOutput output;
+	float4 worldPos = mul(u_World, float4(p, 1.0));
+	output.Position       = mul(u_ViewProjection, worldPos);
+	output.WorldPosition  = worldPos.xyz;
+	output.WorldNormal    = normalize(mul((float3x3)u_World, n));
+	output.WorldTangent   = normalize(mul((float3x3)u_World, t));
 	output.WorldBitangent = cross(output.WorldNormal, output.WorldTangent) * input.Tangent.w;
 	output.TexCoord       = input.TexCoord * u_UVTiling + u_UVOffset;
 	return output;

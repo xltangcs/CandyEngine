@@ -564,6 +564,15 @@ namespace
 				}
 			}
 
+			if (!m_SelectionContext.HasComponent<SkeletalMeshComponent>())
+			{
+				if (ImGui::MenuItem("Skeletal Mesh"))
+				{
+					m_SelectionContext.AddComponent<SkeletalMeshComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
 			if (!m_SelectionContext.HasComponent<CircleRendererComponent>())
 			{
 				if (ImGui::MenuItem("Circle Renderer"))
@@ -811,6 +820,120 @@ namespace
 				}
 			});
 	
+
+		DrawComponent<SkeletalMeshComponent>("Skeletal Mesh", entity, [](auto& component)
+			{
+				// Mesh path + import (same pattern as Static Mesh).
+				if (ImGuiUtils::DrawPathInput("Mesh Path", component.MeshPath, [&component]()->void
+				{
+					if (component.Mesh)
+					{
+						ImGui::Text("Vertices: %zu", component.Mesh->Vertices.size());
+						ImGui::Text("Indices : %zu", component.Mesh->Indices.size());
+						ImGui::Text("Joints  : %zu", component.Mesh->Skeleton.size());
+						ImGui::Text("Clips   : %zu", component.Mesh->Clips.size());
+					}
+					else
+					{
+						ImGui::TextDisabled("No mesh loaded");
+					}
+				}))
+				{
+					if (component.MeshPath.empty())
+					{
+						component.Mesh.reset();
+						component.Materials.clear();
+						component.ClipName.clear();
+						component.Time = 0.0f;
+					}
+					else
+					{
+						auto imported = MeshImporter::ImportSkeletalMesh(component.MeshPath);
+						if (imported && imported->Mesh)
+						{
+							component.Mesh = imported->Mesh;
+							component.Materials = imported->Materials;
+							component.Time = 0.0f;
+							if (component.ClipName.empty() && !imported->Mesh->Clips.empty())
+								component.ClipName = imported->Mesh->Clips[0].Name;
+							CANDY_INFO("Loaded skeletal mesh '{}' ({} verts, {} joints, {} clips)",
+								component.MeshPath, component.Mesh->Vertices.size(),
+								component.Mesh->Skeleton.size(), component.Mesh->Clips.size());
+						}
+						else
+							CANDY_WARN("Could not import skeletal mesh {0}", component.MeshPath);
+					}
+				}
+
+				if (!component.Mesh || component.Mesh->Skeleton.empty())
+					return;
+
+				// Animation clip selection.
+				if (!component.Mesh->Clips.empty())
+				{
+					std::string preview = component.ClipName;
+					if (ImGui::BeginCombo("Clip", preview.c_str()))
+					{
+						for (size_t i = 0; i < component.Mesh->Clips.size(); i++)
+						{
+							const bool selected = component.Mesh->Clips[i].Name == component.ClipName;
+							if (ImGui::Selectable(component.Mesh->Clips[i].Name.c_str(), selected))
+							{
+								component.ClipName = component.Mesh->Clips[i].Name;
+								component.Time = 0.0f;
+							}
+						}
+						ImGui::EndCombo();
+					}
+				}
+
+				// Playback controls.
+				ImGuiUtils::DrawCheckbox("Play", component.Play);
+				ImGuiUtils::DrawCheckbox("Loop", component.Loop);
+				ImGuiUtils::DrawDragFloat("Speed", component.Speed, 0.05f, 0.0f, 10.0f);
+
+				// Time timeline (scrubbing pauses playback).
+				const AnimationClip* activeClip = nullptr;
+				if (!component.ClipName.empty())
+				{
+					for (const auto& c : component.Mesh->Clips)
+					{
+						if (c.Name == component.ClipName)
+						{
+							activeClip = &c;
+							break;
+						}
+					}
+				}
+				if (!activeClip && !component.Mesh->Clips.empty())
+					activeClip = &component.Mesh->Clips[0];
+				const float duration = activeClip ? activeClip->Duration : 0.0f;
+
+				ImGuiUtils::DrawSliderFloat("Time", component.Time, 0.0f, std::max(duration, 0.001f), "%.2fs");
+
+				ImGuiUtils::DrawCheckbox("Show Skeleton", component.ShowSkeleton);
+
+				// Material overrides (one .mat path per submesh).
+				size_t submeshCount = component.Mesh->Submeshes.size();
+				component.MaterialPaths.resize(submeshCount);
+				for (size_t i = 0; i < submeshCount; i++)
+				{
+					const auto& submesh = component.Mesh->Submeshes[i];
+					std::string label = submesh.Name.empty()
+						? "Material " + std::to_string(i)
+						: submesh.Name;
+
+					if (ImGuiUtils::DrawPathInput(label, component.MaterialPaths[i]))
+					{
+						if (!component.MaterialPaths[i].empty() && i < component.Materials.size())
+						{
+							auto mat = MaterialCache::Get().Load(component.MaterialPaths[i]);
+							if (mat)
+								component.Materials[i] = mat;
+						}
+					}
+				}
+			});
 
 		DrawComponent<LightComponent>("Light", entity, [](auto& component)
 			{

@@ -5,6 +5,7 @@
 #include "Runtime/Renderer/Texture.h"
 #include "Runtime/Renderer/TextureCubemap.h"
 #include "Runtime/Asset/StaticMeshResource.h"
+#include "Runtime/Asset/SkeletalMeshResource.h"
 #include "Runtime/Asset/Material.h"
 
 
@@ -105,6 +106,46 @@ namespace Candy {
 
 		StaticMeshComponent() = default;
 		StaticMeshComponent(const StaticMeshComponent&) = default;
+	};
+
+	CANDY_CLASS()
+	struct SkeletalMeshComponent
+	{
+		// VFS:// path to the source skinned glTF asset (serialized for save/load).
+		CANDY_PROPERTY()
+		std::string MeshPath;
+
+		// One .mat VFS path per Submesh (indexed by Submesh::MaterialIndex).
+		CANDY_PROPERTY()
+		std::vector<std::string> MaterialPaths;
+
+		// Animation playback state (serialized).
+		CANDY_PROPERTY()
+		std::string ClipName;
+		CANDY_PROPERTY()
+		float Speed = 1.0f;
+		CANDY_PROPERTY()
+		bool Play = true;
+		CANDY_PROPERTY()
+		bool Loop = true;
+
+		// Runtime imported data (not serialized).
+		Ref<SkeletalMeshResource> Mesh;
+		std::vector<Ref<Material>> Materials;
+
+		// Current animation time in seconds (runtime; advanced by
+		// SkeletalAnimationSystem, seekable from the inspector).
+		float Time = 0.0f;
+
+		// Editor-only: draw the joint hierarchy as debug lines (RenderOverlay).
+		bool ShowSkeleton = false;
+
+		// Most recent global joint poses (mesh-space skin matrices not applied),
+		// filled by SkeletalAnimationSystem for editor skeleton debug lines.
+		std::vector<glm::mat4> DebugGlobalPose;
+
+		SkeletalMeshComponent() = default;
+		SkeletalMeshComponent(const SkeletalMeshComponent&) = default;
 	};
 
 	struct CircleRendererComponent

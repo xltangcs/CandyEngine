@@ -8,6 +8,7 @@
 #include "Runtime/Renderer/EditorCamera.h"
 #include "Runtime/Scene/Scene.h"
 #include "Runtime/Scene/Components.h"
+#include "Runtime/Scene/SkeletalAnimationSystem.h"
 #include "Runtime/Imgui/ImguiLayer.h"
 #include "Runtime/UI/UISystem.h"
 #include "Runtime/RHI/RHICommandQueue.h"
@@ -184,6 +185,11 @@ namespace Candy {
 		if (hdrScene->GetColorAttachmentCount() > 1)
 			hdrScene->ClearAttachment(1, -1);
 
+		// ---- Animation evaluation (edit + runtime, one tick per frame) ----
+		// Presentation-layer update: skeletal animation advances with render
+		// time (ctx.DeltaTime) in every scene mode; logic ticks never touch it.
+		SkeletalAnimationSystem::Update(*ctx.ActiveScene, ctx.DeltaTime);
+
 		// ---- Scene pass (collect: meshes + sprites/circles) ---------------
 		if (ctx.EditorCamera)
 			ctx.ActiveScene->RenderScene(*ctx.EditorCamera);
@@ -215,7 +221,7 @@ namespace Candy {
 		ctx.ViewportTarget->Unbind();
 	}
 
-	void GameFrameRenderer::RenderSceneTo(Framebuffer& target, Scene& scene, EditorCamera* editorCamera)
+	void GameFrameRenderer::RenderSceneTo(Framebuffer& target, Scene& scene, EditorCamera* editorCamera, float deltaTime)
 	{
 		Ref<Framebuffer> hdrScene = EnsureHDRTarget(s_HDRSceneTarget,
 			target.GetWidth(), target.GetHeight(), true);
@@ -224,6 +230,9 @@ namespace Candy {
 
 		hdrScene->Bind();
 		SceneRenderer::SetActiveRenderTarget(hdrScene);
+
+		// Animation evaluation (same presentation-layer tick as the editor).
+		SkeletalAnimationSystem::Update(scene, deltaTime);
 
 		if (editorCamera)
 		{
@@ -248,12 +257,37 @@ namespace Candy {
 
 	void GameFrameRenderer::RenderOverlay(const EditorRenderContext& ctx)
 	{
-		if (!ctx.ShowPhysicsColliders)
-			return;
-
 		// Debug line submissions land in the frame's render pass (SceneRenderer
 		// draws them after the transparent pass; camera comes from the frame's
 		// BeginFrame, so no camera setup is needed here).
+
+		// Skeleton debug lines (skeletal mesh joint hierarchy). Uses the frame's
+		// DebugGlobalPose (filled by SkeletalAnimationSystem) transformed by the
+		// entity's world transform. Not gated by ShowPhysicsColliders.
+		{
+			auto view = ctx.ActiveScene->GetAllEntitiesWith<TransformComponent, SkeletalMeshComponent>();
+			for (auto entity : view)
+			{
+				auto [tc, skmc] = view.get<TransformComponent, SkeletalMeshComponent>(entity);
+				if (!skmc.ShowSkeleton || !skmc.Mesh || skmc.DebugGlobalPose.size() != skmc.Mesh->Skeleton.size())
+					continue;
+
+				const glm::mat4 transform = tc.GetTransform();
+				const glm::vec4 color(1.0f, 1.0f, 0.0f, 1.0f);
+				for (size_t j = 0; j < skmc.Mesh->Skeleton.size(); j++)
+				{
+					const int32_t parent = skmc.Mesh->Skeleton[j].ParentIndex;
+					if (parent < 0)
+						continue;
+					const glm::vec3 p0 = glm::vec3(transform * glm::vec4(glm::vec3(skmc.DebugGlobalPose[parent][3]), 1.0f));
+					const glm::vec3 p1 = glm::vec3(transform * glm::vec4(glm::vec3(skmc.DebugGlobalPose[j][3]), 1.0f));
+					SceneRenderer::SubmitLine(p0, p1, color);
+				}
+			}
+		}
+
+		if (!ctx.ShowPhysicsColliders)
+			return;
 
 		// Box Colliders
 		{

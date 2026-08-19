@@ -5,9 +5,11 @@
 #include "Runtime/Scene/Components.h"
 #include "Runtime/Scene/ScriptableEntity.h"
 #include "Runtime/Scene/PhysicsContactListener.h"
+#include "Runtime/Scene/SkeletalAnimationSystem.h"
 #include "Runtime/Scripting/ScriptSystem.h"
 
 #include "Runtime/Renderer/SceneRenderer.h"
+#include "Runtime/Renderer/Texture.h"
 
 #include <glm/glm.hpp>
 
@@ -92,6 +94,7 @@ namespace Candy {
 		CopyComponent<TransformComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<SpriteRendererComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<StaticMeshComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
+		CopyComponent<SkeletalMeshComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<CircleRendererComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<CameraComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<LightComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
@@ -377,6 +380,7 @@ namespace Candy {
 			SubmitSkybox();
 			SubmitSceneLights();
 			SubmitStaticMeshDraws();
+			SubmitSkeletalMeshDraws();
 			SubmitSpriteAndCircleDraws();
 		}
 	}
@@ -624,6 +628,7 @@ namespace Candy {
 		SubmitSkybox();
 		SubmitSceneLights();
 		SubmitStaticMeshDraws();
+		SubmitSkeletalMeshDraws();
 		SubmitSpriteAndCircleDraws();
 	}
 
@@ -635,6 +640,7 @@ namespace Candy {
 		SubmitSkybox();
 		SubmitSceneLights();
 		SubmitStaticMeshDraws();
+		SubmitSkeletalMeshDraws();
 		SubmitSpriteAndCircleDraws();
 	}
 
@@ -713,6 +719,33 @@ namespace Candy {
 		}
 	}
 
+	void Scene::SubmitSkeletalMeshDraws()
+	{
+		auto view = m_Registry.view<TransformComponent, SkeletalMeshComponent>();
+		for (auto entity : view)
+		{
+			auto [tc, smc] = view.get<TransformComponent, SkeletalMeshComponent>(entity);
+			if (!smc.Mesh || smc.Mesh->Submeshes.empty() || smc.Mesh->Skeleton.empty())
+				continue;
+
+			// Bone CB written by SkeletalAnimationSystem::Update each frame;
+			// same skeleton = same buffer, shared by every submesh draw.
+			const glm::mat4 transform = tc.GetTransform();
+			Ref<RHIBuffer> boneBuffer = SkeletalAnimationSystem::GetBoneBuffer(smc.Mesh);
+			for (size_t i = 0; i < smc.Mesh->Submeshes.size(); ++i)
+			{
+				MeshDrawCommand draw;
+				draw.Transform     = transform;
+				draw.SkinnedMesh   = smc.Mesh;
+				draw.Material      = (i < smc.Materials.size()) ? smc.Materials[i] : nullptr;
+				draw.SubmeshIndex  = static_cast<uint32_t>(i);
+				draw.EntityID      = static_cast<int>(entity);
+				draw.BoneMatrices  = boneBuffer;
+				SceneRenderer::Submit(draw);
+			}
+		}
+	}
+
 	template<typename T>
 	void Scene::OnComponentAdded(Entity entity, T& component)
 	{
@@ -756,7 +789,12 @@ namespace Candy {
 	}
 
 	template<>
-	void Scene::OnComponentAdded<TagComponent>(Entity entity, TagComponent& component)
+	void Scene::OnComponentAdded<StaticMeshComponent>(Entity entity, StaticMeshComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<SkeletalMeshComponent>(Entity entity, SkeletalMeshComponent& component)
 	{
 	}
 
