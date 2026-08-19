@@ -8,7 +8,6 @@
 #include "Runtime/Renderer/EditorCamera.h"
 #include "Runtime/Scene/Scene.h"
 #include "Runtime/Scene/Components.h"
-#include "Runtime/Scene/SkeletalAnimationSystem.h"
 #include "Runtime/Imgui/ImguiLayer.h"
 #include "Runtime/UI/UISystem.h"
 #include "Runtime/RHI/RHICommandQueue.h"
@@ -185,11 +184,6 @@ namespace Candy {
 		if (hdrScene->GetColorAttachmentCount() > 1)
 			hdrScene->ClearAttachment(1, -1);
 
-		// ---- Animation evaluation (edit + runtime, one tick per frame) ----
-		// Presentation-layer update: skeletal animation advances with render
-		// time (ctx.DeltaTime) in every scene mode; logic ticks never touch it.
-		SkeletalAnimationSystem::Update(*ctx.ActiveScene, ctx.DeltaTime);
-
 		// ---- Scene pass (collect: meshes + sprites/circles) ---------------
 		if (ctx.EditorCamera)
 			ctx.ActiveScene->RenderScene(*ctx.EditorCamera);
@@ -221,7 +215,7 @@ namespace Candy {
 		ctx.ViewportTarget->Unbind();
 	}
 
-	void GameFrameRenderer::RenderSceneTo(Framebuffer& target, Scene& scene, EditorCamera* editorCamera, float deltaTime)
+	void GameFrameRenderer::RenderSceneTo(Framebuffer& target, Scene& scene, EditorCamera* editorCamera)
 	{
 		Ref<Framebuffer> hdrScene = EnsureHDRTarget(s_HDRSceneTarget,
 			target.GetWidth(), target.GetHeight(), true);
@@ -230,9 +224,6 @@ namespace Candy {
 
 		hdrScene->Bind();
 		SceneRenderer::SetActiveRenderTarget(hdrScene);
-
-		// Animation evaluation (same presentation-layer tick as the editor).
-		SkeletalAnimationSystem::Update(scene, deltaTime);
 
 		if (editorCamera)
 		{

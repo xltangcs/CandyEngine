@@ -195,6 +195,8 @@ namespace Candy {
 			m_ActiveScene->OnUpdateSimulationLogic(ts);
 		else if (m_SceneState == SceneState::Play)
 			m_ActiveScene->OnUpdateRuntimeLogic(ts);
+		else
+			m_ActiveScene->OnUpdateEditorLogic(ts);
 
 		// ---- Render the whole editor frame (scene → overlay → PIP → game UI) ----
 		auto [mx, my] = ImGui::GetMousePos();

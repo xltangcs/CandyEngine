@@ -44,6 +44,8 @@ namespace Candy {
 
 		void OnUpdateRuntime(Timestep ts);
 		void OnUpdateRuntimeLogic(Timestep ts);
+		/// Editor-mode logic tick (skeletal animation preview; no physics).
+		void OnUpdateEditorLogic(Timestep ts);
 		/// Begins a SceneRenderer frame and submits all draw commands (meshes,
 		/// sprites, circles). The caller owns SceneRenderer::EndFrame() — the
 		/// frame orchestrator (GameFrameRenderer) ends the frame once, after

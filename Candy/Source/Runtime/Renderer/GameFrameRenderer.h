@@ -43,7 +43,7 @@ namespace Candy {
 		/// owned by SceneRenderer's render passes (LoadOp).
 		static void RenderEditorFrame(const EditorRenderContext& ctx);
 
-		static void RenderSceneTo(Framebuffer& target, Scene& scene, EditorCamera* editorCamera, float deltaTime = 1.0f / 60.0f);
+		static void RenderSceneTo(Framebuffer& target, Scene& scene, EditorCamera* editorCamera);
 		static void RenderUITo(Framebuffer& target, Scene& scene, float mouseX, float mouseY, bool mouseDown, float deltaTime);
 
 		/// Returns the internal HDR scene target for the current frame.

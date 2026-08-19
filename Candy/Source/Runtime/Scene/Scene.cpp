@@ -270,6 +270,10 @@ namespace Candy {
 				transform.Rotation.z = body->GetAngle();
 			}
 		}
+
+		// Animation evaluation last: scripts/physics may have changed
+		// Time/ClipName this tick; the renderer consumes the fresh pose.
+		SkeletalAnimationSystem::Update(*this, ts);
 	}
 
 	// ---- Sprite/circle shared rendering resources ---------------------------
@@ -418,6 +422,10 @@ namespace Candy {
 				transform.Rotation.z = body->GetAngle();
 			}
 		}
+
+		// Animation evaluation last: scripts/physics may have changed
+		// Time/ClipName this tick; the renderer consumes the fresh pose.
+		SkeletalAnimationSystem::Update(*this, ts);
 	}
 
 	void Scene::OnUpdateSimulation(Timestep ts, EditorCamera& camera)
@@ -427,6 +435,15 @@ namespace Candy {
 		// Render
 		RenderScene(camera);
 		SceneRenderer::EndFrame();
+	}
+
+	void Scene::OnUpdateEditorLogic(Timestep ts)
+	{
+		ProcessDeletions();
+
+		// Edit mode has no physics; only presentation-adjacent runtime state
+		// (skeletal animation preview) advances here.
+		SkeletalAnimationSystem::Update(*this, ts);
 	}
 
 	void Scene::OnUpdateEditor(Timestep ts, EditorCamera& camera)

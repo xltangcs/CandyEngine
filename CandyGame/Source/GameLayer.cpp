@@ -127,7 +127,7 @@ namespace Candy {
 		// Clear/viewport semantics live in SceneRenderer::EndFrame (LoadOp::Clear
 		// on the first pass after SetActiveRenderTarget; swap-chain path clears).
 		m_GameFramebuffer->Bind();
-		GameFrameRenderer::RenderSceneTo(*m_GameFramebuffer, *m_ActiveScene, nullptr, ts.GetSeconds());
+		GameFrameRenderer::RenderSceneTo(*m_GameFramebuffer, *m_ActiveScene, nullptr);
 
 		// Mouse position in window coordinates (fullscreen game = 1:1)
 		float mouseX = (float)Input::GetMouseX();
