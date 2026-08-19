@@ -6,6 +6,10 @@ namespace Candy {
 
 	class D3D12Device;
 
+	/// D3D12 backend factory — registered by D3D12GraphicsContext::Init via
+	/// TextureCubemap::RegisterBackendFactory (composition root).
+	Ref<TextureCubemap> CreateD3D12TextureCubemapFromEquirect(const std::string& vfsPath);
+
 	// =========================================================================
 	// D3D12TextureCubemap — D3D12 implementation of the cubemap + IBL set.
 	// Loads the equirect panorama and bakes everything on the GPU with

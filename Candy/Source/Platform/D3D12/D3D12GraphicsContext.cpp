@@ -6,6 +6,8 @@
 #include "Platform/D3D12/D3D12GraphicsContext.h"
 #include "Platform/D3D12/D3D12Device.h"
 #include "Platform/D3D12/D3D12SwapChain.h"
+#include "Platform/D3D12/D3D12TextureCubemap.h"
+#include "Runtime/Renderer/TextureCubemap.h"
 #include "Runtime/Core/Log.h"
 #include "Runtime/RHI/RHISwapChain.h"
 #include "Runtime/RHI/RHIContext.h"
@@ -69,6 +71,10 @@ namespace Candy {
 		// code can reach the active device without including Platform headers.
 		RHIContext::SetDevice(m_Device.get());
 		RHIContext::SetSwapChain(m_SwapChainRef.get());
+
+		// Backend factories (composition root — the only place that names
+		// concrete backend types).
+		TextureCubemap::RegisterBackendFactory(&CreateD3D12TextureCubemapFromEquirect);
 
 		CANDY_CORE_INFO("D3D12GraphicsContext: initialized ({}x{})", width, height);
 	}

@@ -8,6 +8,7 @@
 #include "Platform/D3D12/D3D12CommandBuffer.h"
 #include "Runtime/Core/FileSystem.h"
 #include "Runtime/Core/Log.h"
+#include "Runtime/RHI/RHIContext.h"
 #include "Runtime/RHI/RHICommandQueue.h"
 #include "Runtime/RHI/RHICommandBuffer.h"
 
@@ -389,6 +390,14 @@ namespace Candy {
 		equirect.reset();
 
 		return true;
+	}
+
+	Ref<TextureCubemap> CreateD3D12TextureCubemapFromEquirect(const std::string& vfsPath)
+	{
+		auto* dev = static_cast<D3D12Device*>(RHIContext::GetDevice());
+		if (!dev)
+			return nullptr;
+		return CreateRef<D3D12TextureCubemap>(dev, vfsPath);
 	}
 
 } // namespace Candy

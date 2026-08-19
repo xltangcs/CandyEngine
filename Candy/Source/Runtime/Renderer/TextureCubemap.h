@@ -25,6 +25,12 @@ namespace Candy {
 	public:
 		virtual ~TextureCubemap() = default;
 
+		/// Backend factory (registered by the active platform backend during
+		/// device init; the composition root is the only place that names
+		/// concrete backend types). No factory registered → nullptr + warn.
+		using CreateBackendFn = Ref<TextureCubemap>(*)(const std::string& vfsPath);
+		static void RegisterBackendFactory(CreateBackendFn fn);
+
 		/// Load + bake from an equirectangular panorama (HDR .hdr or LDR image).
 		/// Cached by VFS path.
 		static Ref<TextureCubemap> CreateFromEquirect(const std::string& vfsPath);
