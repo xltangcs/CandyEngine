@@ -108,6 +108,14 @@ namespace Candy {
 		CopyComponent<UITextBlockComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 		CopyComponent<UIButtonComponent>(dstSceneRegistry, srcSceneRegistry, enttMap);
 
+		// Per-instance runtime resources must not be shared across scenes:
+		// reset the copied bone CBs so each instance lazily re-creates its own.
+		for (auto&& [enttID, smc] : dstSceneRegistry.view<SkeletalMeshComponent>().each())
+		{
+			smc.BoneBuffer = nullptr;
+			smc.BoneBufferJoints = 0;
+		}
+
 		return newScene;
 	}
 
@@ -728,10 +736,10 @@ namespace Candy {
 			if (!smc.Mesh || smc.Mesh->Submeshes.empty() || smc.Mesh->Skeleton.empty())
 				continue;
 
-			// Bone CB written by SkeletalAnimationSystem::Update each frame;
-			// same skeleton = same buffer, shared by every submesh draw.
+			// Per-instance bone CB written by SkeletalAnimationSystem::Update
+			// each frame; shared by every submesh draw of this instance.
 			const glm::mat4 transform = tc.GetTransform();
-			Ref<RHIBuffer> boneBuffer = SkeletalAnimationSystem::GetBoneBuffer(smc.Mesh);
+			Ref<RHIBuffer> boneBuffer = smc.BoneBuffer;
 			for (size_t i = 0; i < smc.Mesh->Submeshes.size(); ++i)
 			{
 				MeshDrawCommand draw;

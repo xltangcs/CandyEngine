@@ -170,9 +170,6 @@ namespace Candy {
 
 	} // namespace
 
-	std::unordered_map<const SkeletalMeshResource*, SkeletalAnimationSystem::SkeletonGPU>
-		SkeletalAnimationSystem::s_Skeletons;
-
 	void SkeletalAnimationSystem::Update(Scene& scene, float dt)
 	{
 		auto* dev = RHIContext::GetDevice();
@@ -208,15 +205,15 @@ namespace Candy {
 			EvaluatePose(comp, globalPose);
 			comp.DebugGlobalPose = globalPose;
 
-			// Upload skin matrices (global pose * inverse bind) into the bone CB.
+			// Upload skin matrices (global pose * inverse bind) into the
+			// per-instance bone CB (never shared across entities).
 			const auto& skeleton = comp.Mesh->Skeleton;
 			const uint32_t boneCount = std::min<uint32_t>(
 				static_cast<uint32_t>(skeleton.size()), kMaxBones);
 			if (boneCount == 0)
 				continue;
 
-			auto& gpu = s_Skeletons[comp.Mesh.get()];
-			if (!gpu.Buffer || gpu.Joints != boneCount)
+			if (!comp.BoneBuffer || comp.BoneBufferJoints != boneCount)
 			{
 				const uint64_t cbSize = ((static_cast<uint64_t>(boneCount) * sizeof(glm::mat4)) + 255u) & ~255ull;
 				BufferDesc cb;
@@ -224,30 +221,17 @@ namespace Candy {
 				cb.Usage         = ResourceUsage::ConstantBuffer;
 				cb.CPUAccessible = true;
 				cb.DebugName     = "SkeletalAnimation_BoneCB";
-				gpu.Buffer = dev->CreateBuffer(cb);
-				gpu.Joints = boneCount;
-				if (!gpu.Buffer)
+				comp.BoneBuffer = dev->CreateBuffer(cb);
+				comp.BoneBufferJoints = boneCount;
+				if (!comp.BoneBuffer)
 					continue;
 			}
 
 			std::vector<glm::mat4> skinMatrices(boneCount);
 			for (uint32_t j = 0; j < boneCount; j++)
 				skinMatrices[j] = globalPose[j] * skeleton[j].InverseBindMatrix;
-			gpu.Buffer->Write(skinMatrices.data(), skinMatrices.size() * sizeof(glm::mat4));
+			comp.BoneBuffer->Write(skinMatrices.data(), skinMatrices.size() * sizeof(glm::mat4));
 		}
-	}
-
-	Ref<RHIBuffer> SkeletalAnimationSystem::GetBoneBuffer(const Ref<SkeletalMeshResource>& mesh)
-	{
-		auto it = s_Skeletons.find(mesh.get());
-		if (it == s_Skeletons.end())
-			return nullptr;
-		return it->second.Buffer;
-	}
-
-	void SkeletalAnimationSystem::Shutdown()
-	{
-		s_Skeletons.clear();
 	}
 
 } // namespace Candy

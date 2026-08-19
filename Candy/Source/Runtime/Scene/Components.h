@@ -4,6 +4,7 @@
 #include "Runtime/Core/UUID.h"
 #include "Runtime/Renderer/Texture.h"
 #include "Runtime/Renderer/TextureCubemap.h"
+#include "Runtime/RHI/RHIDevice.h"
 #include "Runtime/Asset/StaticMeshResource.h"
 #include "Runtime/Asset/SkeletalMeshResource.h"
 #include "Runtime/Asset/Material.h"
@@ -143,6 +144,11 @@ namespace Candy {
 		// Most recent global joint poses (mesh-space skin matrices not applied),
 		// filled by SkeletalAnimationSystem for editor skeleton debug lines.
 		std::vector<glm::mat4> DebugGlobalPose;
+
+		// Per-instance bone CB (runtime; owned here so each instance evaluates
+		// its own pose — never shared across entities or scene copies).
+		Ref<RHIBuffer> BoneBuffer;
+		uint32_t BoneBufferJoints = 0;
 
 		SkeletalMeshComponent() = default;
 		SkeletalMeshComponent(const SkeletalMeshComponent&) = default;
