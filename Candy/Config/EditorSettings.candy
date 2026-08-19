@@ -2,7 +2,7 @@ EditorSettings:
   FontSize: 22
   FontPath: VFS://Engine/Content/Fonts/opensans/OpenSans-Regular.ttf
   ShowPhysicsColliders: false
-  CameraFlySpeed: 4.72100019
+  CameraFlySpeed: 3.19799995
   ThumbnailSize: 99.2679977
   ThumbnailPadding: 12.085
   ContentBrowserTreeWidth: 276

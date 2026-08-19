@@ -761,7 +761,12 @@ namespace Candy {
 				mx -= m_ViewportBounds[0].x;
 				my -= m_ViewportBounds[0].y;
 				glm::vec2 viewportSize = m_ViewportBounds[1] - m_ViewportBounds[0];
-				my = viewportSize.y - my; // flip to bottom-left origin for ReadPixel
+				// ReadPixel origin: OpenGL framebuffers are stored bottom-up
+				// (V=0 is the bottom row), so the mouse Y must be flipped;
+				// D3D12/Vulkan framebuffers are top-down (V=0 is the top row) —
+				// read the row directly, matching the display-side convention.
+				if (Renderer::GetAPI() == RendererAPI::API::OpenGL)
+					my = viewportSize.y - my;
 
 				if (mx >= 0 && my >= 0 && mx < viewportSize.x && my < viewportSize.y)
 				{

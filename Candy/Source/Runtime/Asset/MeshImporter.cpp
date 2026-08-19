@@ -152,7 +152,7 @@ namespace Candy {
 				return;
 			}
 
-			const cgltf_size vertexCount = posAccessor->count;
+			cgltf_size vertexCount = posAccessor->count;
 			const uint32_t baseVertex = static_cast<uint32_t>(mesh->Vertices.size());
 
 			// Unpack attribute streams into flat float arrays.
@@ -180,6 +180,73 @@ namespace Candy {
 				cgltf_accessor_unpack_floats(tanAccessor, tangents.data(), tangents.size());
 			}
 
+			// glTF spec: when NORMAL is absent, client implementations should
+			// calculate flat (per-face) normals. Indexed primitives may share
+			// vertices between triangles, so expand to non-indexed triangle
+			// corners first; each corner then carries its face normal.
+			bool expandedToNonIndexed = false;
+			if (!norAccessor)
+			{
+				std::vector<uint32_t> triIndices;
+				if (prim.indices)
+				{
+					triIndices.resize(prim.indices->count);
+					cgltf_accessor_unpack_indices(prim.indices, triIndices.data(), sizeof(uint32_t), triIndices.size());
+				}
+				else
+				{
+					triIndices.resize(vertexCount);
+					for (cgltf_size i = 0; i < vertexCount; i++)
+						triIndices[i] = static_cast<uint32_t>(i);
+				}
+
+				if (prim.indices)
+				{
+					// Duplicate shared vertices so each triangle owns its corners.
+					const size_t cornerCount = triIndices.size();
+					std::vector<float> expPositions(cornerCount * 3);
+					std::vector<float> expTexcoords;
+					std::vector<float> expTangents;
+					if (!texcoords.empty()) expTexcoords.resize(cornerCount * 2);
+					if (!tangents.empty())  expTangents.resize(cornerCount * 4);
+					for (size_t i = 0; i < cornerCount; i++)
+					{
+						const uint32_t src = triIndices[i];
+						for (int k = 0; k < 3; k++) expPositions[i * 3 + k] = positions[src * 3 + k];
+						if (!texcoords.empty())
+							for (int k = 0; k < 2; k++) expTexcoords[i * 2 + k] = texcoords[src * 2 + k];
+						if (!tangents.empty())
+							for (int k = 0; k < 4; k++) expTangents[i * 4 + k] = tangents[src * 4 + k];
+					}
+					positions.swap(expPositions);
+					texcoords.swap(expTexcoords);
+					tangents.swap(expTangents);
+					vertexCount = cornerCount;
+					expandedToNonIndexed = true;
+				}
+
+				// Per-face flat normals. After expansion (or for originally
+				// non-indexed data) triangle t owns corners t*3+0..t*3+2.
+				const size_t triCount = triIndices.size() / 3;
+				normals.resize(vertexCount * 3);
+				for (size_t t = 0; t < triCount; t++)
+				{
+					const size_t i0 = t * 3, i1 = t * 3 + 1, i2 = t * 3 + 2;
+					const glm::vec3 a(positions[i0 * 3 + 0], positions[i0 * 3 + 1], positions[i0 * 3 + 2]);
+					const glm::vec3 b(positions[i1 * 3 + 0], positions[i1 * 3 + 1], positions[i1 * 3 + 2]);
+					const glm::vec3 c(positions[i2 * 3 + 0], positions[i2 * 3 + 1], positions[i2 * 3 + 2]);
+					glm::vec3 n = glm::cross(b - a, c - a);
+					const float len = glm::length(n);
+					n = (len > 1e-8f) ? (n / len) : glm::vec3(0.0f, 1.0f, 0.0f);
+					for (int k = 0; k < 3; k++)
+					{
+						normals[(i0 + k) * 3 + 0] = n.x;
+						normals[(i0 + k) * 3 + 1] = n.y;
+						normals[(i0 + k) * 3 + 2] = n.z;
+					}
+				}
+			}
+
 			// Build vertices.
 			mesh->Vertices.reserve(mesh->Vertices.size() + vertexCount);
 			for (cgltf_size i = 0; i < vertexCount; i++)
@@ -200,7 +267,7 @@ namespace Candy {
 
 			// Build indices (indexed or implicit).
 			std::vector<uint32_t> indices;
-			if (prim.indices)
+			if (prim.indices && !expandedToNonIndexed)
 			{
 				const cgltf_size indexCount = prim.indices->count;
 				indices.resize(indexCount);
@@ -360,7 +427,7 @@ namespace Candy {
 				return;
 			}
 
-			const cgltf_size vertexCount = posAccessor->count;
+			cgltf_size vertexCount = posAccessor->count;
 			const uint32_t baseVertex = static_cast<uint32_t>(mesh->Vertices.size());
 
 			// Unpack attribute streams into flat arrays.
@@ -403,6 +470,83 @@ namespace Candy {
 			{
 				for (cgltf_size i = 0; i < vertexCount; i++)
 					weights[i * 4] = 1.0f;
+			}
+
+			// glTF spec: when NORMAL is absent, client implementations should
+			// calculate flat (per-face) normals. Indexed primitives may share
+			// vertices between triangles, so expand to non-indexed triangle
+			// corners first; each corner then carries its face normal.
+			bool expandedToNonIndexed = false;
+			if (!norAccessor)
+			{
+				std::vector<uint32_t> triIndices;
+				if (prim.indices)
+				{
+					triIndices.resize(prim.indices->count);
+					cgltf_accessor_unpack_indices(prim.indices, triIndices.data(), sizeof(uint32_t), triIndices.size());
+				}
+				else
+				{
+					triIndices.resize(vertexCount);
+					for (cgltf_size i = 0; i < vertexCount; i++)
+						triIndices[i] = static_cast<uint32_t>(i);
+				}
+
+				if (prim.indices)
+				{
+					// Duplicate shared vertices so each triangle owns its
+					// corners; joints/weights are copied along with the data.
+					const size_t cornerCount = triIndices.size();
+					std::vector<float> expPositions(cornerCount * 3);
+					std::vector<float> expTexcoords;
+					std::vector<float> expTangents;
+					std::vector<cgltf_uint> expJoints(cornerCount * 4, 0);
+					std::vector<float> expWeights(cornerCount * 4, 0.0f);
+					if (!texcoords.empty()) expTexcoords.resize(cornerCount * 2);
+					if (!tangents.empty())  expTangents.resize(cornerCount * 4);
+					for (size_t i = 0; i < cornerCount; i++)
+					{
+						const uint32_t src = triIndices[i];
+						for (int k = 0; k < 3; k++) expPositions[i * 3 + k] = positions[src * 3 + k];
+						if (!texcoords.empty())
+							for (int k = 0; k < 2; k++) expTexcoords[i * 2 + k] = texcoords[src * 2 + k];
+						if (!tangents.empty())
+							for (int k = 0; k < 4; k++) expTangents[i * 4 + k] = tangents[src * 4 + k];
+						for (int k = 0; k < 4; k++)
+						{
+							expJoints[i * 4 + k]   = joints[src * 4 + k];
+							expWeights[i * 4 + k]  = weights[src * 4 + k];
+						}
+					}
+					positions.swap(expPositions);
+					texcoords.swap(expTexcoords);
+					tangents.swap(expTangents);
+					joints.swap(expJoints);
+					weights.swap(expWeights);
+					vertexCount = cornerCount;
+					expandedToNonIndexed = true;
+				}
+
+				// Per-face flat normals. After expansion (or for originally
+				// non-indexed data) triangle t owns corners t*3+0..t*3+2.
+				const size_t triCount = triIndices.size() / 3;
+				normals.resize(vertexCount * 3);
+				for (size_t t = 0; t < triCount; t++)
+				{
+					const size_t i0 = t * 3, i1 = t * 3 + 1, i2 = t * 3 + 2;
+					const glm::vec3 a(positions[i0 * 3 + 0], positions[i0 * 3 + 1], positions[i0 * 3 + 2]);
+					const glm::vec3 b(positions[i1 * 3 + 0], positions[i1 * 3 + 1], positions[i1 * 3 + 2]);
+					const glm::vec3 c(positions[i2 * 3 + 0], positions[i2 * 3 + 1], positions[i2 * 3 + 2]);
+					glm::vec3 n = glm::cross(b - a, c - a);
+					const float len = glm::length(n);
+					n = (len > 1e-8f) ? (n / len) : glm::vec3(0.0f, 1.0f, 0.0f);
+					for (int k = 0; k < 3; k++)
+					{
+						normals[(i0 + k) * 3 + 0] = n.x;
+						normals[(i0 + k) * 3 + 1] = n.y;
+						normals[(i0 + k) * 3 + 2] = n.z;
+					}
+				}
 			}
 
 			// Build vertices.
@@ -450,7 +594,7 @@ namespace Candy {
 
 			// Build indices (indexed or implicit).
 			std::vector<uint32_t> indices;
-			if (prim.indices)
+			if (prim.indices && !expandedToNonIndexed)
 			{
 				const cgltf_size indexCount = prim.indices->count;
 				indices.resize(indexCount);

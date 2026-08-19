@@ -170,7 +170,7 @@ namespace Candy {
 	{
 		float yawSign = GetUpDirection().y < 0 ? -1.0f : 1.0f;
 		m_Yaw += yawSign * delta.x * RotationSpeed();
-		m_Pitch -= delta.y * RotationSpeed();
+		m_Pitch += delta.y * RotationSpeed();
 		m_Pitch = glm::clamp(m_Pitch, -89.9f, 89.9f);
 
 		float speed = m_FlySpeed * (m_Distance / 10.0f) * EditorSettings::Get().m_CameraFlySpeed;

@@ -27,9 +27,12 @@ struct VSOutput
 VSOutput VSMain(uint vertexID : SV_VertexID)
 {
 	VSOutput output;
-	// Fullscreen triangle: (0,0), (2,0), (0,2) in UV-space.
+	// Fullscreen triangle: (0,0), (2,0), (0,2) in UV-space. The position's Y
+	// is negated so UV(0,0) lands at NDC top-left (D3D12's top-down texture
+	// origin); without the flip the source's top row renders at the screen
+	// bottom and the whole frame appears upside down.
 	output.TexCoord = float2((vertexID << 1) & 2, vertexID & 2);
-	output.Position = float4(output.TexCoord * 2.0 - 1.0, 0.0, 1.0);
+	output.Position = float4(output.TexCoord * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 1.0);
 	return output;
 }
 
