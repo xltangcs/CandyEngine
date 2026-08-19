@@ -601,8 +601,8 @@ namespace Candy {
 						{
 							skmc.Mesh = imported->Mesh;
 							skmc.Materials = imported->Materials;
-							if (skmc.ClipName.empty() && !imported->Mesh->Clips.empty())
-								skmc.ClipName = imported->Mesh->Clips[0].Name;
+							if (skmc.ClipName.empty() && !imported->Mesh->Skeleton->Clips.empty())
+								skmc.ClipName = imported->Mesh->Skeleton->Clips[0].Name;
 						}
 						else
 							CANDY_CORE_WARN("SceneSerializer: failed to import skeletal mesh {0}", skmc.MeshPath);

@@ -261,14 +261,15 @@ namespace Candy {
 			for (auto entity : view)
 			{
 				auto [tc, skmc] = view.get<TransformComponent, SkeletalMeshComponent>(entity);
-				if (!skmc.ShowSkeleton || !skmc.Mesh || skmc.DebugGlobalPose.size() != skmc.Mesh->Skeleton.size())
+				if (!skmc.ShowSkeleton || !skmc.Mesh || !skmc.Mesh->Skeleton
+					|| skmc.DebugGlobalPose.size() != skmc.Mesh->Skeleton->Joints.size())
 					continue;
 
 				const glm::mat4 transform = tc.GetTransform();
 				const glm::vec4 color(1.0f, 1.0f, 0.0f, 1.0f);
-				for (size_t j = 0; j < skmc.Mesh->Skeleton.size(); j++)
+				for (size_t j = 0; j < skmc.Mesh->Skeleton->Joints.size(); j++)
 				{
-					const int32_t parent = skmc.Mesh->Skeleton[j].ParentIndex;
+					const int32_t parent = skmc.Mesh->Skeleton->Joints[j].ParentIndex;
 					if (parent < 0)
 						continue;
 					const glm::vec3 p0 = glm::vec3(transform * glm::vec4(glm::vec3(skmc.DebugGlobalPose[parent][3]), 1.0f));

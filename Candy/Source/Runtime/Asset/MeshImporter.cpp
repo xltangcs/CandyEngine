@@ -628,18 +628,19 @@ namespace Candy {
 
 		std::unordered_map<const cgltf_node*, int32_t> nodeToIndex;
 		std::vector<int32_t> oldToNew;
-		std::vector<SkeletonJoint> skeleton = BuildSkeleton(cgltfData->skins[0], nodeToIndex, oldToNew);
-		if (skeleton.size() > 255)
+		std::vector<SkeletonJoint> joints = BuildSkeleton(cgltfData->skins[0], nodeToIndex, oldToNew);
+		if (joints.size() > 255)
 		{
 			CANDY_CORE_ERROR("MeshImporter: '{}' has {} joints; JOINTS_0 is uint8 (max 255), import aborted",
-				gltfPath, skeleton.size());
+				gltfPath, joints.size());
 			cgltf_free(cgltfData);
 			return nullptr;
 		}
 
 		Ref<ImportedSkeletalMesh> imported = CreateRef<ImportedSkeletalMesh>();
 		imported->Mesh = CreateRef<SkeletalMeshResource>();
-		imported->Mesh->Skeleton = std::move(skeleton);
+		imported->Mesh->Skeleton = CreateRef<SkeletonResource>();
+		imported->Mesh->Skeleton->Joints = std::move(joints);
 
 		for (cgltf_size m = 0; m < cgltfData->meshes_count; m++)
 		{
@@ -664,17 +665,17 @@ namespace Candy {
 			return nullptr;
 		}
 
-		imported->Mesh->Clips = BuildAnimationClips(*cgltfData, nodeToIndex, oldToNew);
+		imported->Mesh->Skeleton->Clips = BuildAnimationClips(*cgltfData, nodeToIndex, oldToNew);
 		imported->Mesh->RecalculateBounds();
 		cgltf_free(cgltfData);
 
 		CANDY_CORE_INFO("MeshImporter: imported skinned '{}' ({} verts, {} joints, {} clips, {} materials)",
 			gltfPath,
 			imported->Mesh->Vertices.size(),
-			imported->Mesh->Skeleton.size(),
-			imported->Mesh->Clips.size(),
+			imported->Mesh->Skeleton->Joints.size(),
+			imported->Mesh->Skeleton->Clips.size(),
 			imported->Materials.size());
-		for (const auto& clip : imported->Mesh->Clips)
+		for (const auto& clip : imported->Mesh->Skeleton->Clips)
 			CANDY_CORE_INFO("MeshImporter:   clip '{}' duration {:.2f}s ({} tracks)",
 				clip.Name, clip.Duration, clip.Tracks.size());
 

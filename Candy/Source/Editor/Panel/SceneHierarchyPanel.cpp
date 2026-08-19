@@ -832,8 +832,8 @@ namespace
 					{
 						ImGui::Text("Vertices: %zu", component.Mesh->Vertices.size());
 						ImGui::Text("Indices : %zu", component.Mesh->Indices.size());
-						ImGui::Text("Joints  : %zu", component.Mesh->Skeleton.size());
-						ImGui::Text("Clips   : %zu", component.Mesh->Clips.size());
+						ImGui::Text("Joints  : %zu", component.Mesh->Skeleton->Joints.size());
+						ImGui::Text("Clips   : %zu", component.Mesh->Skeleton->Clips.size());
 					}
 					else
 					{
@@ -856,32 +856,32 @@ namespace
 							component.Mesh = imported->Mesh;
 							component.Materials = imported->Materials;
 							component.Time = 0.0f;
-							if (component.ClipName.empty() && !imported->Mesh->Clips.empty())
-								component.ClipName = imported->Mesh->Clips[0].Name;
+							if (component.ClipName.empty() && !imported->Mesh->Skeleton->Clips.empty())
+								component.ClipName = imported->Mesh->Skeleton->Clips[0].Name;
 							CANDY_INFO("Loaded skeletal mesh '{}' ({} verts, {} joints, {} clips)",
 								component.MeshPath, component.Mesh->Vertices.size(),
-								component.Mesh->Skeleton.size(), component.Mesh->Clips.size());
+								component.Mesh->Skeleton->Joints.size(), component.Mesh->Skeleton->Clips.size());
 						}
 						else
 							CANDY_WARN("Could not import skeletal mesh {0}", component.MeshPath);
 					}
 				}
 
-				if (!component.Mesh || component.Mesh->Skeleton.empty())
+				if (!component.Mesh || !component.Mesh->Skeleton || component.Mesh->Skeleton->Joints.empty())
 					return;
 
 				// Animation clip selection.
-				if (!component.Mesh->Clips.empty())
+				if (!component.Mesh->Skeleton->Clips.empty())
 				{
 					std::string preview = component.ClipName;
 					if (ImGui::BeginCombo("Clip", preview.c_str()))
 					{
-						for (size_t i = 0; i < component.Mesh->Clips.size(); i++)
+						for (size_t i = 0; i < component.Mesh->Skeleton->Clips.size(); i++)
 						{
-							const bool selected = component.Mesh->Clips[i].Name == component.ClipName;
-							if (ImGui::Selectable(component.Mesh->Clips[i].Name.c_str(), selected))
+							const bool selected = component.Mesh->Skeleton->Clips[i].Name == component.ClipName;
+							if (ImGui::Selectable(component.Mesh->Skeleton->Clips[i].Name.c_str(), selected))
 							{
-								component.ClipName = component.Mesh->Clips[i].Name;
+								component.ClipName = component.Mesh->Skeleton->Clips[i].Name;
 								component.Time = 0.0f;
 							}
 						}
@@ -898,7 +898,7 @@ namespace
 				const AnimationClip* activeClip = nullptr;
 				if (!component.ClipName.empty())
 				{
-					for (const auto& c : component.Mesh->Clips)
+					for (const auto& c : component.Mesh->Skeleton->Clips)
 					{
 						if (c.Name == component.ClipName)
 						{
@@ -907,8 +907,8 @@ namespace
 						}
 					}
 				}
-				if (!activeClip && !component.Mesh->Clips.empty())
-					activeClip = &component.Mesh->Clips[0];
+				if (!activeClip && !component.Mesh->Skeleton->Clips.empty())
+					activeClip = &component.Mesh->Skeleton->Clips[0];
 				const float duration = activeClip ? activeClip->Duration : 0.0f;
 
 				ImGuiUtils::DrawSliderFloat("Time", component.Time, 0.0f, std::max(duration, 0.001f), "%.2fs");

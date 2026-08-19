@@ -111,27 +111,27 @@ namespace Candy {
 			return glm::vec4(0.0f);
 		}
 
-		const AnimationClip* FindClip(const SkeletalMeshResource& mesh, const std::string& name)
+		const AnimationClip* FindClip(const SkeletonResource& skeleton, const std::string& name)
 		{
-			if (mesh.Clips.empty())
+			if (skeleton.Clips.empty())
 				return nullptr;
 			if (!name.empty())
 			{
-				for (const auto& clip : mesh.Clips)
+				for (const auto& clip : skeleton.Clips)
 				{
 					if (clip.Name == name)
 						return &clip;
 				}
 			}
-			return &mesh.Clips[0];
+			return &skeleton.Clips[0];
 		}
 
 		// Evaluates the component's pose: `globalPose[j]` = accumulated
 		// transform of joint j relative to mesh space (bind-space root).
 		void EvaluatePose(const SkeletalMeshComponent& comp, std::vector<glm::mat4>& globalPose)
 		{
-			const auto& mesh = comp.Mesh;
-			const size_t jointCount = mesh->Skeleton.size();
+			const auto& skeleton = comp.Mesh->Skeleton;
+			const size_t jointCount = skeleton->Joints.size();
 			if (globalPose.size() != jointCount)
 				globalPose.assign(jointCount, glm::mat4(1.0f));
 
@@ -139,9 +139,9 @@ namespace Candy {
 			// channels can be replaced below.
 			std::vector<JointTRS> pose(jointCount);
 			for (size_t j = 0; j < jointCount; j++)
-				pose[j] = Decompose(mesh->Skeleton[j].LocalRestPose);
+				pose[j] = Decompose(skeleton->Joints[j].LocalRestPose);
 
-			const AnimationClip* clip = FindClip(*mesh, comp.ClipName);
+			const AnimationClip* clip = FindClip(*skeleton, comp.ClipName);
 			if (clip && !clip->Tracks.empty())
 			{
 				for (const auto& track : clip->Tracks)
@@ -163,7 +163,7 @@ namespace Candy {
 			for (size_t j = 0; j < jointCount; j++)
 			{
 				const glm::mat4 local = Compose(pose[j]);
-				const int32_t parent = mesh->Skeleton[j].ParentIndex;
+				const int32_t parent = skeleton->Joints[j].ParentIndex;
 				globalPose[j] = (parent >= 0) ? globalPose[parent] * local : local;
 			}
 		}
@@ -180,11 +180,11 @@ namespace Candy {
 		for (auto e : view)
 		{
 			auto& comp = view.get<SkeletalMeshComponent>(e);
-			if (!comp.Mesh || comp.Mesh->Skeleton.empty())
+			if (!comp.Mesh || !comp.Mesh->Skeleton || comp.Mesh->Skeleton->Joints.empty())
 				continue;
 
 			// Advance time.
-			const AnimationClip* clip = FindClip(*comp.Mesh, comp.ClipName);
+			const AnimationClip* clip = FindClip(*comp.Mesh->Skeleton, comp.ClipName);
 			if (comp.Play && dt > 0.0f)
 			{
 				comp.Time += dt * comp.Speed;
@@ -209,7 +209,7 @@ namespace Candy {
 			// per-instance bone CB (never shared across entities).
 			const auto& skeleton = comp.Mesh->Skeleton;
 			const uint32_t boneCount = std::min<uint32_t>(
-				static_cast<uint32_t>(skeleton.size()), kMaxBones);
+				static_cast<uint32_t>(skeleton->Joints.size()), kMaxBones);
 			if (boneCount == 0)
 				continue;
 
@@ -229,7 +229,7 @@ namespace Candy {
 
 			std::vector<glm::mat4> skinMatrices(boneCount);
 			for (uint32_t j = 0; j < boneCount; j++)
-				skinMatrices[j] = globalPose[j] * skeleton[j].InverseBindMatrix;
+				skinMatrices[j] = globalPose[j] * skeleton->Joints[j].InverseBindMatrix;
 			comp.BoneBuffer->Write(skinMatrices.data(), skinMatrices.size() * sizeof(glm::mat4));
 		}
 	}

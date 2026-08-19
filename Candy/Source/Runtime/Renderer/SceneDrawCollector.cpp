@@ -247,7 +247,8 @@ namespace Candy {
 		for (auto entity : view)
 		{
 			auto [tc, smc] = view.get<TransformComponent, SkeletalMeshComponent>(entity);
-			if (!smc.Mesh || smc.Mesh->Submeshes.empty() || smc.Mesh->Skeleton.empty())
+			if (!smc.Mesh || smc.Mesh->Submeshes.empty()
+				|| !smc.Mesh->Skeleton || smc.Mesh->Skeleton->Joints.empty())
 				continue;
 
 			// Per-instance bone CB written by SkeletalAnimationSystem::Update
