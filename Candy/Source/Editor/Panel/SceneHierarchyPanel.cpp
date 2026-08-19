@@ -7,6 +7,8 @@
 
 #include "ImGuiUtils.h"
 
+#include "ComponentUI.generated.inl"
+
 #include "Runtime/Scene/Components.h"
 #include "Runtime/Asset/MeshImporter.h"
 #include "Runtime/Asset/Material.h"

@@ -154,10 +154,14 @@ namespace Candy {
 		SkeletalMeshComponent(const SkeletalMeshComponent&) = default;
 	};
 
+	CANDY_CLASS()
 	struct CircleRendererComponent
 	{
+		CANDY_PROPERTY()
 		glm::vec4 Color{ 1.0f, 1.0f, 1.0f, 1.0f };
+		CANDY_PROPERTY()
 		float Thickness = 1.0f;
+		CANDY_PROPERTY()
 		float Fade = 0.005f;
 
 		CircleRendererComponent() = default;
