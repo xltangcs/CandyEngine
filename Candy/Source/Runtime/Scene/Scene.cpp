@@ -462,6 +462,7 @@ namespace Candy {
 		CopyComponentIfExists<TransformComponent>(newEntity, entity);
 		CopyComponentIfExists<SpriteRendererComponent>(newEntity, entity);
 		CopyComponentIfExists<StaticMeshComponent>(newEntity, entity);
+		CopyComponentIfExists<SkeletalMeshComponent>(newEntity, entity);
 		CopyComponentIfExists<CircleRendererComponent>(newEntity, entity);
 		CopyComponentIfExists<CameraComponent>(newEntity, entity);
 		CopyComponentIfExists<LightComponent>(newEntity, entity);
@@ -474,6 +475,15 @@ namespace Candy {
 		CopyComponentIfExists<AudioSourceComponent>(newEntity, entity);
 		CopyComponentIfExists<UITextBlockComponent>(newEntity, entity);
 		CopyComponentIfExists<UIButtonComponent>(newEntity, entity);
+
+		// Per-instance runtime resources must not be shared: the duplicate
+		// lazily re-creates its own bone CB on the next animation tick.
+		if (newEntity.HasComponent<SkeletalMeshComponent>())
+		{
+			auto& smc = newEntity.GetComponent<SkeletalMeshComponent>();
+			smc.BoneBuffer = nullptr;
+			smc.BoneBufferJoints = 0;
+		}
 	}
 
 	Entity Scene::GetPrimaryCameraEntity()

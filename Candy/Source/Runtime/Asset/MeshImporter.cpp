@@ -423,8 +423,9 @@ namespace Candy {
 				float sum = 0.0f;
 				for (int k = 0; k < 4; k++)
 				{
-					const uint32_t j = joints[i * 4 + k];
-					v.BoneIndices[k] = (j < oldToNew.size()) ? static_cast<uint8_t>(oldToNew[j]) : 0;
+				const uint32_t j = joints[i * 4 + k];
+				CANDY_CORE_ASSERT(j < oldToNew.size() && oldToNew[j] <= 255, "joint index exceeds uint8 JOINTS_0 capacity");
+				v.BoneIndices[k] = (j < oldToNew.size()) ? static_cast<uint8_t>(oldToNew[j]) : 0;
 					v.BoneWeights[k] = weights[i * 4 + k];
 					sum += v.BoneWeights[k];
 				}
@@ -629,8 +630,12 @@ namespace Candy {
 		std::vector<int32_t> oldToNew;
 		std::vector<SkeletonJoint> skeleton = BuildSkeleton(cgltfData->skins[0], nodeToIndex, oldToNew);
 		if (skeleton.size() > 255)
-			CANDY_CORE_WARN("MeshImporter: '{}' has {} joints; JOINTS_0 is uint8 (max 255), extra joints are clamped",
+		{
+			CANDY_CORE_ERROR("MeshImporter: '{}' has {} joints; JOINTS_0 is uint8 (max 255), import aborted",
 				gltfPath, skeleton.size());
+			cgltf_free(cgltfData);
+			return nullptr;
+		}
 
 		Ref<ImportedSkeletalMesh> imported = CreateRef<ImportedSkeletalMesh>();
 		imported->Mesh = CreateRef<SkeletalMeshResource>();

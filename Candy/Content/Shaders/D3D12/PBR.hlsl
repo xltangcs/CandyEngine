@@ -58,12 +58,12 @@ cbuffer LightCB : register(b2)
 	float     _IBLPad;
 };
 
-// Skinned-mesh bone matrices (SkinnedVSMain only; 512 x 64B = 32KB < 64KB
-// root CBV limit). The binding is per-skeleton, shared by every draw that
-// references the same SkeletalMeshResource.
+// Skinned-mesh bone matrices (SkinnedVSMain only; 256 x 64B = 16KB < 64KB
+// root CBV limit). Must match kMaxBones in SkeletalAnimationSystem.cpp; the
+// uint8 JOINTS_0 vertex attribute caps the skeleton at 255 joints.
 cbuffer SkinCB : register(b3)
 {
-	float4x4 u_Bones[512];
+	float4x4 u_Bones[256];
 };
 
 Texture2D    u_BaseColorMap;         // @param texture "Base Color Map" --- color map (sRGB-decoded per engine convention)

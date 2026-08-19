@@ -18,9 +18,9 @@ namespace Candy {
 
 	namespace {
 
-		// Must match u_Bones[512] in PBR.hlsl (SkinnedVSMain) and the root CBV
-		// size limits.
-		constexpr uint32_t kMaxBones = 512;
+		// Must match u_Bones[256] in PBR.hlsl (SkinnedVSMain) and the uint8
+		// JOINTS_0 capacity enforced at import (max 255 joints).
+		constexpr uint32_t kMaxBones = 256;
 
 		struct JointTRS
 		{
