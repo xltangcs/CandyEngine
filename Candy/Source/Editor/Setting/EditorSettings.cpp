@@ -40,6 +40,7 @@ namespace Candy {
 		out << YAML::Key << "FontSize" << YAML::Value << m_FontSize;
 		out << YAML::Key << "FontPath" << YAML::Value << m_FontPath;
 		out << YAML::Key << "ShowPhysicsColliders" << YAML::Value << m_ShowPhysicsColliders;
+		out << YAML::Key << "CameraFlySpeed" << YAML::Value << m_CameraFlySpeed;
 		out << YAML::Key << "ThumbnailSize" << YAML::Value << m_ThumbnailSize;
 		out << YAML::Key << "ThumbnailPadding" << YAML::Value << m_ThumbnailPadding;
 		out << YAML::Key << "ContentBrowserTreeWidth" << YAML::Value << m_ContentBrowserTreeWidth;
@@ -72,6 +73,7 @@ namespace Candy {
 			}
 		}
 		if (s["ShowPhysicsColliders"]) m_ShowPhysicsColliders = s["ShowPhysicsColliders"].as<bool>();
+		if (s["CameraFlySpeed"]) m_CameraFlySpeed = s["CameraFlySpeed"].as<float>();
 		if (s["ThumbnailSize"]) m_ThumbnailSize = s["ThumbnailSize"].as<float>();
 		if (s["ThumbnailPadding"]) m_ThumbnailPadding = s["ThumbnailPadding"].as<float>();
 		if (s["ContentBrowserTreeWidth"]) m_ContentBrowserTreeWidth = s["ContentBrowserTreeWidth"].as<float>();

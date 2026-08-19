@@ -24,6 +24,8 @@ namespace Candy {
 
 		bool m_ShowPhysicsColliders = false;
 
+		float m_CameraFlySpeed = 1.0f;
+
 		std::vector<std::string> m_HiddenExtensions;
 		std::vector<std::string> m_HiddenFolderNames;
 

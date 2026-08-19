@@ -49,7 +49,10 @@ static const float kPI = 3.14159265358979;
 float3 FaceTexelToDir(uint face, uint x, uint y)
 {
 	float u = (x + 0.5) / u_FaceSize * 2.0 - 1.0;
-	float v = (y + 0.5) / u_FaceSize * 2.0 - 1.0;
+	// v is flipped: texture row 0 (first row in memory) must map to the
+	// face's +up direction to match the hardware TextureCube sampling
+	// convention (D3D v=0 = top row, up points toward decreasing v).
+	float v = 1.0 - (y + 0.5) / u_FaceSize * 2.0;
 	return normalize(kFaceDirs[face] + kFaceUp[face] * v
 	                 + cross(kFaceUp[face], kFaceDirs[face]) * u);
 }

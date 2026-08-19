@@ -5,6 +5,7 @@
 #include "Runtime/Core/KeyCodes.h"
 #include "Runtime/Core/MouseCodes.h"
 #include "Runtime/Core/Application.h"
+#include "Editor/Setting/EditorSettings.h"
 
 #include <glfw/glfw3.h>
 
@@ -93,16 +94,17 @@ namespace Candy {
 		glm::vec2 delta = (mouse - m_InitialMousePosition) * 0.003f;
 		m_InitialMousePosition = mouse;
 
-		if (Input::IsKeyPressed(Key::LeftAlt))
-		{
-			if (Input::IsMouseButtonPressed(Mouse::ButtonMiddle))
-				MousePan(delta);
-			else if (Input::IsMouseButtonPressed(Mouse::ButtonLeft))
-				MouseRotate(delta);
-			else if (Input::IsMouseButtonPressed(Mouse::ButtonRight))
-				MouseZoom(delta.y);
-		}
-		else if (Input::IsMouseButtonPressed(Mouse::ButtonMiddle))
+		// if (Input::IsKeyPressed(Key::LeftAlt))
+		// {
+		// 	if (Input::IsMouseButtonPressed(Mouse::ButtonMiddle))
+		// 		MousePan(delta);
+		// 	else if (Input::IsMouseButtonPressed(Mouse::ButtonLeft))
+		// 		MouseRotate(delta);
+		// 	else if (Input::IsMouseButtonPressed(Mouse::ButtonRight))
+		// 		MouseZoom(delta.y);
+		// }
+		// else
+		if (Input::IsMouseButtonPressed(Mouse::ButtonMiddle))
 		{
 			MousePan(delta);
 		}
@@ -168,12 +170,10 @@ namespace Candy {
 	{
 		float yawSign = GetUpDirection().y < 0 ? -1.0f : 1.0f;
 		m_Yaw += yawSign * delta.x * RotationSpeed();
-		m_Pitch += delta.y * RotationSpeed();
+		m_Pitch -= delta.y * RotationSpeed();
 		m_Pitch = glm::clamp(m_Pitch, -89.9f, 89.9f);
 
-		float speed = m_FlySpeed * (m_Distance / 10.0f);
-		if (Input::IsKeyPressed(Key::LeftShift) || Input::IsKeyPressed(Key::RightShift))
-			speed *= 3.0f;
+		float speed = m_FlySpeed * (m_Distance / 10.0f) * EditorSettings::Get().m_CameraFlySpeed;
 
 		glm::vec3 move(0.0f);
 		if (Input::IsKeyPressed(Key::W)) move += GetForwardDirection();

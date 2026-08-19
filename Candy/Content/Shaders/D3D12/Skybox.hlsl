@@ -57,7 +57,7 @@ PSOutput PSMain(VSOutput input)
 	// must be mapped to clip space [-1,1]^2 before unprojection.
 	float4 clipPos = float4(input.NDC * 2.0 - 1.0, 1.0, 1.0);
 	float4 world   = mul(u_InvViewProjection, clipPos);
-	float3 dir     = normalize(world.xyz / world.w);
+	float3 dir     = normalize(world.xyz / world.w - u_CameraPosition);
 
 	float3 color = u_SkyboxMap.Sample(u_Sampler, dir).rgb;
 

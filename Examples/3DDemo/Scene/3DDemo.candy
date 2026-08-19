@@ -48,9 +48,9 @@ Entities:
     TagComponent:
       Tag: Texture
     TransformComponent:
-      Translation: [1, 0, 0]
+      Translation: [10.0373697, -0.408058643, 0]
       Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
+      Scale: [10, 10, 10]
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
       TexturePath: VFS://Game/Model/lemon/textures/lemon_diff_1k.jpg
@@ -62,14 +62,14 @@ Entities:
       Rotation: [0, 0, 0]
       Scale: [1, 1, 1]
     SkyboxComponent:
-      CubemapPath: VFS://Game/Texture/autumn_field_puresky_1k.hdr
+      CubemapPath: VFS://Game/Texture/rustig_koppie_puresky_1k.hdr
       Intensity: 1
       Exposure: 1
   - Entity: 9876543210123456789
     TagComponent:
       Tag: Fox
     TransformComponent:
-      Translation: [15.2622004, 0, 0]
+      Translation: [20.998167, -3.13723087, -0.000120716686]
       Rotation: [0, 0, 0]
       Scale: [0.100000001, 0.100000001, 0.100000001]
     SkeletalMeshComponent:
