@@ -5,6 +5,7 @@
 #include "Runtime/Core/FileSystem.h"
 #include "Runtime/Renderer/Framebuffer.h"
 #include "Runtime/Renderer/SceneRenderer.h"
+#include "Runtime/Renderer/SceneDrawCollector.h"
 #include "Runtime/Renderer/EditorCamera.h"
 #include "Runtime/Scene/Scene.h"
 #include "Runtime/Scene/Components.h"
@@ -186,9 +187,9 @@ namespace Candy {
 
 		// ---- Scene pass (collect: meshes + sprites/circles) ---------------
 		if (ctx.EditorCamera)
-			ctx.ActiveScene->RenderScene(*ctx.EditorCamera);
+			SceneDrawCollector::SubmitScene(*ctx.ActiveScene, *ctx.EditorCamera);
 		else
-			ctx.ActiveScene->RenderRuntimeScene();
+			SceneDrawCollector::SubmitRuntimeScene(*ctx.ActiveScene);
 
 		// ---- Overlay pass (physics colliders etc., debug lines) -----------
 		RenderOverlay(ctx);
@@ -227,11 +228,11 @@ namespace Candy {
 
 		if (editorCamera)
 		{
-			scene.RenderScene(*editorCamera);
+			SceneDrawCollector::SubmitScene(scene, *editorCamera);
 		}
 		else
 		{
-			scene.RenderRuntimeScene();
+			SceneDrawCollector::SubmitRuntimeScene(scene);
 		}
 		SceneRenderer::EndFrame();
 
@@ -346,7 +347,7 @@ namespace Candy {
 		hdrPreview->Bind();
 		SceneRenderer::SetActiveRenderTarget(hdrPreview);
 
-		ctx.ActiveScene->RenderSceneFromCamera(cameraComp, cameraTransform.GetTransform());
+		SceneDrawCollector::SubmitScene(*ctx.ActiveScene, cameraComp, cameraTransform.GetTransform());
 		SceneRenderer::EndFrame();
 
 		// HDR → LDR tonemap into the display preview target (ImGui samples it).
