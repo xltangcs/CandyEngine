@@ -53,6 +53,15 @@ namespace Candy {
 		UpdateView();
 	}
 
+	void EditorCamera::RestoreView(const glm::vec3& focalPoint, float pitch, float yaw, float distance)
+	{
+		m_FocalPoint = focalPoint;
+		m_Pitch = glm::clamp(pitch, -89.9f, 89.9f);
+		m_Yaw = yaw;
+		m_Distance = glm::max(distance, 1.0f);
+		UpdateView();
+	}
+
 	std::pair<float, float> EditorCamera::PanSpeed() const
 	{
 		float x = std::min(m_ViewportWidth / 1000.0f, 2.4f); // max = 2.4f

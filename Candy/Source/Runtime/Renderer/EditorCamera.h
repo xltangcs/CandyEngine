@@ -28,7 +28,11 @@ namespace Candy {
 		inline void SetViewportSize(float width, float height) { m_ViewportWidth = width; m_ViewportHeight = height; UpdateProjection(); }
 		inline void SetViewportMousePosition(float x, float y) { m_ViewportMousePos = { x, y }; }
 		inline void SetFocalPoint(const glm::vec3& focalPoint) { m_FocalPoint = focalPoint; }
+		inline const glm::vec3& GetFocalPoint() const { return m_FocalPoint; }
 		inline bool IsFlying() const { return m_IsFlying; }
+
+		// Restores a persisted camera pose on startup.
+		void RestoreView(const glm::vec3& focalPoint, float pitch, float yaw, float distance);
 
 		const glm::mat4& GetViewMatrix() const { return m_ViewMatrix; }
 		glm::mat4 GetViewProjection() const { return m_Projection * m_ViewMatrix; }

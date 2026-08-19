@@ -43,6 +43,16 @@ namespace Candy {
 		if (s["WindowMaximized"]) WindowMaximized = s["WindowMaximized"].as<bool>();
 		if (s["LayoutPresetApplied"]) LayoutPresetApplied = s["LayoutPresetApplied"].as<bool>();
 
+		if (auto cam = s["EditorCamera"])
+		{
+			if (cam["FocalPointX"]) EditorCameraFocalPointX = cam["FocalPointX"].as<float>();
+			if (cam["FocalPointY"]) EditorCameraFocalPointY = cam["FocalPointY"].as<float>();
+			if (cam["FocalPointZ"]) EditorCameraFocalPointZ = cam["FocalPointZ"].as<float>();
+			if (cam["Pitch"]) EditorCameraPitch = cam["Pitch"].as<float>();
+			if (cam["Yaw"]) EditorCameraYaw = cam["Yaw"].as<float>();
+			if (cam["Distance"]) EditorCameraDistance = cam["Distance"].as<float>();
+		}
+
 		if (auto recents = s["RecentProjects"])
 		{
 			for (const auto& node : recents)
@@ -89,6 +99,14 @@ namespace Candy {
 		out << YAML::Key << "WindowHeight" << YAML::Value << WindowHeight;
 		out << YAML::Key << "WindowMaximized" << YAML::Value << WindowMaximized;
 		out << YAML::Key << "LayoutPresetApplied" << YAML::Value << LayoutPresetApplied;
+		out << YAML::Key << "EditorCamera" << YAML::Value << YAML::BeginMap;
+		out << YAML::Key << "FocalPointX" << YAML::Value << EditorCameraFocalPointX;
+		out << YAML::Key << "FocalPointY" << YAML::Value << EditorCameraFocalPointY;
+		out << YAML::Key << "FocalPointZ" << YAML::Value << EditorCameraFocalPointZ;
+		out << YAML::Key << "Pitch" << YAML::Value << EditorCameraPitch;
+		out << YAML::Key << "Yaw" << YAML::Value << EditorCameraYaw;
+		out << YAML::Key << "Distance" << YAML::Value << EditorCameraDistance;
+		out << YAML::EndMap;
 		out << YAML::EndMap << YAML::EndMap;
 		FileSystem::Get().WriteText(GetFilePath(), out.c_str());
 	}

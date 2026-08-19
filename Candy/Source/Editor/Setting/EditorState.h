@@ -34,6 +34,14 @@ namespace Candy {
 		// a fresh project (no Saved/imgui.ini yet). Persisted so we only apply it once.
 		bool LayoutPresetApplied = false;
 
+		// Editor viewport camera pose 
+		float EditorCameraFocalPointX = 0.0f;
+		float EditorCameraFocalPointY = 0.0f;
+		float EditorCameraFocalPointZ = 0.0f;
+		float EditorCameraPitch = 0.0f;
+		float EditorCameraYaw = 0.0f;
+		float EditorCameraDistance = 10.0f;
+
 	private:
 		EditorState() = default;
 		bool m_Loaded = false;

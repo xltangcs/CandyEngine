@@ -1,11 +1,11 @@
 Scene: 3DDemo
-AmbientColor: [0.03, 0.03, 0.03]
+AmbientColor: [0.0299999993, 0.0299999993, 0.0299999993]
 Entities:
   - Entity: 12854884733615300658
     TagComponent:
       Tag: Lemon
     TransformComponent:
-      Translation: [-3.70000005, 0.5, -20]
+      Translation: [0, 0, 0]
       Rotation: [0, 0, 0]
       Scale: [100, 100, 100]
     StaticMeshComponent:
@@ -17,11 +17,11 @@ Entities:
       Tag: Sun
     TransformComponent:
       Translation: [0, 0, 0]
-      Rotation: [-1.107, 0.929, 0]
+      Rotation: [0, 0, 0]
       Scale: [1, 1, 1]
     LightComponent:
       Type: Directional
-      Color: [1, 0.95, 0.88]
+      Color: [1, 0.949999988, 0.879999995]
       Intensity: 1
       Range: 10
       InnerConeAngle: 12.5
@@ -31,7 +31,7 @@ Entities:
     TagComponent:
       Tag: Camera
     TransformComponent:
-      Translation: [0, 0, 10]
+      Translation: [0, 0, 30]
       Rotation: [0, 0, 0]
       Scale: [1, 1, 1]
     CameraComponent:
@@ -69,12 +69,14 @@ Entities:
     TagComponent:
       Tag: Fox
     TransformComponent:
-      Translation: [3, 0, -20]
+      Translation: [15.2622004, 0, 0]
       Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
+      Scale: [0.100000001, 0.100000001, 0.100000001]
     SkeletalMeshComponent:
       MeshPath: VFS://Game/Model/Fox/Fox.gltf
-      ClipName: Walk
+      MaterialPaths:
+        - VFS://Game/Materials/NewMaterial_1.mat
+      ClipName: Run
       Speed: 1
-      Play: true
+      Play: false
       Loop: true

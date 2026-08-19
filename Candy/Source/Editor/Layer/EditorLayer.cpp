@@ -79,6 +79,12 @@ namespace Candy {
 		auto& editorState = EditorState::Get();
 		editorState.Load();
 
+		m_EditorCamera.RestoreView(
+			{ editorState.EditorCameraFocalPointX, editorState.EditorCameraFocalPointY, editorState.EditorCameraFocalPointZ },
+			editorState.EditorCameraPitch,
+			editorState.EditorCameraYaw,
+			editorState.EditorCameraDistance);
+
 		auto project = Application::Get().GetProject();
 		if (project)
 		{
@@ -111,7 +117,17 @@ namespace Candy {
 		EditorSettings::Get().Save();
 		if (auto project = Application::Get().GetProject())
 			project->Save();
-		EditorState::Get().Save();
+
+		// Capture the editor camera pose so the next session starts where we left off.
+		auto& editorState = EditorState::Get();
+		const glm::vec3& focalPoint = m_EditorCamera.GetFocalPoint();
+		editorState.EditorCameraFocalPointX = focalPoint.x;
+		editorState.EditorCameraFocalPointY = focalPoint.y;
+		editorState.EditorCameraFocalPointZ = focalPoint.z;
+		editorState.EditorCameraPitch = m_EditorCamera.GetPitch();
+		editorState.EditorCameraYaw = m_EditorCamera.GetYaw();
+		editorState.EditorCameraDistance = m_EditorCamera.GetDistance();
+		editorState.Save();
 	}
 
 	void EditorLayer::OnUpdate(Timestep ts)
