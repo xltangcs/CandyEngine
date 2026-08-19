@@ -38,7 +38,7 @@ namespace Candy {
 	// Constructor: load from file
 	// =========================================================================
 
-	D3D12Texture2D::D3D12Texture2D(D3D12Device* device, const std::string& path)
+	D3D12Texture2D::D3D12Texture2D(D3D12Device* device, const std::string& path, bool srgb)
 		: m_Device(device), m_Path(path)
 	{
 		// Read file (supports VFS)
@@ -74,7 +74,7 @@ namespace Candy {
 		TextureDesc desc;
 		desc.Width     = m_Width;
 		desc.Height    = m_Height;
-		desc.Format    = RHIFormat::R8G8B8A8Unorm;
+		desc.Format    = srgb ? RHIFormat::R8G8B8A8Srgb : RHIFormat::R8G8B8A8Unorm;
 		desc.Usage     = ResourceUsage::ShaderRead | ResourceUsage::CopyDst;
 		desc.MipLevels = 1;
 		desc.DebugName = path;

@@ -9,7 +9,10 @@ namespace Candy {
 	{
 	public:
 		OpenGLTexture2D(uint32_t width, uint32_t height);
-		OpenGLTexture2D(const std::string& path);
+		/// Load from file. Color maps default to sRGB (srgb = true →
+		/// GL_SRGB8_ALPHA8 / GL_SRGB8, hardware-decoded on sample); data maps
+		/// and ImGui display textures pass srgb = false.
+		OpenGLTexture2D(const std::string& path, bool srgb = true);
 		virtual ~OpenGLTexture2D();
 
 		virtual uint32_t GetWidth() const override { return m_Width; }

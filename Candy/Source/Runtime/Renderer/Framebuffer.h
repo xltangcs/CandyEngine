@@ -5,6 +5,8 @@
 
 namespace Candy {
 
+	class RHITexture;
+
 	// =========================================================================
 	// Framebuffer — engine-level off-screen render target
 	//
@@ -35,6 +37,12 @@ namespace Candy {
 		/// In D3D12, this is the D3D12_GPU_DESCRIPTOR_HANDLE.ptr (used as ImTextureID).
 		/// In OpenGL, returns GetColorAttachmentRendererID() zero-extended.
 		virtual uint64_t GetColorAttachmentGPUHandle(uint32_t index = 0) const = 0;
+
+		/// Returns the color attachment as a sampled texture (used by the
+		/// tonemap pass to read the HDR scene target). Backends that cannot
+		/// expose attachments as textures return nullptr (e.g. OpenGL — the
+		/// scene renderer is D3D12-only anyway).
+		virtual Ref<RHITexture> GetColorAttachmentTexture(uint32_t index = 0) = 0;
 
 		static Ref<Framebuffer> Create(const FramebufferDesc& desc);
 	};

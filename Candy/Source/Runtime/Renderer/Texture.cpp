@@ -38,16 +38,16 @@ namespace Candy {
 		CANDY_CORE_ASSERT(false, "Unknown RendererAPI!");
 		return nullptr;
 	}
-	Ref<Texture2D> Texture2D::Create(const std::string& path)
+	Ref<Texture2D> Texture2D::Create(const std::string& path, bool srgb)
 	{
 		switch (Renderer::GetAPI())
 		{
 		case RendererAPI::API::None:    CANDY_CORE_ASSERT(false, "RendererAPI::None is currently not supported!"); return nullptr;
-		case RendererAPI::API::OpenGL:  return CreateRef<OpenGLTexture2D>(path);
+		case RendererAPI::API::OpenGL:  return CreateRef<OpenGLTexture2D>(path, srgb);
 		case RendererAPI::API::D3D12:
 		{
 			auto* dev = GetD3D12Device();
-			if (dev) return CreateRef<D3D12Texture2D>(dev, path);
+			if (dev) return CreateRef<D3D12Texture2D>(dev, path, srgb);
 			return nullptr;
 		}
 		}

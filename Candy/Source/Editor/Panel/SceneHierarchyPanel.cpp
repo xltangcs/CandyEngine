@@ -702,7 +702,7 @@ namespace
 						component.Texture.reset();
 					else
 					{
-						Ref<Texture2D> tex = Texture2D::Create(component.TexturePath);
+						Ref<Texture2D> tex = Texture2D::Create(component.TexturePath); // sprite maps are color maps -> default sRGB
 						if (tex && tex->IsLoaded())
 							component.Texture = tex;
 						else

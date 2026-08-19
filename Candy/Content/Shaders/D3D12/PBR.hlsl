@@ -58,10 +58,10 @@ cbuffer LightCB : register(b2)
 	float     _IBLPad;
 };
 
-Texture2D    u_BaseColorMap;         // @param texture "Base Color Map"
+Texture2D    u_BaseColorMap;         // @param texture "Base Color Map" --- color map (sRGB-decoded per engine convention)
 Texture2D    u_MetallicRoughnessMap; // @param texture "Metallic-Roughness Map" (G = roughness, B = metallic)
 Texture2D    u_NormalMap;            // @param texture "Normal Map"
-Texture2D    u_EmissiveMap;          // @param texture "Emissive Map"
+Texture2D    u_EmissiveMap;          // @param texture "Emissive Map" --- color map (sRGB-decoded per engine convention)
 SamplerState u_Sampler : register(s0);
 
 // IBL environment maps (bound once per pass by SceneRenderer).

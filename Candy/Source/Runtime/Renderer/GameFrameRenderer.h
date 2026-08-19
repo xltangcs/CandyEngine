@@ -10,6 +10,8 @@ namespace Candy {
 	class Scene;
 	class Framebuffer;
 	class EditorCamera;
+	class RHIGraphicsPipeline;
+	class RHIBuffer;
 
 	// =========================================================================
 	// EditorRenderContext — everything the editor frame render needs, filled
@@ -36,13 +38,18 @@ namespace Candy {
 	class GameFrameRenderer
 	{
 	public:
-		/// Render one full editor frame: scene pass → overlay pass → camera
+		/// Render one full editor frame: scene pass (HDR) → tonemap → camera
 		/// preview PIP → game UI composite. All clear/viewport semantics are
 		/// owned by SceneRenderer's render passes (LoadOp).
 		static void RenderEditorFrame(const EditorRenderContext& ctx);
 
 		static void RenderSceneTo(Framebuffer& target, Scene& scene, EditorCamera* editorCamera);
 		static void RenderUITo(Framebuffer& target, Scene& scene, float mouseX, float mouseY, bool mouseDown, float deltaTime);
+
+		/// Returns the internal HDR scene target for the current frame.
+		/// Entity ids live in its color attachment 1 — the editor's picking
+		/// (ReadPixel) reads from here, not from the LDR display target.
+		static Ref<Framebuffer> GetSceneColorTarget();
 
 	private:
 		static void RenderOverlay(const EditorRenderContext& ctx);

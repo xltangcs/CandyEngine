@@ -52,10 +52,11 @@ namespace Candy {
 	{
 		switch (format)
 		{
-		case RHIFormat::R8G8B8A8Unorm: return DXGI_FORMAT_R8G8B8A8_UNORM;
-		case RHIFormat::R32Sint:       return DXGI_FORMAT_R32_SINT;
-		case RHIFormat::D24UnormS8Uint: return DXGI_FORMAT_D24_UNORM_S8_UINT;
-		default:                        return DXGI_FORMAT_UNKNOWN;
+		case RHIFormat::R8G8B8A8Unorm:    return DXGI_FORMAT_R8G8B8A8_UNORM;
+		case RHIFormat::R16G16B16A16Float: return DXGI_FORMAT_R16G16B16A16_FLOAT;
+		case RHIFormat::R32Sint:          return DXGI_FORMAT_R32_SINT;
+		case RHIFormat::D24UnormS8Uint:   return DXGI_FORMAT_D24_UNORM_S8_UINT;
+		default:                          return DXGI_FORMAT_UNKNOWN;
 		}
 	}
 
@@ -95,6 +96,7 @@ namespace Candy {
 		m_ColorAttachments.clear();
 		m_DepthAttachment.Reset();
 		m_ColorSRVGPUHandles.clear();
+		m_ColorAttachmentTextures.clear();
 		m_ReadbackBuffer.Reset();
 		m_ReadbackBufferSize = 0;
 
@@ -141,6 +143,7 @@ namespace Candy {
 		// ---- Create color textures + RTVs + SRVs ---------------------------
 		m_ColorAttachments.resize(colorCount);
 		m_ColorSRVGPUHandles.resize(colorCount);
+		m_ColorAttachmentTextures.resize(colorCount);
 
 		for (uint32_t i = 0; i < colorCount; ++i)
 			CreateColorTexture(i, m_Desc.ColorAttachments[i].Format);
@@ -232,6 +235,16 @@ namespace Candy {
 			gpuSrvHandle.ptr += static_cast<SIZE_T>(srvSlot) * srvDescriptorSize;
 			m_ColorSRVGPUHandles[index] = gpuSrvHandle;
 		}
+
+		// --- Adopting sampled-texture wrapper (tonemap pass) ----------------
+		TextureDesc texDesc;
+		texDesc.Width     = width;
+		texDesc.Height    = height;
+		texDesc.MipLevels = 1;
+		texDesc.Format    = format;
+		texDesc.DebugName = "FramebufferColorAttachment";
+		m_ColorAttachmentTextures[index] = D3D12Texture::Adopt(
+			m_Device, m_ColorAttachments[index], texDesc, m_ColorAttachmentStates[index]);
 	}
 
 	void D3D12Framebuffer::CreateDepthTexture()
@@ -348,12 +361,24 @@ namespace Candy {
 
 		list->ResourceBarrier(1, &barrier);
 		m_ColorAttachmentStates[index] = target;
+		// Keep the adopting sampled-texture wrapper's state in sync.
+		if (index < m_ColorAttachmentTextures.size() && m_ColorAttachmentTextures[index])
+			m_ColorAttachmentTextures[index]->SetState(target);
 	}
 
 	void D3D12Framebuffer::SetColorAttachmentState(uint32_t index, D3D12_RESOURCE_STATES state)
 	{
 		if (index < m_ColorAttachmentStates.size())
 			m_ColorAttachmentStates[index] = state;
+		if (index < m_ColorAttachmentTextures.size() && m_ColorAttachmentTextures[index])
+			m_ColorAttachmentTextures[index]->SetState(state);
+	}
+
+	Ref<RHITexture> D3D12Framebuffer::GetColorAttachmentTexture(uint32_t index)
+	{
+		if (index >= m_ColorAttachmentTextures.size())
+			return nullptr;
+		return m_ColorAttachmentTextures[index];
 	}
 
 	// =========================================================================

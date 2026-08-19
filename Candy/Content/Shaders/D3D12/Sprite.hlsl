@@ -36,7 +36,7 @@ cbuffer MaterialCB : register(b1)
 	float2 u_UVOffset;           // @param "UV Offset" = (0.0, 0.0)
 };
 
-Texture2D    u_BaseColorMap;         // @param texture "Base Color Map"
+Texture2D    u_BaseColorMap;         // @param texture "Base Color Map" --- color map (sRGB-decoded per engine convention)
 SamplerState u_Sampler : register(s0);
 
 struct VSInput

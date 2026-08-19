@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Runtime/Renderer/Framebuffer.h"
+#include "Platform/D3D12/D3D12Texture.h"
 
 #include <d3d12.h>
 #include <wrl/client.h>
@@ -36,6 +37,11 @@ namespace Candy {
 
 		/// Returns full 64-bit GPU descriptor handle .ptr for ImGui::Image.
 		uint64_t GetColorAttachmentGPUHandle(uint32_t index = 0) const override;
+
+		/// Returns the color attachment as a sampled texture (adopting
+		/// wrapper around the attachment resource; state is kept in sync with
+		/// EnsureColorAttachmentState).
+		Ref<RHITexture> GetColorAttachmentTexture(uint32_t index = 0) override;
 
 		bool IsSwapChainTarget() const { return m_Desc.SwapChainTarget; }
 
@@ -76,6 +82,10 @@ namespace Candy {
 		// Attachment resources
 		std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> m_ColorAttachments;
 		Microsoft::WRL::ComPtr<ID3D12Resource>              m_DepthAttachment;
+
+		// Non-owning sampled-texture wrappers for the color attachments
+		// (rebuilt on Invalidate; used by the tonemap pass).
+		std::vector<Ref<D3D12Texture>> m_ColorAttachmentTextures;
 
 		// Descriptor heaps
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_RTVHeap;

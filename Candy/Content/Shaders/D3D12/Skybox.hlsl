@@ -61,9 +61,9 @@ PSOutput PSMain(VSOutput input)
 
 	float3 color = u_SkyboxMap.Sample(u_Sampler, dir).rgb;
 
-	// Exposure + Reinhard tonemap (LDR pipeline: the framebuffer is RGBA8).
+	// Linear HDR output: the scene pass renders to a float16 target, and the
+	// tonemap pass (Tonemap.hlsl) applies exposure + ACES + sRGB encoding.
 	color *= u_Exposure;
-	color  = color / (color + 1.0);
 	color *= u_Intensity;
 
 	PSOutput output;

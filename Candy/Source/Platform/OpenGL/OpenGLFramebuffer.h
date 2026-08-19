@@ -29,6 +29,13 @@ namespace Candy {
 			return static_cast<uint64_t>(GetColorAttachmentRendererID(index));
 		}
 
+		// OpenGL cannot expose attachments as RHITexture (SceneRenderer is
+		// D3D12-only anyway); the tonemap path is never reached.
+		virtual Ref<RHITexture> GetColorAttachmentTexture(uint32_t index = 0) override
+		{
+			return nullptr;
+		}
+
 		bool IsSwapChainTarget() const { return m_Desc.SwapChainTarget; }
 
 		/// Expose the internal GL FBO id so the OpenGL RHI command buffer can

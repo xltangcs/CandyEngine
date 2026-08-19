@@ -589,10 +589,10 @@ namespace Candy {
 						std::string raw = tp.as<std::string>();
 						if (!raw.empty())
 						{
-							src.TexturePath = raw;
-							auto tex = Texture2D::Create(src.TexturePath);
-							if (tex && tex->IsLoaded())
-								src.Texture = tex;
+						src.TexturePath = raw;
+						auto tex = Texture2D::Create(src.TexturePath); // sprite maps are color maps -> default sRGB
+						if (tex && tex->IsLoaded())
+							src.Texture = tex;
 							else
 								CANDY_CORE_WARN("SceneSerializer: failed to load texture {0}", src.TexturePath);
 						}

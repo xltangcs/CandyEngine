@@ -163,7 +163,8 @@ namespace Candy {
 		CANDY_PROPERTY()
 		float Intensity = 1.0f;
 
-		/// Exposure applied to the skybox itself before tonemapping.
+		/// Global scene exposure (tonemap pass). Also scales the skybox
+		/// itself. 1.0 = neutral.
 		CANDY_PROPERTY()
 		float Exposure = 1.0f;
 

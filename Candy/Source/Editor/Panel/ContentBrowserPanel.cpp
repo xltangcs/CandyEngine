@@ -59,8 +59,9 @@ namespace Candy {
 
 	ContentBrowserPanel::ContentBrowserPanel()
 	{
-		m_DirectoryIcon = Texture2D::Create("VFS://Engine/Content/Icons/ContentBrowser/DirectoryIcon.png");
-		m_FileIcon = Texture2D::Create("VFS://Engine/Content/Icons/ContentBrowser/FileIcon.png");
+		// Editor chrome textures are displayed raw by ImGui (no sRGB decode).
+		m_DirectoryIcon = Texture2D::Create("VFS://Engine/Content/Icons/ContentBrowser/DirectoryIcon.png", false);
+		m_FileIcon = Texture2D::Create("VFS://Engine/Content/Icons/ContentBrowser/FileIcon.png", false);
 		m_TreePaneWidth = EditorSettings::Get().m_ContentBrowserTreeWidth;
 		if (m_TreePaneWidth < 160.0f) m_TreePaneWidth = 240.0f;
 	}

@@ -19,6 +19,15 @@ namespace Candy {
 		D3D12Texture(D3D12Device* device, const TextureDesc& desc);
 		virtual ~D3D12Texture();
 
+		/// Wrap an existing D3D12 resource (e.g. a framebuffer color attachment)
+		/// as a sampled texture. The wrapper shares the resource lifetime via
+		/// ComPtr; callers must keep the owning framebuffer alive while the
+		/// wrapper is in use. Not registered in the RHI resource manager.
+		static Ref<D3D12Texture> Adopt(D3D12Device* device,
+		                               Microsoft::WRL::ComPtr<ID3D12Resource> resource,
+		                               const TextureDesc& desc,
+		                               D3D12_RESOURCE_STATES state);
+
 		const TextureDesc& GetDesc() const override { return m_Desc; }
 
 		/// Upload pixel data to the texture (creates upload buffer, copies, transitions,
@@ -53,6 +62,10 @@ namespace Candy {
 		void UAVBarrier(ID3D12GraphicsCommandList* list) const;
 
 	private:
+		D3D12Texture(D3D12Device* device, const TextureDesc& desc,
+		             Microsoft::WRL::ComPtr<ID3D12Resource> resource,
+		             D3D12_RESOURCE_STATES state);
+
 		TextureDesc                           m_Desc;
 		D3D12Device*                          m_Device = nullptr;
 		Microsoft::WRL::ComPtr<ID3D12Resource> m_Resource;

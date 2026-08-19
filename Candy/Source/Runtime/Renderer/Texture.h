@@ -37,6 +37,11 @@ namespace Candy {
 	{
 	public:
 		static Ref<Texture2D> Create(uint32_t width, uint32_t height);
-		static Ref<Texture2D> Create(const std::string& path);
+		/// Load from file. Color maps (base color / emissive / sprite) are
+		/// sRGB-encoded by convention and default to srgb = true (hardware
+		/// decodes them to linear on sample). Data maps (normal, metallic-
+		/// roughness, AO, ...) and textures displayed directly by ImGui (no
+		/// decode) must pass srgb = false.
+		static Ref<Texture2D> Create(const std::string& path, bool srgb = true);
 	};
 }

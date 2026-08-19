@@ -21,8 +21,10 @@ namespace Candy {
 	public:
 		/// Create empty texture (width x height, RGBA8).
 		D3D12Texture2D(D3D12Device* device, uint32_t width, uint32_t height);
-		/// Load from file.
-		D3D12Texture2D(D3D12Device* device, const std::string& path);
+		/// Load from file. Color maps default to sRGB (srgb = true →
+		/// R8G8B8A8Srgb, hardware-decoded on sample); data maps (normal, MR,
+		/// ...) and ImGui display textures pass srgb = false.
+		D3D12Texture2D(D3D12Device* device, const std::string& path, bool srgb = true);
 		virtual ~D3D12Texture2D();
 
 		uint32_t GetWidth()  const override { return m_Width; }

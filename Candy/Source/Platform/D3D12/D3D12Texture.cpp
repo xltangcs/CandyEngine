@@ -138,6 +138,25 @@ namespace Candy {
 		                desc.Width, desc.Height, static_cast<int>(desc.Format), desc.MipLevels);
 	}
 
+	D3D12Texture::D3D12Texture(D3D12Device* device, const TextureDesc& desc,
+	                           Microsoft::WRL::ComPtr<ID3D12Resource> resource,
+	                           D3D12_RESOURCE_STATES state)
+		: m_Desc(desc), m_Device(device), m_Resource(std::move(resource)), m_State(state)
+	{
+	}
+
+	Ref<D3D12Texture> D3D12Texture::Adopt(D3D12Device* device,
+	                                      Microsoft::WRL::ComPtr<ID3D12Resource> resource,
+	                                      const TextureDesc& desc,
+	                                      D3D12_RESOURCE_STATES state)
+	{
+		if (!device || !resource)
+			return nullptr;
+		// `new` here runs inside the class scope so the private adopting
+		// constructor is accessible (std::make_shared would not be).
+		return Ref<D3D12Texture>(new D3D12Texture(device, desc, std::move(resource), state));
+	}
+
 	D3D12Texture::~D3D12Texture()
 	{
 		m_Resource.Reset();

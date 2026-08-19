@@ -19,6 +19,11 @@
 
 namespace Candy {
 
+	// HDR scene pipeline: the scene pass renders linear HDR into a float16
+	// target; the tonemap pass (GameFrameRenderer) converts it to LDR sRGB
+	// for display. All scene pipelines must use this RT format.
+	constexpr RHIFormat kSceneColorFormat = RHIFormat::R16G16B16A16Float;
+
 	// ---- GPU constant layouts (byte-for-byte with PBR.hlsl / Sprite.hlsl) --
 
 	// CameraCB (b0): float4x4 u_ViewProjection + float3 u_CameraPosition +
@@ -288,19 +293,23 @@ namespace Candy {
 		return false;
 	}
 
-	Ref<Texture2D> GetTexture(const std::string& vfsPath)
+	Ref<Texture2D> GetTexture(const std::string& vfsPath, bool srgb)
 	{
 		if (vfsPath.empty())
 			return s_Data.WhiteTexture;
 
-		auto it = s_Data.TextureCache.find(vfsPath);
+		// The texture format depends on usage: the same file can be both a
+		// color map (sRGB decode) and a data map (linear), so the cache key
+		// must include the requested color space.
+		const std::string key = vfsPath + (srgb ? "|srgb" : "");
+		auto it = s_Data.TextureCache.find(key);
 		if (it != s_Data.TextureCache.end())
 			return it->second;
 
-		Ref<Texture2D> tex = Texture2D::Create(vfsPath);
+		Ref<Texture2D> tex = Texture2D::Create(vfsPath, srgb);
 		if (!tex)
 			tex = s_Data.WhiteTexture;
-		s_Data.TextureCache[vfsPath] = tex;
+		s_Data.TextureCache[key] = tex;
 		return tex;
 	}
 
@@ -385,13 +394,18 @@ namespace Candy {
 					state.BlendMode = state.Uniforms.BlendMode;
 				}
 
-				std::string path;
-				uint32_t flags = 0;
-				if (TryGetParam(params, "u_BaseColorMap", path))
-				{
-					state.Textures[0] = GetTexture(path);
-					if (!path.empty()) flags |= 1;
-				}
+			std::string path;
+			uint32_t flags = 0;
+
+			// Engine color-space convention for material texture slots (UE/
+			// Godot-style: decided here, never in shader declarations):
+			//   base color / emissive → sRGB color maps (hardware-decoded)
+			//   metallic-roughness / normal → linear data maps
+			if (TryGetParam(params, "u_BaseColorMap", path))
+			{
+				state.Textures[0] = GetTexture(path, true);
+				if (!path.empty()) flags |= 1;
+			}
 				if (state.IsSprite)
 				{
 					state.Sprite.TextureFlags = flags;
@@ -400,17 +414,17 @@ namespace Candy {
 				{
 					if (TryGetParam(params, "u_MetallicRoughnessMap", path))
 					{
-						state.Textures[1] = GetTexture(path);
+						state.Textures[1] = GetTexture(path, false); // linear data map
 						if (!path.empty()) flags |= 2;
 					}
 					if (TryGetParam(params, "u_NormalMap", path))
 					{
-						state.Textures[2] = GetTexture(path);
+						state.Textures[2] = GetTexture(path, false); // linear data map
 						if (!path.empty()) flags |= 4;
 					}
 					if (TryGetParam(params, "u_EmissiveMap", path))
 					{
-						state.Textures[3] = GetTexture(path);
+						state.Textures[3] = GetTexture(path, true); // sRGB color map
 						if (!path.empty()) flags |= 8;
 					}
 					state.Uniforms.TextureFlags = flags;
@@ -535,7 +549,7 @@ namespace Candy {
 		base.DepthStencil.DepthCompareOp   = CompareOp::Less;
 		base.DepthStencilFormat = RHIFormat::D24UnormS8Uint;
 		base.Blend.BlendEnable  = false;
-		base.RenderTargetFormats = { RHIFormat::R8G8B8A8Unorm, RHIFormat::R32Sint };
+		base.RenderTargetFormats = { kSceneColorFormat, RHIFormat::R32Sint };
 
 		VertexInputLayout::VertexBinding binding;
 		binding.Binding = 0;
@@ -628,7 +642,7 @@ namespace Candy {
 					ld.Blend.BlendEnable  = true;
 					ld.Blend.SrcColorBlendFactor = BlendState::BlendFactor::SrcAlpha;
 					ld.Blend.DstColorBlendFactor = BlendState::BlendFactor::OneMinusSrcAlpha;
-					ld.RenderTargetFormats = { RHIFormat::R8G8B8A8Unorm, RHIFormat::R32Sint };
+					ld.RenderTargetFormats = { kSceneColorFormat, RHIFormat::R32Sint };
 
 					VertexInputLayout::VertexBinding lb;
 					lb.Binding = 0;
@@ -676,7 +690,7 @@ namespace Candy {
 					sd.DepthStencil.DepthCompareOp   = CompareOp::LessEqual;
 					sd.DepthStencilFormat = RHIFormat::D24UnormS8Uint;
 					sd.Blend.BlendEnable  = false;
-					sd.RenderTargetFormats = { RHIFormat::R8G8B8A8Unorm, RHIFormat::R32Sint };
+					sd.RenderTargetFormats = { kSceneColorFormat, RHIFormat::R32Sint };
 					// No vertex input: fullscreen triangle driven by SV_VertexID.
 
 					s_Data.SkyboxPipeline = dev->CreateGraphicsPipeline(sd, skyVS, skyPS);
@@ -768,6 +782,11 @@ namespace Candy {
 		s_Data.SkyboxCubemap = cubemap;
 		s_Data.SkyboxIntensity = intensity;
 		s_Data.SkyboxExposure  = exposure;
+	}
+
+	float SceneRenderer::GetSkyboxExposure()
+	{
+		return s_Data.SkyboxExposure;
 	}
 
 	void SceneRenderer::SubmitLine(const glm::vec3& p0, const glm::vec3& p1, const glm::vec4& color, int entityID)
@@ -943,7 +962,7 @@ namespace Candy {
 		RenderPassDesc rpDesc;
 		{
 			RenderPassColorAttachment color;
-			color.Format     = RHIFormat::R8G8B8A8Unorm;
+			color.Format     = kSceneColorFormat;
 			color.LoadOp     = loadOp;
 			color.ClearColor[0] = 0.1f;
 			color.ClearColor[1] = 0.1f;
@@ -1120,7 +1139,8 @@ namespace Candy {
 				}
 				else if (!draw.Overrides.BaseColorMap.empty())
 				{
-					textures[0] = GetTexture(draw.Overrides.BaseColorMap)->GetRHITexture();
+					// Sprite/entity base color maps are always color maps → sRGB.
+					textures[0] = GetTexture(draw.Overrides.BaseColorMap, true)->GetRHITexture();
 					if (state.IsSprite) sprite.TextureFlags |= 1;
 					else                uniforms.TextureFlags |= 1;
 				}

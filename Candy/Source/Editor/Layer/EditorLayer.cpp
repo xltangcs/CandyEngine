@@ -42,10 +42,12 @@ namespace Candy {
 	{
 		CANDY_PROFILE_FUNCTION();
 
-		m_CheckerboardTexture = Texture2D::Create("VFS://Engine/Content/Textures/Checkerboard.png");
-		m_IconPlay = Texture2D::Create("VFS://Engine/Content/Icons/PlayButton.png");
-		m_IconStop = Texture2D::Create("VFS://Engine/Content/Icons/StopButton.png");
-		m_IconSimulate = Texture2D::Create("VFS://Engine/Content/Icons/SimulateButton.png");
+		// Editor chrome textures are displayed raw by ImGui (no sRGB decode),
+		// so they must stay linear-format (srgb = false).
+		m_CheckerboardTexture = Texture2D::Create("VFS://Engine/Content/Textures/Checkerboard.png", false);
+		m_IconPlay = Texture2D::Create("VFS://Engine/Content/Icons/PlayButton.png", false);
+		m_IconStop = Texture2D::Create("VFS://Engine/Content/Icons/StopButton.png", false);
+		m_IconSimulate = Texture2D::Create("VFS://Engine/Content/Icons/SimulateButton.png", false);
 
 		FramebufferDesc fbSpec;
 		fbSpec.ColorAttachments = { { RHIFormat::R8G8B8A8Unorm, false }, { RHIFormat::R32Sint, true } };
@@ -745,7 +747,10 @@ namespace Candy {
 
 				if (mx >= 0 && my >= 0 && mx < viewportSize.x && my < viewportSize.y)
 				{
-					int pixelData = m_Framebuffer->ReadPixel(1, (int)mx, (int)my);
+					// Entity ids live in the HDR scene target's attachment 1
+					// (the LDR display target only holds the tonemapped image).
+					auto hdrScene = GameFrameRenderer::GetSceneColorTarget();
+					int pixelData = hdrScene ? hdrScene->ReadPixel(1, (int)mx, (int)my) : -1;
 					m_HoveredEntity = pixelData == -1 ? Entity() : Entity((entt::entity)pixelData, m_ActiveScene.get());
 				}
 

@@ -26,6 +26,8 @@ namespace Candy {
 		void ClearAttachment(uint32_t attachmentIndex, int value) override;
 		uint32_t GetColorAttachmentRendererID(uint32_t index = 0) const override;
 		uint64_t GetColorAttachmentGPUHandle(uint32_t index = 0) const override;
+		// FROZEN backend: no sampled-texture attachment support.
+		Ref<RHITexture> GetColorAttachmentTexture(uint32_t index = 0) override { return nullptr; }
 		bool IsSwapChainTarget() const { return m_Desc.SwapChainTarget; }
 
 		// ---- RHIFramebuffer (via Framebuffer) ---------------------------

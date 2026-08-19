@@ -30,7 +30,7 @@ namespace Candy {
 		m_RHIDesc.SampleCount = 1;
 	}
 
-	OpenGLTexture2D::OpenGLTexture2D(const std::string& path)
+	OpenGLTexture2D::OpenGLTexture2D(const std::string& path, bool srgb)
 		: m_Path(path)
 	{
 		CANDY_CORE_INFO("The Texture path is {0}", path);
@@ -62,17 +62,18 @@ namespace Candy {
 			GLenum internalFormat = 0, dataFormat = 0;
 			if (channels == 4)
 			{
-				internalFormat = GL_RGBA8;
+				internalFormat = srgb ? GL_SRGB8_ALPHA8 : GL_RGBA8;
 				dataFormat = GL_RGBA;
 			}
 			else if (channels == 3)
 			{
-				internalFormat = GL_RGB8;
+				internalFormat = srgb ? GL_SRGB8 : GL_RGB8;
 				dataFormat = GL_RGB;
 			}
 
 			m_InternalFormat = internalFormat;
 			m_DataFormat = dataFormat;
+			m_RHIDesc.Format = srgb ? RHIFormat::R8G8B8A8Srgb : RHIFormat::R8G8B8A8Unorm;
 
 			CANDY_CORE_ASSERT(internalFormat & dataFormat, "Format not supported!");
 

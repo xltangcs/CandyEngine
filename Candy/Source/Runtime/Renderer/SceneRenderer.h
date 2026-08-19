@@ -128,6 +128,10 @@ namespace Candy {
 		static void SubmitSkybox(const Ref<TextureCubemap>& cubemap,
 		                         float intensity = 1.0f, float exposure = 1.0f);
 
+		/// Current frame's skybox exposure (1.0 when no skybox is active).
+		/// The tonemap pass uses it as the global scene exposure.
+		static float GetSkyboxExposure();
+
 		// ---- Debug line pass (editor collider wireframes, overlay) --------
 		static void SubmitLine(const glm::vec3& p0, const glm::vec3& p1, const glm::vec4& color, int entityID = -1);
 		/// Unit-quad corners ([-0.5, 0.5]^2 in the XY plane) transformed by
