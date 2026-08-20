@@ -1059,6 +1059,15 @@ float4 main(PSInput input) : SV_TARGET
 		// Per-RT blend allowed: RT0 (color) blends alpha, RT1 (R32_SINT
 		// entity-id) must NOT blend under any circumstances ---- D3D12 otherwise
 		// rejects PSO creation ("R32_SINT does not support blending").
+		// With IndependentBlendEnable=TRUE every RT uses its OWN entry; the
+		// zero-initialized defaults leave RT1+'s RenderTargetWriteMask at 0
+		// (COLOR_WRITE_ENABLE_NONE) which silently discards all entity-id
+		// writes — so enable full writes on every slot before configuring RT0.
+		for (auto& rt : blend.RenderTarget)
+		{
+			rt.BlendEnable            = FALSE;
+			rt.RenderTargetWriteMask  = D3D12_COLOR_WRITE_ENABLE_ALL;
+		}
 		blend.IndependentBlendEnable   = TRUE;
 		blend.RenderTarget[0].BlendEnable   = desc.Blend.BlendEnable;
 		blend.RenderTarget[0].SrcBlend      = D3D12_BLEND_SRC_ALPHA;
@@ -1104,11 +1113,13 @@ float4 main(PSInput input) : SV_TARGET
 		{
 			switch (fmt)
 			{
-			case RHIFormat::B8G8R8A8Unorm:    return DXGI_FORMAT_B8G8R8A8_UNORM;
-			case RHIFormat::B8G8R8A8Srgb:     return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-			case RHIFormat::R8G8B8A8Unorm:    return DXGI_FORMAT_R8G8B8A8_UNORM;
-			case RHIFormat::R32Sint:          return DXGI_FORMAT_R32_SINT;
-			default:                          return DXGI_FORMAT_R8G8B8A8_UNORM;
+			case RHIFormat::B8G8R8A8Unorm:      return DXGI_FORMAT_B8G8R8A8_UNORM;
+			case RHIFormat::B8G8R8A8Srgb:       return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+			case RHIFormat::R8G8B8A8Unorm:      return DXGI_FORMAT_R8G8B8A8_UNORM;
+			case RHIFormat::R16G16B16A16Float:  return DXGI_FORMAT_R16G16B16A16_FLOAT;
+			case RHIFormat::R32G32B32A32Float:  return DXGI_FORMAT_R32G32B32A32_FLOAT;
+			case RHIFormat::R32Sint:            return DXGI_FORMAT_R32_SINT;
+			default:                            return DXGI_FORMAT_R8G8B8A8_UNORM;
 			}
 		};
 
@@ -1217,6 +1228,15 @@ float4 main(PSInput input) : SV_TARGET
 		// Per-RT blend allowed: RT0 (color) blends alpha, RT1 (R32_SINT
 		// entity-id) must NOT blend under any circumstances ---- D3D12 otherwise
 		// rejects PSO creation ("R32_SINT does not support blending").
+		// With IndependentBlendEnable=TRUE every RT uses its OWN entry; the
+		// zero-initialized defaults leave RT1+'s RenderTargetWriteMask at 0
+		// (COLOR_WRITE_ENABLE_NONE) which silently discards all entity-id
+		// writes — so enable full writes on every slot before configuring RT0.
+		for (auto& rt : blend.RenderTarget)
+		{
+			rt.BlendEnable            = FALSE;
+			rt.RenderTargetWriteMask  = D3D12_COLOR_WRITE_ENABLE_ALL;
+		}
 		blend.IndependentBlendEnable   = TRUE;
 		blend.RenderTarget[0].BlendEnable   = desc.Blend.BlendEnable;
 		blend.RenderTarget[0].SrcBlend      = D3D12_BLEND_SRC_ALPHA;
@@ -1252,11 +1272,13 @@ float4 main(PSInput input) : SV_TARGET
 		{
 			switch (fmt)
 			{
-			case RHIFormat::B8G8R8A8Unorm: return DXGI_FORMAT_B8G8R8A8_UNORM;
-			case RHIFormat::B8G8R8A8Srgb:  return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-			case RHIFormat::R8G8B8A8Unorm: return DXGI_FORMAT_R8G8B8A8_UNORM;
-			case RHIFormat::R32Sint:       return DXGI_FORMAT_R32_SINT;
-			default:                       return DXGI_FORMAT_R8G8B8A8_UNORM;
+			case RHIFormat::B8G8R8A8Unorm:    return DXGI_FORMAT_B8G8R8A8_UNORM;
+			case RHIFormat::B8G8R8A8Srgb:     return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+			case RHIFormat::R8G8B8A8Unorm:    return DXGI_FORMAT_R8G8B8A8_UNORM;
+			case RHIFormat::R16G16B16A16Float: return DXGI_FORMAT_R16G16B16A16_FLOAT;
+			case RHIFormat::R32G32B32A32Float: return DXGI_FORMAT_R32G32B32A32_FLOAT;
+			case RHIFormat::R32Sint:          return DXGI_FORMAT_R32_SINT;
+			default:                          return DXGI_FORMAT_R8G8B8A8_UNORM;
 			}
 		};
 

@@ -788,8 +788,7 @@ namespace Candy {
 					m_HoveredEntity = pixelData == -1 ? Entity() : Entity((entt::entity)pixelData, m_ActiveScene.get());
 				}
 
-				if (m_HoveredEntity)
-					m_SceneHierarchyPanel.SetSelectedEntity(m_HoveredEntity);
+				m_SceneHierarchyPanel.SetSelectedEntity(m_HoveredEntity);
 			}
 		}
 		return false;
