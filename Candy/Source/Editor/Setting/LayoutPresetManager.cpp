@@ -127,6 +127,7 @@ namespace Candy {
 		ImGui::DockBuilderDockWindow("Scene Hierarchy", dockHierarchy);
 		ImGui::DockBuilderDockWindow("Viewport", dockViewport);
 		ImGui::DockBuilderDockWindow("Content Browser", dockBottom);
+		ImGui::DockBuilderDockWindow("Console", dockBottom);
 		ImGui::DockBuilderDockWindow("Properties", dockProperties);
 		ImGui::DockBuilderDockWindow("Stats", dockStats);
 

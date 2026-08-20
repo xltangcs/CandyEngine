@@ -416,6 +416,12 @@ namespace Candy {
 				ImGui::EndMenu();
 			}
 
+			if (ImGui::BeginMenu("View"))
+			{
+				ImGui::MenuItem("Console", nullptr, &m_ShowConsole);
+				ImGui::EndMenu();
+			}
+
 			if (ImGui::BeginMenu("Build"))
 			{
 				if (ImGui::MenuItem("Build and Package..."))
@@ -462,6 +468,9 @@ namespace Candy {
 		// avoiding a one-frame delay when inspecting an asset.
 		m_ContentBrowserPanel.OnImGuiRender();
 		m_SceneHierarchyPanel.OnImGuiRender();
+
+		if (m_ShowConsole)
+			m_ConsolePanel.OnImGuiRender(&m_ShowConsole);
 
 		ImGui::Begin("Stats");
 

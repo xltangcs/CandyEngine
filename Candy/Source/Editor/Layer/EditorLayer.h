@@ -7,6 +7,7 @@
 #include "Setting/LayoutPresetManager.h"
 #include "Panel/SceneHierarchyPanel.h"
 #include "Panel/ContentBrowserPanel.h"
+#include "Panel/ConsolePanel.h"
 #include "Panel/EditorSettingsPanel.h"
 #include "Panel/ProjectSettingsPanel.h"
 #include "Panel/SceneSettingsPanel.h"
@@ -86,6 +87,8 @@ namespace Candy {
 		// Panels
 		SceneHierarchyPanel m_SceneHierarchyPanel;
 		ContentBrowserPanel m_ContentBrowserPanel;
+		ConsolePanel m_ConsolePanel;
+		bool m_ShowConsole = true;
 
 		// Editor resources
 		Ref<Texture2D> m_IconPlay, m_IconStop, m_IconSimulate;

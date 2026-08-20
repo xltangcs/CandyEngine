@@ -118,7 +118,7 @@ project "Candy"
 		optimize "on"
 
 project "CandyEditor"
-	kind "ConsoleApp"
+	kind "WindowedApp"
 	language "C++"
 	cppdialect "C++20"
 	staticruntime "off"
@@ -162,6 +162,10 @@ project "CandyEditor"
 
 	filter "system:windows"
 		systemversion "latest"
+
+		-- Engine entry point is plain main() (Runtime/Core/EntryPoint.h); WindowedApp
+		-- defaults to WinMainCRTStartup, so pin the CRT entry point explicitly.
+		linkoptions { "/ENTRY:mainCRTStartup" }
 
 	filter "configurations:Debug"
 		defines "CANDY_DEBUG"
