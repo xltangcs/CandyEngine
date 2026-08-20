@@ -5,6 +5,8 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <filesystem>
+#include <ctime>
+#include <vector>
 
 namespace Candy {
 
@@ -15,6 +17,28 @@ namespace Candy {
 	void Log::Init()
 	{
 		std::filesystem::create_directories("Saved");
+
+		{
+			namespace fs = std::filesystem;
+			const fs::path logPath = "Saved/CandyEngine.log";
+			if (fs::exists(logPath))
+			{
+				auto now = std::chrono::system_clock::now();
+				std::time_t t = std::chrono::system_clock::to_time_t(now);
+				std::tm local = {};
+#if defined(CANDY_PLATFORM_WINDOWS)
+				localtime_s(&local, &t);
+#else
+				localtime_r(&t, &local);
+#endif
+				char buf[64] = {};
+				std::strftime(buf, sizeof(buf), "%Y%m%d-%H%M%S", &local);
+
+				const fs::path backupPath = fs::path("Saved") /
+					("CandyEngine-" + std::string(buf) + ".log");
+				fs::rename(logPath, backupPath);
+			}
+		}
 
 		std::vector<spdlog::sink_ptr> logSinks;
 
