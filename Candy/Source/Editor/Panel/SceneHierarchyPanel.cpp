@@ -18,6 +18,7 @@
 #include "EditorSelection.h"
 
 #include <cstring>
+#include <filesystem>
 #include <regex>
 #include <fstream>
 #include <algorithm>
@@ -275,8 +276,8 @@ namespace
 		// so Material::Serialize is not called on every drag-step.
 		bool dirty = false;
 
-		// Identity
-		dirty |= ImGuiUtils::DrawInputText("Name", mat->Name);
+		// Identity comes from the .mat file name — there is no separate disk field.
+		ImGui::Text("Name: %s", std::filesystem::path(vfsPath).stem().string().c_str());
 
 		ImGui::Separator();
 

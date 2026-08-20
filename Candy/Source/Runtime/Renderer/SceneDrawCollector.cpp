@@ -38,7 +38,6 @@ namespace Candy {
 		if (!s_SpriteMaterial)
 		{
 			s_SpriteMaterial = CreateRef<Material>();
-			s_SpriteMaterial->Name = "Builtin/Sprite";
 			s_SpriteMaterial->ShaderPath = "VFS://Engine/Content/Shaders/D3D12/Sprite.hlsl";
 			s_SpriteMaterial->ShaderParams["u_BlendMode"] = 2.0f; // Transparent
 		}
@@ -50,7 +49,6 @@ namespace Candy {
 		if (!s_CircleMaterial)
 		{
 			s_CircleMaterial = CreateRef<Material>();
-			s_CircleMaterial->Name = "Builtin/Circle";
 			s_CircleMaterial->ShaderPath = "VFS://Engine/Content/Shaders/D3D12/Sprite.hlsl";
 			s_CircleMaterial->ShaderParams["u_BlendMode"]  = 2.0f; // Transparent
 			s_CircleMaterial->ShaderParams["u_CircleMode"] = 1.0f; // SDF circle

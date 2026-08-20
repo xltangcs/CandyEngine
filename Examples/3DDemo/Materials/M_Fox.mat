@@ -1,5 +1,4 @@
 Material:
-  Name: NewMaterial_1
   ShaderPath: VFS://Engine/Content/Shaders/D3D12/PBR.hlsl
   Params:
     u_BaseColorMap: VFS://Game/Model/Fox/Texture.png

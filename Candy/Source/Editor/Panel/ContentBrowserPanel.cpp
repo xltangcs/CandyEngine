@@ -114,7 +114,13 @@ namespace Candy {
 		{
 			CANDY_CORE_ERROR("ContentBrowser: failed to create folder '{}': {}",
 				target.string(), ec.message());
+			return;
 		}
+
+		// Jump straight into inline rename for the new folder.
+		std::string relPath = std::filesystem::relative(target,
+			ResolveDiskPath(m_CurrentDomain, std::filesystem::path())).generic_string();
+		StartRename(VfsPath(ToVfsDomain(m_CurrentDomain), relPath).ToString());
 	}
 
 	void ContentBrowserPanel::CreateNewMaterial()
@@ -129,11 +135,199 @@ namespace Candy {
 		std::string vfsPath = vp.ToString();
 
 		Ref<Material> mat = CreateRef<Material>();
-		mat->Name = target.stem().string();
 		if (!mat->Serialize(vfsPath))
 		{
 			CANDY_CORE_ERROR("ContentBrowser: failed to write new material at '{}'", vfsPath);
+			return;
 		}
+
+		// Jump straight into inline rename for the new material.
+		StartRename(vfsPath);
+	}
+
+	void ContentBrowserPanel::StartRename(const std::string& vfsPath)
+	{
+		VfsPath vp = VfsPath::Parse(vfsPath);
+		if (!vp.IsValid())
+			return;
+
+		std::filesystem::path rel(vp.relativePath);
+		std::string filename = rel.filename().string();
+		std::filesystem::path p(filename);
+		// Files keep their extension on commit, so only pre-fill the stem.
+		m_RenameBuffer = p.has_extension() ? p.stem().string() : filename;
+		m_RenameTarget = vfsPath;
+		m_RenameFocusRequested = true;
+	}
+
+	void ContentBrowserPanel::CommitRename()
+	{
+		if (m_RenameTarget.empty())
+			return;
+
+		VfsPath vp = VfsPath::Parse(m_RenameTarget);
+		if (!vp.IsValid())
+		{
+			CancelRename();
+			return;
+		}
+
+		const Domain domain = FromVfsDomain(vp.domain);
+		std::filesystem::path oldPath = ResolveDiskPath(domain, std::filesystem::path(vp.relativePath));
+
+		std::string newName = m_RenameBuffer;
+		// Trim trailing dots/spaces (invalid on Windows file names).
+		while (!newName.empty() && (newName.back() == '.' || newName.back() == ' '))
+			newName.pop_back();
+		if (newName.empty() || newName.find_first_of("\\/:*?\"<>|") != std::string::npos)
+		{
+			CANDY_CORE_WARN("ContentBrowser: invalid name '{}' - rename cancelled.", m_RenameBuffer);
+			CancelRename();
+			return;
+		}
+
+		// Preserve the original extension (files only).
+		std::string ext = oldPath.extension().string();
+		if (!ext.empty() && !newName.ends_with(ext))
+			newName += ext;
+
+		std::filesystem::path newPath = oldPath.parent_path() / newName;
+		if (newPath == oldPath)   // nothing changed
+		{
+			CancelRename();
+			return;
+		}
+		if (std::filesystem::exists(newPath))
+		{
+			CANDY_CORE_WARN("ContentBrowser: '{}' already exists - rename cancelled.", newPath.string());
+			CancelRename();
+			return;
+		}
+
+		std::error_code ec;
+		std::filesystem::rename(oldPath, newPath, ec);
+		if (ec)
+		{
+			CANDY_CORE_ERROR("ContentBrowser: failed to rename '{}' -> '{}': {}",
+				oldPath.string(), newPath.string(), ec.message());
+			CancelRename();
+			return;
+		}
+
+		// Refresh any state that referenced the old path.
+		auto domainRoot = ResolveDiskPath(domain, std::filesystem::path());
+		std::string newRel = std::filesystem::relative(newPath, domainRoot).generic_string();
+		std::string newVfs = VfsPath(vp.domain, newRel).ToString();
+
+		if (m_SelectedAsset == m_RenameTarget)
+			m_SelectedAsset = newVfs;
+
+		std::string domainLabel = DomainLabel(domain);
+		if (m_SelectedTreePath == domainLabel + "/" + vp.relativePath)
+			m_SelectedTreePath = domainLabel + "/" + newRel;
+
+		m_RenameTarget.clear();
+		m_RenameBuffer.clear();
+	}
+
+	void ContentBrowserPanel::CancelRename()
+	{
+		m_RenameTarget.clear();
+		m_RenameBuffer.clear();
+		m_RenameFocusRequested = false;
+	}
+
+	void ContentBrowserPanel::RequestDelete(const std::string& vfsPath)
+	{
+		VfsPath vp = VfsPath::Parse(vfsPath);
+		if (!vp.IsValid())
+			return;
+		m_PendingDeleteVfs = vfsPath;
+	}
+
+	void ContentBrowserPanel::PerformDelete()
+	{
+		if (m_PendingDeleteVfs.empty())
+			return;
+
+		VfsPath vp = VfsPath::Parse(m_PendingDeleteVfs);
+		if (!vp.IsValid())
+		{
+			m_PendingDeleteVfs.clear();
+			return;
+		}
+
+		const Domain domain = FromVfsDomain(vp.domain);
+		std::filesystem::path diskPath = ResolveDiskPath(domain, std::filesystem::path(vp.relativePath));
+
+		std::error_code ec;
+		if (std::filesystem::is_directory(diskPath))
+			std::filesystem::remove_all(diskPath, ec);
+		else
+			std::filesystem::remove(diskPath, ec);
+
+		if (ec)
+		{
+			CANDY_CORE_ERROR("ContentBrowser: failed to delete '{}': {}", diskPath.string(), ec.message());
+		}
+		else
+		{
+			CANDY_CORE_INFO("ContentBrowser: deleted '{}'.", diskPath.string());
+			if (m_SelectedAsset == m_PendingDeleteVfs)
+				m_SelectedAsset.clear();
+			std::string domainLabel = DomainLabel(domain);
+			if (m_SelectedTreePath == domainLabel + "/" + vp.relativePath)
+				m_SelectedTreePath.clear();
+		}
+
+		m_PendingDeleteVfs.clear();
+	}
+
+	void ContentBrowserPanel::DrawDeleteConfirmDialog()
+	{
+		if (m_PendingDeleteVfs.empty())
+			return;
+
+		ImGui::OpenPopup("Delete Asset");
+		if (ImGui::BeginPopupModal("Delete Asset", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			VfsPath vp = VfsPath::Parse(m_PendingDeleteVfs);
+			std::string name = vp.IsValid()
+				? std::filesystem::path(vp.relativePath).filename().string()
+				: m_PendingDeleteVfs;
+
+			ImGui::Text("Delete '%s'?", name.c_str());
+			if (vp.IsValid())
+			{
+				const Domain domain = FromVfsDomain(vp.domain);
+				if (std::filesystem::is_directory(ResolveDiskPath(domain, std::filesystem::path(vp.relativePath))))
+					ImGui::TextDisabled("The folder and all of its contents will be permanently deleted.");
+			}
+			ImGui::Separator();
+
+			if (ImGui::Button("Delete", ImVec2(120.0f, 0.0f)))
+			{
+				PerformDelete();
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel", ImVec2(120.0f, 0.0f)))
+			{
+				m_PendingDeleteVfs.clear();
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndPopup();
+		}
+		else
+		{
+			// Dismissed via Escape / outside click — drop the pending delete.
+			m_PendingDeleteVfs.clear();
+		}
+	}
+
+	ContentBrowserPanel::Domain ContentBrowserPanel::FromVfsDomain(VfsPath::Domain d)
+	{
+		return d == VfsPath::Domain::Game ? Domain::Game : Domain::Engine;
 	}
 
 	void ContentBrowserPanel::OnImGuiRender()
@@ -179,6 +373,9 @@ namespace Candy {
 		ImGui::BeginChild("##ContentPane", ImVec2(0, h), true);
 		DrawContentGrid();
 		ImGui::EndChild();
+
+		// Delete confirmation modal (last, so it draws on top).
+		DrawDeleteConfirmDialog();
 
 		ImGui::End();
 	}
@@ -338,12 +535,11 @@ namespace Candy {
 
 		if (!std::filesystem::exists(currentDir))
 		{
-			// Even if the dir vanished, still allow right-click on the grid for
-			// future folder creation in the (now restored) parent.
+			CancelRename();
 			ImGui::Columns(1);
 			return;
 		}
-
+		
 		// Build lowercase search filter
 		std::string lowerFilter = m_SearchFilter;
 		std::transform(lowerFilter.begin(), lowerFilter.end(), lowerFilter.begin(),
@@ -376,9 +572,6 @@ namespace Candy {
 
 			bool isSelected = (m_SelectedAsset == vfsPathStr);
 
-			ImGui::PushID(filenameString.c_str());
-			Ref<Texture2D> icon = GetIconForFile(path.filename(), directoryEntry.is_directory());
-
 			// Highlight selected item.
 			if (isSelected)
 			{
@@ -390,6 +583,9 @@ namespace Candy {
 			{
 				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 			}
+			
+			ImGui::PushID(filenameString.c_str());
+			Ref<Texture2D> icon = GetIconForFile(path.filename(), directoryEntry.is_directory());
 			// UV flip: OpenGL framebuffers are bottom-up (V=0 is bottom); D3D12/Vulkan
 			// are top-down (V=0 is top), so the flip would show icons upside down.
 			ImVec2 uv0{ 0, 1 }, uv1{ 1, 0 };
@@ -406,27 +602,33 @@ namespace Candy {
 				ImGui::SetDragDropPayload("CONTENT_BROWSER_ITEM", vfsPathStr.c_str(), vfsPathStr.size() + 1);
 				ImGui::EndDragDropSource();
 			}
-
-			// Right-click on item: per-file context menu (placeholder for now).
+			
+			// Left-Click and Right-click can selects the item so the context menu acts on it.
+			if (ImGui::IsItemClicked(ImGuiMouseButton_Right) || ImGui::IsItemClicked(ImGuiMouseButton_Left))
+			{
+				m_SelectedAsset = vfsPathStr;
+			}
+			
+			// Right-click on item: per-file context menu.
 			if (ImGui::BeginPopupContextItem())
 			{
 				ImGui::TextDisabled("%s", filenameString.c_str());
 				ImGui::Separator();
-				ImGui::MenuItem("Rename...", nullptr, false, false);
-				ImGui::MenuItem("Delete", nullptr, false, false);
+				if (ImGui::MenuItem("Rename..."))
+				{
+					StartRename(vfsPathStr);
+					ImGui::CloseCurrentPopup();
+				}
+				if (ImGui::MenuItem("Delete"))
+				{
+					RequestDelete(vfsPathStr);
+					ImGui::CloseCurrentPopup();
+				}
 				ImGui::EndPopup();
 			}
 
 			ImGui::PopStyleColor(isSelected ? 3 : 1);
-
-			// Single-click → select locally (highlight only). Does NOT publish to
-			// EditorSelection: the Properties panel is only opened on double-click,
-			// matching the UE/Godot habit of "click to select, double-click to edit".
-			if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
-			{
-				m_SelectedAsset = vfsPathStr;
-			}
-
+			
 			// Double-click → publish the asset to the Properties panel so it can be
 			// inspected/edited there. A double-click on a folder still enters it.
 			if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
@@ -442,17 +644,40 @@ namespace Candy {
 				}
 			}
 
-			ImGui::TextWrapped("%s", filenameString.c_str());
+			// Name label, or inline rename box.
+			if (m_RenameTarget == vfsPathStr)
+			{
+				if (m_RenameFocusRequested)
+				{
+					ImGui::SetKeyboardFocusHere();
+					m_RenameFocusRequested = false;
+				}
+				ImGui::SetNextItemWidth(thumbnailSize);
+				bool committed = ImGui::InputText("##Rename", &m_RenameBuffer,
+					ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+				if (committed)
+					CommitRename();                                   // Enter
+				else if (ImGui::IsKeyPressed(ImGuiKey_Escape) && ImGui::IsItemActive())
+					CancelRename();                                   // Esc
+				else if (ImGui::IsItemDeactivated())
+					CommitRename();                                   // focus lost → commit
+			}
+			else
+			{
+				ImGui::TextWrapped("%s", filenameString.c_str());
+			}
 			ImGui::NextColumn();
 			ImGui::PopID();
 		}
 
 		ImGui::Columns(1);
-
-		// Right-click on empty grid area: New Folder / New Material.
+		
+		// Right-click on empty grid area: New Folder / New Material
 		if (ImGui::BeginPopupContextWindow("##ContentBrowserBlankContext",
 		    ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
 		{
+			if (ImGui::IsWindowAppearing())
+				m_SelectedAsset.clear();
 			if (ImGui::MenuItem("New Folder"))
 			{
 				CreateNewFolder();

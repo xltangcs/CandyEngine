@@ -134,8 +134,6 @@ namespace Candy {
 		{
 			out << YAML::BeginMap;
 
-			out << YAML::Key << "Name" << YAML::Value << Name;
-
 			out << YAML::Key << "ShaderPath" << YAML::Value << ShaderPath;
 
 			if (!ShaderParams.empty())
@@ -185,10 +183,6 @@ namespace Candy {
 
 		Ref<Material> material = CreateRef<Material>();
 		const YAML::Node& root = data["Material"];
-
-		if (root["Name"])
-			material->Name = root["Name"].as<std::string>();
-
 		if (root["ShaderPath"])
 			material->ShaderPath = root["ShaderPath"].as<std::string>();
 

@@ -30,6 +30,14 @@ namespace Candy {
 		// can be shared with the Properties panel via the same format.
 		std::string m_SelectedAsset;
 
+		// --- Inline rename state (newly created entries start here too) ---
+		std::string m_RenameTarget;          // VFS path of the entry being renamed; empty = none
+		std::string m_RenameBuffer;          // live text inside the rename edit box
+		bool m_RenameFocusRequested = false; // request keyboard focus for the box this frame
+
+		// --- Delete confirmation state ---
+		std::string m_PendingDeleteVfs;      // VFS path awaiting confirmation; empty = none
+
 		Ref<Texture2D> m_DirectoryIcon;
 		Ref<Texture2D> m_FileIcon;
 
@@ -42,6 +50,19 @@ namespace Candy {
 		// Asset creation helpers (right-click context menu).
 		void CreateNewFolder();
 		void CreateNewMaterial();
+
+		// Inline rename.
+		void StartRename(const std::string& vfsPath);
+		void CommitRename();
+		void CancelRename();
+
+		// Delete with confirmation dialog.
+		void RequestDelete(const std::string& vfsPath);
+		void PerformDelete();
+		void DrawDeleteConfirmDialog();
+
+		// Domain conversions.
+		static Domain FromVfsDomain(VfsPath::Domain d);
 
 		// Returns a unique non-colliding name under baseDir; if the candidate
 		// name already exists, appends "_1", "_2", ... until it doesn't.
