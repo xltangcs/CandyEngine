@@ -54,6 +54,14 @@ namespace Candy {
 	public:
 		std::vector<SkeletonJoint> Joints;
 		std::vector<AnimationClip> Clips;
+		// World transform of the root joint's ancestor chain (non-joint nodes
+		// such as an Armature placed in the scene graph, e.g. Blender's -90°X).
+		// Animation drives local TRS of joints, so this offset must be applied
+		// on top of the root joint when accumulating global poses, otherwise
+		// skinned geometry renders offset/rotated from the entity pivot.
+		// = world(rootJoint) * inverse(local(rootJoint)); identity when the
+		// root joint has no non-joint ancestors.
+		glm::mat4 RootOffset = glm::mat4(1.0f);
 	};
 
 } // namespace Candy

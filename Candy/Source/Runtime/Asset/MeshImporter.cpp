@@ -126,7 +126,7 @@ namespace Candy {
 		void ImportPrimitive(Ref<StaticMeshResource>& mesh,
 			std::vector<Ref<Material>>& materials,
 			const cgltf_primitive& prim, const std::string& baseDir,
-			const std::string& meshName)
+			const std::string& meshName, const glm::mat4& nodeTransform)
 		{
 			// Collect the attributes we care about.
 			const cgltf_accessor* posAccessor = nullptr;
@@ -247,20 +247,30 @@ namespace Candy {
 				}
 			}
 
-			// Build vertices.
+			// Build vertices. The node's world transform is baked in (positions
+			// transform by the full matrix, normals/tangents by the inverse
+			// transpose of the upper 3x3, normalized).
+			const glm::mat3 normalMatrix = glm::determinant(glm::mat3(nodeTransform)) != 0.0f
+				? glm::transpose(glm::inverse(glm::mat3(nodeTransform)))
+				: glm::mat3(nodeTransform);
 			mesh->Vertices.reserve(mesh->Vertices.size() + vertexCount);
 			for (cgltf_size i = 0; i < vertexCount; i++)
 			{
 				MeshVertex v;
-				v.Position = glm::vec3(
-					positions[i * 3 + 0], positions[i * 3 + 1], positions[i * 3 + 2]);
+				v.Position = glm::vec3(nodeTransform * glm::vec4(
+					positions[i * 3 + 0], positions[i * 3 + 1], positions[i * 3 + 2], 1.0f));
 
 				if (!normals.empty())
-					v.Normal = glm::vec3(normals[i * 3 + 0], normals[i * 3 + 1], normals[i * 3 + 2]);
+					v.Normal = glm::normalize(normalMatrix * glm::vec3(
+						normals[i * 3 + 0], normals[i * 3 + 1], normals[i * 3 + 2]));
 				if (!texcoords.empty())
 					v.TexCoord = glm::vec2(texcoords[i * 2 + 0], texcoords[i * 2 + 1]);
 				if (!tangents.empty())
-					v.Tangent = glm::vec4(tangents[i * 4 + 0], tangents[i * 4 + 1], tangents[i * 4 + 2], tangents[i * 4 + 3]);
+				{
+					const glm::vec3 t = glm::normalize(normalMatrix * glm::vec3(
+						tangents[i * 4 + 0], tangents[i * 4 + 1], tangents[i * 4 + 2]));
+					v.Tangent = glm::vec4(t, tangents[i * 4 + 3]);
+				}
 
 				mesh->Vertices.push_back(v);
 			}
@@ -325,7 +335,7 @@ namespace Candy {
 		// skin indices (used for animation channel targets).
 		std::vector<SkeletonJoint> BuildSkeleton(const cgltf_skin& skin,
 			std::unordered_map<const cgltf_node*, int32_t>& nodeToIndex,
-			std::vector<int32_t>& oldToNew)
+			std::vector<int32_t>& oldToNew, glm::mat4& rootOffset)
 		{
 			const cgltf_size count = skin.joints_count;
 			for (cgltf_size i = 0; i < count; i++)
@@ -376,6 +386,19 @@ namespace Candy {
 				cgltf_float m[16];
 				cgltf_node_transform_local(node, m);
 				std::memcpy(&j.LocalRestPose, m, sizeof(m));
+
+				// Root joints (parent not part of the skin) may still sit under
+				// non-joint ancestors (an Armature node etc.). Their combined
+				// transform is captured once per skeleton as RootOffset and
+				// applied on top of the root joint at pose evaluation time.
+				if (j.ParentIndex < 0 && rootOffset == glm::mat4(1.0f))
+				{
+					cgltf_float wm[16];
+					cgltf_node_transform_world(node, wm);
+					glm::mat4 world;
+					std::memcpy(&world, wm, sizeof(wm));
+					rootOffset = world * glm::inverse(glm::mat4(j.LocalRestPose));
+				}
 
 				if (skin.inverse_bind_matrices && skin.inverse_bind_matrices->count > order[i])
 				{
@@ -772,7 +795,8 @@ namespace Candy {
 
 		std::unordered_map<const cgltf_node*, int32_t> nodeToIndex;
 		std::vector<int32_t> oldToNew;
-		std::vector<SkeletonJoint> joints = BuildSkeleton(cgltfData->skins[0], nodeToIndex, oldToNew);
+		glm::mat4 rootOffset(1.0f);
+		std::vector<SkeletonJoint> joints = BuildSkeleton(cgltfData->skins[0], nodeToIndex, oldToNew, rootOffset);
 		if (joints.size() > 255)
 		{
 			CANDY_CORE_ERROR("MeshImporter: '{}' has {} joints; JOINTS_0 is uint8 (max 255), import aborted",
@@ -785,6 +809,7 @@ namespace Candy {
 		imported->Mesh = CreateRef<SkeletalMeshResource>();
 		imported->Mesh->Skeleton = CreateRef<SkeletonResource>();
 		imported->Mesh->Skeleton->Joints = std::move(joints);
+		imported->Mesh->Skeleton->RootOffset = rootOffset;
 
 		for (cgltf_size m = 0; m < cgltfData->meshes_count; m++)
 		{
@@ -861,19 +886,58 @@ namespace Candy {
 		Ref<ImportedStaticMesh> imported = CreateRef<ImportedStaticMesh>();
 		imported->Mesh = CreateRef<StaticMeshResource>();
 
-		for (cgltf_size m = 0; m < cgltfData->meshes_count; m++)
+		// Walk the scene node hierarchy and bake each node's world transform
+		// into the imported vertices. Importing raw mesh data directly would
+		// drop node TRS (Blender's -90°X axis conversion, scales, offsets),
+		// leaving the mesh visually offset/rotated from the entity pivot.
+		std::function<void(const cgltf_node*)> visitNode = [&](const cgltf_node* node)
 		{
-			const cgltf_mesh& cgltfMesh = cgltfData->meshes[m];
-			const std::string meshName = cgltfMesh.name ? cgltfMesh.name : "";
-			for (cgltf_size p = 0; p < cgltfMesh.primitives_count; p++)
+			if (node->mesh)
 			{
-				const cgltf_primitive& prim = cgltfMesh.primitives[p];
-				if (prim.type != cgltf_primitive_type_triangles)
+				cgltf_float m[16];
+				cgltf_node_transform_world(node, m);
+				glm::mat4 nodeTransform;
+				std::memcpy(&nodeTransform, m, sizeof(m));
+
+				const std::string meshName = node->mesh->name ? node->mesh->name : "";
+				for (cgltf_size p = 0; p < node->mesh->primitives_count; p++)
 				{
-					CANDY_CORE_WARN("MeshImporter: skipping non-triangle primitive in '{}'", meshName);
-					continue;
+					const cgltf_primitive& prim = node->mesh->primitives[p];
+					if (prim.type != cgltf_primitive_type_triangles)
+					{
+						CANDY_CORE_WARN("MeshImporter: skipping non-triangle primitive in '{}'", meshName);
+						continue;
+					}
+					ImportPrimitive(imported->Mesh, imported->Materials, prim, baseDir, meshName, nodeTransform);
 				}
-				ImportPrimitive(imported->Mesh, imported->Materials, prim, baseDir, meshName);
+			}
+			for (cgltf_size i = 0; i < node->children_count; i++)
+				visitNode(node->children[i]);
+		};
+
+		if (cgltfData->scenes_count > 0 && cgltfData->scenes[0].nodes_count > 0)
+		{
+			for (cgltf_size i = 0; i < cgltfData->scenes[0].nodes_count; i++)
+				visitNode(cgltfData->scenes[0].nodes[i]);
+		}
+		else
+		{
+			// Scene-less file: fall back to importing every mesh raw (no
+			// node transforms available).
+			for (cgltf_size m = 0; m < cgltfData->meshes_count; m++)
+			{
+				const cgltf_mesh& cgltfMesh = cgltfData->meshes[m];
+				const std::string meshName = cgltfMesh.name ? cgltfMesh.name : "";
+				for (cgltf_size p = 0; p < cgltfMesh.primitives_count; p++)
+				{
+					const cgltf_primitive& prim = cgltfMesh.primitives[p];
+					if (prim.type != cgltf_primitive_type_triangles)
+					{
+						CANDY_CORE_WARN("MeshImporter: skipping non-triangle primitive in '{}'", meshName);
+						continue;
+					}
+					ImportPrimitive(imported->Mesh, imported->Materials, prim, baseDir, meshName, glm::mat4(1.0f));
+				}
 			}
 		}
 

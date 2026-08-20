@@ -530,9 +530,11 @@ namespace Candy {
 			ImGui::EndDragDropTarget();
 		}
 
-		// Gizmos
+		// Gizmos — Edit mode only. In Play the viewport renders from the runtime
+		// camera while the gizmo would use the editor camera (misaligned), and in
+		// Simulate the edited entity is a throwaway runtime copy.
 		Entity selectedEntity = m_SceneHierarchyPanel.GetSelectedEntity();
-		if (selectedEntity && m_GizmoType != -1)
+		if (m_SceneState == SceneState::Edit && selectedEntity && m_GizmoType != -1)
 		{
 			ImGuizmo::SetOrthographic(false);
 			ImGuizmo::SetDrawlist();

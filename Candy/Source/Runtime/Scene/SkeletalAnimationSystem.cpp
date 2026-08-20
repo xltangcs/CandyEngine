@@ -160,11 +160,14 @@ namespace Candy {
 			}
 
 			// Accumulate global poses (topological order: parents come first).
+			// Root joints additionally carry the skeleton's RootOffset so the
+			// non-joint ancestor chain (Armature node etc.) survives animation,
+			// which only drives joint-local TRS.
 			for (size_t j = 0; j < jointCount; j++)
 			{
 				const glm::mat4 local = Compose(pose[j]);
 				const int32_t parent = skeleton->Joints[j].ParentIndex;
-				globalPose[j] = (parent >= 0) ? globalPose[parent] * local : local;
+				globalPose[j] = (parent >= 0) ? globalPose[parent] * local : skeleton->RootOffset * local;
 			}
 		}
 
