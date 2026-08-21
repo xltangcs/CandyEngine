@@ -11,7 +11,7 @@ Entities:
     StaticMeshComponent:
       MeshPath: VFS://Game/Model/lemon/lemon_1k.gltf
       MaterialPaths:
-        - VFS://Game/Materials/NewMaterial.mat
+        - VFS://Game/Materials/M_Lemon.mat
   - Entity: 18284943316315124677
     TagComponent:
       Tag: Sun
@@ -54,6 +54,7 @@ Entities:
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
       TexturePath: VFS://Game/Model/lemon/textures/lemon_diff_1k.jpg
+      TilingFactor: 1
   - Entity: 7777777777777777777
     TagComponent:
       Tag: Skybox
@@ -75,7 +76,7 @@ Entities:
     SkeletalMeshComponent:
       MeshPath: VFS://Game/Model/Fox/Fox.gltf
       MaterialPaths:
-        - VFS://Game/Materials/NewMaterial_1.mat
+        - VFS://Game/Materials/M_Fox.mat
       ClipName: Run
       Speed: 1
       Play: false

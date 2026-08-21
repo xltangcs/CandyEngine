@@ -92,7 +92,7 @@ namespace Candy {
 		if (m_Desc.SwapChainTarget)
 			return;
 		glDeleteFramebuffers(1, &m_RendererID);
-		glDeleteTextures(m_ColorAttachments.size(), m_ColorAttachments.data());
+		glDeleteTextures(static_cast<GLsizei>(m_ColorAttachments.size()), m_ColorAttachments.data());
 		glDeleteTextures(1, &m_DepthAttachment);
 	}
 
@@ -110,7 +110,7 @@ namespace Candy {
 		if (m_RendererID)
 		{
 			glDeleteFramebuffers(1, &m_RendererID);
-			glDeleteTextures(m_ColorAttachments.size(), m_ColorAttachments.data());
+			glDeleteTextures(static_cast<GLsizei>(m_ColorAttachments.size()), m_ColorAttachments.data());
 			glDeleteTextures(1, &m_DepthAttachment);
 			m_ColorAttachments.clear();
 			m_DepthAttachment = 0;
@@ -125,7 +125,7 @@ namespace Candy {
 		if (colorAttachments.size())
 		{
 			m_ColorAttachments.resize(colorAttachments.size());
-			Utils::CreateTextures(multisample, reinterpret_cast<uint32_t*>(m_ColorAttachments.data()), m_ColorAttachments.size() );
+			Utils::CreateTextures(multisample, reinterpret_cast<uint32_t*>(m_ColorAttachments.data()), static_cast<uint32_t>(m_ColorAttachments.size()) );
 
 			for (size_t i = 0; i < m_ColorAttachments.size(); i++)
 			{
@@ -133,10 +133,10 @@ namespace Candy {
 				switch (colorAttachments[i].Format)
 				{
 				case RHIFormat::R8G8B8A8Unorm:
-					Utils::AttachColorTexture(m_ColorAttachments[i], m_Desc.SampleCount, GL_RGBA8, GL_RGBA, m_Desc.Width, m_Desc.Height, i);
+					Utils::AttachColorTexture(m_ColorAttachments[i], m_Desc.SampleCount, GL_RGBA8, GL_RGBA, m_Desc.Width, m_Desc.Height, static_cast<int>(i));
 					break;
 				case RHIFormat::R32Sint:
-					Utils::AttachColorTexture(m_ColorAttachments[i], m_Desc.SampleCount, GL_R32I, GL_RED_INTEGER, m_Desc.Width, m_Desc.Height, i);
+					Utils::AttachColorTexture(m_ColorAttachments[i], m_Desc.SampleCount, GL_R32I, GL_RED_INTEGER, m_Desc.Width, m_Desc.Height, static_cast<int>(i));
 					break;
 				}
 			}
@@ -158,7 +158,7 @@ namespace Candy {
 		{
 			CANDY_CORE_ASSERT(m_ColorAttachments.size() <= 4);
 			GLenum buffers[4] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
-			glDrawBuffers(m_ColorAttachments.size(), buffers);
+			glDrawBuffers(static_cast<GLsizei>(m_ColorAttachments.size()), buffers);
 		}
 		else if (m_ColorAttachments.empty())
 		{

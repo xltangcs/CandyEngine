@@ -16,6 +16,14 @@
 #include "Runtime/RHI/RHICommandQueue.h"
 #include "Runtime/Core/Log.h"
 
+// D3D12 backend system dependencies. Embedded as /DEFAULTLIB directives in the
+// .obj so they propagate through Candy.lib to any final executable — no need to
+// list import libs in per-exe premake links (avoids LNK4006 from lib.exe merging).
+#pragma comment(lib, "d3d12.lib")
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "dxguid.lib")
+#pragma comment(lib, "d3dcompiler.lib")
+
 using Microsoft::WRL::ComPtr;
 
 namespace Candy {
@@ -262,8 +270,14 @@ float4 main(PSInput input) : SV_TARGET
 			if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0,
 			                                _uuidof(ID3D12Device), nullptr)))
 			{
-				std::wstring wideName(desc.Description);
-				std::string name(wideName.begin(), wideName.end());
+				// Narrow wide adapter name for logging (CP_UTF8, same pattern as WindowsPlatformUtils)
+				std::string name;
+				int nameSize = WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, nullptr, 0, nullptr, nullptr);
+				if (nameSize > 1)
+				{
+					name.resize(nameSize - 1);
+					WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, name.data(), nameSize, nullptr, nullptr);
+				}
 				CANDY_CORE_INFO("D3D12Device: selected adapter '{}'", name);
 				break;
 			}

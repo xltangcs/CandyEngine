@@ -49,11 +49,25 @@ void ScriptSystem::InitPython()
     }();
     std::filesystem::path exeDir = exePath.parent_path();
 
-    // Embedded Python: python314.dll, python314.zip, python314._pth next to exe
+    // Embedded Python: python314.dll, python314.zip, python314._pth next to exe.
+    // PEP 587 PyConfig API — Py_SetPythonHome is deprecated since 3.11.
     std::wstring pythonHome = exeDir.wstring();
-    Py_SetPythonHome(pythonHome.c_str());
 
-    Py_Initialize();
+    PyConfig config;
+    PyConfig_InitPythonConfig(&config);
+    PyStatus status = PyConfig_SetString(&config, &config.home, pythonHome.c_str());
+    if (PyStatus_Exception(status))
+    {
+        CANDY_CORE_ERROR("Python config failed: {0}", status.err_msg ? status.err_msg : "unknown");
+        Py_ExitStatusException(status);
+    }
+    status = Py_InitializeFromConfig(&config);
+    PyConfig_Clear(&config);
+    if (PyStatus_Exception(status))
+    {
+        CANDY_CORE_ERROR("Python init failed: {0}", status.err_msg ? status.err_msg : "unknown");
+        Py_ExitStatusException(status);
+    }
 
     // Resolve scripts directory: project Content/Scripts (filesystem path)
     auto project = Application::Get().GetProject();

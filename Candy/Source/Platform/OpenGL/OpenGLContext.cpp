@@ -8,6 +8,10 @@
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
 
+// OpenGL backend system dependency (WGL). Propagates through Candy.lib to any
+// final executable via /DEFAULTLIB — see D3D12Device.cpp for the same pattern.
+#pragma comment(lib, "opengl32.lib")
+
 namespace Candy {
 
 	#ifdef CANDY_DEBUG

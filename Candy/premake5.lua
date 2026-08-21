@@ -62,17 +62,13 @@ project "Candy"
 		"GLAD",
 		"Imgui",
 		"yaml-cpp",
-		"box2d",
-		"opengl32.lib",
-		"d3d12.lib",
-		"dxgi.lib",
-		"dxguid.lib",
-		"d3dcompiler.lib"
+		"box2d"
 	}
 
-	if PythonLibDir and PythonLibDir ~= "" then
-		links { PythonLibDir .. "/" .. PythonLibName }
-	end
+	-- System import libs (opengl32/d3d12/dxgi/dxguid/d3dcompiler) are declared via
+	-- #pragma comment(lib) in the backend sources (D3D12Device.cpp / OpenGLContext.cpp);
+	-- python314.lib is linked directly by the exe projects. Keeping import libs out of
+	-- this StaticLib's links avoids LNK4006 when lib.exe merges them into Candy.lib.
 
 	filter "files:ThirdParty/ImGuizmo/src/**.cpp"
 	flags { "NoPCH" }
@@ -85,7 +81,10 @@ project "Candy"
 	flags { "NoPCH" }
 
 	filter "files:ThirdParty/miniaudio/**.cpp"
-	flags { "NoPCH" }
+		flags { "NoPCH" }
+		-- Third-party single-header lib (git subtree); suppress its C4244 instead of
+		-- patching the header so future upgrades stay conflict-free.
+		disablewarnings { "4244" }
 
 	-- cgltf is a bundled single-header C parser; its implementation TU must not
 	-- use the engine PCH (pure C translation unit).
@@ -123,7 +122,7 @@ project "CandyEditor"
 	cppdialect "C++20"
 	staticruntime "off"
 	buildoptions { "/utf-8" }
-	defines { "YAML_CPP_STATIC_DEFINE" }
+	defines { "YAML_CPP_STATIC_DEFINE", "_CRT_SECURE_NO_WARNINGS" }
 
     targetdir ("%{wks.location}/bin/" .. outputdir .. "/%{prj.name}")
 	objdir ("%{wks.location}/bin-int/" .. outputdir .. "/%{prj.name}")
