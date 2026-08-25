@@ -11,9 +11,9 @@ namespace GeneratedSerialization {
 // ---- TransformComponent ------------------------------------------------
 inline void SerializeTransformComponent(YAML::Emitter& out, const Candy::TransformComponent& c)
 {
-	out << YAML::Key << "Translation" << YAML::Value << c.Translation;
-	out << YAML::Key << "Rotation" << YAML::Value << c.Rotation;
-	out << YAML::Key << "Scale" << YAML::Value << c.Scale;
+	out << YAML::Key << "Translation" << YAML::Value << YAML::Flow << YAML::BeginSeq << c.Translation.x << c.Translation.y << c.Translation.z << YAML::EndSeq;
+	out << YAML::Key << "Rotation" << YAML::Value << YAML::Flow << YAML::BeginSeq << c.Rotation.x << c.Rotation.y << c.Rotation.z << YAML::EndSeq;
+	out << YAML::Key << "Scale" << YAML::Value << YAML::Flow << YAML::BeginSeq << c.Scale.x << c.Scale.y << c.Scale.z << YAML::EndSeq;
 }
 
 inline void DeserializeTransformComponent(const YAML::Node& node, Candy::TransformComponent& c)
@@ -29,7 +29,7 @@ inline void DeserializeTransformComponent(const YAML::Node& node, Candy::Transfo
 // ---- SpriteRendererComponent ------------------------------------------------
 inline void SerializeSpriteRendererComponent(YAML::Emitter& out, const Candy::SpriteRendererComponent& c)
 {
-	out << YAML::Key << "Color" << YAML::Value << c.Color;
+	out << YAML::Key << "Color" << YAML::Value << YAML::Flow << YAML::BeginSeq << c.Color.x << c.Color.y << c.Color.z << c.Color.w << YAML::EndSeq;
 	if (!c.TexturePath.empty())
 		out << YAML::Key << "TexturePath" << YAML::Value << c.TexturePath;
 	out << YAML::Key << "TilingFactor" << YAML::Value << c.TilingFactor;
@@ -115,7 +115,7 @@ inline void DeserializeSkeletalMeshComponent(const YAML::Node& node, Candy::Skel
 // ---- CircleRendererComponent ------------------------------------------------
 inline void SerializeCircleRendererComponent(YAML::Emitter& out, const Candy::CircleRendererComponent& c)
 {
-	out << YAML::Key << "Color" << YAML::Value << c.Color;
+	out << YAML::Key << "Color" << YAML::Value << YAML::Flow << YAML::BeginSeq << c.Color.x << c.Color.y << c.Color.z << c.Color.w << YAML::EndSeq;
 	out << YAML::Key << "Thickness" << YAML::Value << c.Thickness;
 	out << YAML::Key << "Fade" << YAML::Value << c.Fade;
 }
@@ -152,8 +152,8 @@ inline void DeserializeSkyboxComponent(const YAML::Node& node, Candy::SkyboxComp
 // ---- BoxCollider2DComponent ------------------------------------------------
 inline void SerializeBoxCollider2DComponent(YAML::Emitter& out, const Candy::BoxCollider2DComponent& c)
 {
-	out << YAML::Key << "Offset" << YAML::Value << c.Offset;
-	out << YAML::Key << "Size" << YAML::Value << c.Size;
+	out << YAML::Key << "Offset" << YAML::Value << YAML::Flow << YAML::BeginSeq << c.Offset.x << c.Offset.y << YAML::EndSeq;
+	out << YAML::Key << "Size" << YAML::Value << YAML::Flow << YAML::BeginSeq << c.Size.x << c.Size.y << YAML::EndSeq;
 	out << YAML::Key << "Density" << YAML::Value << c.Density;
 	out << YAML::Key << "Friction" << YAML::Value << c.Friction;
 	out << YAML::Key << "Restitution" << YAML::Value << c.Restitution;
@@ -179,7 +179,7 @@ inline void DeserializeBoxCollider2DComponent(const YAML::Node& node, Candy::Box
 // ---- CircleCollider2DComponent ------------------------------------------------
 inline void SerializeCircleCollider2DComponent(YAML::Emitter& out, const Candy::CircleCollider2DComponent& c)
 {
-	out << YAML::Key << "Offset" << YAML::Value << c.Offset;
+	out << YAML::Key << "Offset" << YAML::Value << YAML::Flow << YAML::BeginSeq << c.Offset.x << c.Offset.y << YAML::EndSeq;
 	out << YAML::Key << "Radius" << YAML::Value << c.Radius;
 	out << YAML::Key << "Density" << YAML::Value << c.Density;
 	out << YAML::Key << "Friction" << YAML::Value << c.Friction;

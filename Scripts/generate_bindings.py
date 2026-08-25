@@ -583,6 +583,16 @@ def generate_scene_serialization(structs: list[StructInfo], output_path: Path):
                 lines.append(f"\t\t\tout << YAML::Value << v;")
                 lines.append(f"\t\tout << YAML::EndSeq;")
                 lines.append("\t}")
+            elif mtype in ("glm::vec2", "glm::vec3", "glm::vec4"):
+                # Emit glm vectors as explicit flow sequences. Do NOT rely on
+                # operator<<(YAML::Emitter&, glm::vecN): that overload is declared
+                # later in SceneSerializer.cpp than the point where this file is
+                # included, so the (non-template) generated functions cannot see
+                # it and silently bind to the generic stream operator in Log.h,
+                # emitting glm::to_string() text like "vec3(0, 0, 0)" instead.
+                comps = "xyzw"[:int(mtype[-1])]
+                fields = " << ".join(f"c.{mname}.{comp}" for comp in comps)
+                lines.append(f"\tout << YAML::Key << \"{mname}\" << YAML::Value << YAML::Flow << YAML::BeginSeq << {fields} << YAML::EndSeq;")
             else:
                 lines.append(f"\tout << YAML::Key << \"{mname}\" << YAML::Value << c.{mname};")
         lines.append("}")
